@@ -5,6 +5,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { EmptyState, Panel, Pill } from "@/components/common"
+import { FormDialog } from "@/components/common/form-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,14 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { useStore } from "@/lib/store"
 import {
   TABLE_SPECS,
@@ -145,7 +138,7 @@ export function SettingsTable({ tableId }: { tableId: string }) {
       )}
 
       {editing && (
-        <RowSheet
+        <RowDialog
           spec={spec}
           row={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
@@ -176,7 +169,7 @@ function CellValue({
 }
 
 /** Mounted only while open, so the form seeds fresh each time. */
-function RowSheet({
+function RowDialog({
   spec,
   row,
   onClose,
@@ -241,18 +234,22 @@ function RowSheet({
   }
 
   return (
-    <Sheet open onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="flex w-full flex-col sm:max-w-[520px]">
-        <SheetHeader>
-          <SheetTitle>
-            {isNew ? (spec.addLabel ?? "Add row") : `Edit ${row[spec.labelKey]}`}
-          </SheetTitle>
-          <SheetDescription>
-            {spec.title}. Every change is written to the audit log against your name.
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="flex-1 space-y-4 overflow-y-auto px-4">
+    <FormDialog
+      onClose={onClose}
+      title={isNew ? (spec.addLabel ?? "Add row") : `Edit ${row[spec.labelKey]}`}
+      description={`${spec.title}. Every change is written to the audit log against your name.`}
+      footer={
+        <>
+          <Button variant="ghost" size="lg" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button size="lg" onClick={save}>
+            {isNew ? "Add" : "Save changes"}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
           {spec.columns.map((c) => (
             <div key={c.key}>
               {c.type === "toggle" ? (
@@ -299,18 +296,8 @@ function RowSheet({
               {c.hint && <p className="mt-1 text-xs text-muted-foreground">{c.hint}</p>}
             </div>
           ))}
-        </div>
-
-        <SheetFooter>
-          <Button variant="ghost" size="lg" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button size="lg" onClick={save}>
-            {isNew ? "Add" : "Save changes"}
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </FormDialog>
   )
 }
 

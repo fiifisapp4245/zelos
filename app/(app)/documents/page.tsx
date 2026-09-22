@@ -2,7 +2,14 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { FileText, Search, Upload } from "lucide-react"
+import {
+  BadgeCheck,
+  Download,
+  FileText,
+  Search,
+  Trash2,
+  Upload,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { PageShell } from "@/components/shell/page-shell"
@@ -14,6 +21,7 @@ import {
   StatCard,
 } from "@/components/common"
 import { DocumentBadge } from "@/components/common/status"
+import { RowActions } from "@/components/common/row-actions"
 import { Button } from "@/components/ui/button"
 import { useStore } from "@/lib/store"
 import { has, isSelf } from "@/lib/rbac"
@@ -209,13 +217,36 @@ export default function DocumentsPage() {
                     </span>
                   )}
                   <DocumentBadge status={d.status} />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toast("Download started.")}
-                  >
-                    Download
-                  </Button>
+                  <RowActions
+                    label={`Actions for ${d.name}`}
+                    actions={[
+                      {
+                        label: "Download",
+                        icon: Download,
+                        onSelect: () => toast(`Downloading ${d.name}.`),
+                      },
+                      has(viewer, "hr_admin") &&
+                        d.status !== "verified" && {
+                          label: "Mark verified",
+                          icon: BadgeCheck,
+                          onSelect: () => {
+                            store.updateDocument(d.id, { status: "verified" })
+                            toast.success(`${d.name} marked verified.`)
+                          },
+                        },
+                      has(viewer, "hr_admin") && {
+                        label: "Remove",
+                        icon: Trash2,
+                        destructive: true,
+                        onSelect: () => {
+                          store.deleteDocument(d.id)
+                          toast.success(
+                            `${d.name} removed. Logged in the audit trail.`
+                          )
+                        },
+                      },
+                    ]}
+                  />
                 </li>
               )
             })}

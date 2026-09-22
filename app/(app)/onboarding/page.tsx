@@ -1,8 +1,8 @@
 "use client"
 
-import * as React from "react"
 import Link from "next/link"
-import { CheckCircle2, Circle, UserPlus } from "lucide-react"
+import { CheckCircle2, Circle, Plus, Trash2, UserPlus } from "lucide-react"
+import { toast } from "sonner"
 
 import { PageShell } from "@/components/shell/page-shell"
 import {
@@ -14,9 +14,14 @@ import {
   StatCard,
 } from "@/components/common"
 import { LifecycleBadge } from "@/components/common/status"
+import { Button } from "@/components/ui/button"
+import { FormDialog } from "@/components/common/form-dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { useStore } from "@/lib/store"
 import { visibleEmployees } from "@/lib/selectors"
 import { daysUntil, formatDate, fullName, relativeTime } from "@/lib/format"
+import * as React from "react"
 import type { OnboardingTask } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -109,6 +114,7 @@ export default function OnboardingPage() {
 
 function JoinerCard({ employeeId }: { employeeId: string }) {
   const store = useStore()
+  const [adding, setAdding] = React.useState(false)
   const employee = store.employeeById(employeeId)!
   const tasks = store.onboardingTasks.filter((t) => t.employeeId === employeeId)
   const docs = store.documents.filter((d) => d.employeeId === employeeId)
@@ -142,6 +148,11 @@ function JoinerCard({ employeeId }: { employeeId: string }) {
             )}
           </p>
         </div>
+
+        <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
+          <Plus className="size-3.5" />
+          Add task
+        </Button>
 
         <div className="min-w-[160px]">
           <div className="mb-1 flex items-baseline justify-between text-xs">
@@ -204,6 +215,17 @@ function JoinerCard({ employeeId }: { employeeId: string }) {
                 >
                   {t.title}
                 </span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${t.title}`}
+                  onClick={() => {
+                    store.deleteOnboardingTask(t.id)
+                    toast.success("Task removed.")
+                  }}
+                  className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
                 <Pill tone="neutral">{OWNER_LABEL[t.owner]}</Pill>
                 <span
                   className={cn(
@@ -221,6 +243,129 @@ function JoinerCard({ employeeId }: { employeeId: string }) {
           })}
         </ul>
       )}
+
+      {adding && (
+        <AddTaskDialog employeeId={employeeId} onClose={() => setAdding(false)} />
+      )}
     </Panel>
+  )
+}
+
+/** Mounted only while open, so the form seeds fresh each time. */
+function AddTaskDialog({
+  employeeId,
+  onClose,
+}: {
+  employeeId: string
+  onClose: () => void
+}) {
+  const store = useStore()
+  const [title, setTitle] = React.useState("")
+  const [owner, setOwner] = React.useState<OnboardingTask["owner"]>("hr")
+  const [category, setCategory] =
+    React.useState<OnboardingTask["category"]>("paperwork")
+  const [dueOn, setDueOn] = React.useState("")
+
+  function save() {
+    if (title.trim().length < 3) {
+      toast.error("Give the task a title.")
+      return
+    }
+    store.addOnboardingTask({
+      id: `ot-${Math.random().toString(36).slice(2, 8)}`,
+      employeeId,
+      title: title.trim(),
+      owner,
+      category,
+      dueOn: dueOn || "2026-10-05",
+      done: false,
+    })
+    toast.success("Task added to the checklist.")
+    onClose()
+  }
+
+  return (
+    <FormDialog
+      onClose={onClose}
+      title="Add onboarding task"
+      description="Checklist items block the move from pre-hire to active until they are done."
+      footer={
+        <>
+          <Button variant="ghost" size="lg" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button size="lg" onClick={save}>
+            Add task
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="task-title" className="mb-1.5 block text-sm">
+            Task
+          </Label>
+          <Input
+            id="task-title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Issue laptop and access badge"
+            className="h-10"
+          />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="task-owner" className="mb-1.5 block text-sm">
+              Owner
+            </Label>
+            <select
+              id="task-owner"
+              value={owner}
+              onChange={(e) => setOwner(e.target.value as OnboardingTask["owner"])}
+              className="h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+            >
+              {(["hr", "manager", "employee", "it"] as const).map((o) => (
+                <option key={o} value={o}>
+                  {OWNER_LABEL[o]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="task-category" className="mb-1.5 block text-sm">
+              Category
+            </Label>
+            <select
+              id="task-category"
+              value={category}
+              onChange={(e) =>
+                setCategory(e.target.value as OnboardingTask["category"])
+              }
+              className="h-10 w-full rounded-lg border bg-background px-3 text-sm capitalize outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+            >
+              {(["paperwork", "access", "orientation", "compliance"] as const).map(
+                (c) => (
+                  <option key={c} value={c} className="capitalize">
+                    {c}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="task-due" className="mb-1.5 block text-sm">
+            Due on
+          </Label>
+          <Input
+            id="task-due"
+            type="date"
+            value={dueOn}
+            onChange={(e) => setDueOn(e.target.value)}
+            className="h-10"
+          />
+        </div>
+      </div>
+    </FormDialog>
   )
 }

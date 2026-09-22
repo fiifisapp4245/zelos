@@ -133,6 +133,16 @@ interface StoreValue extends State {
     note: string
   ) => void
   submitLeave: (request: LeaveRequest) => void
+  cancelLeave: (id: string) => void
+  addOnboardingTask: (task: OnboardingTask) => void
+  deleteOnboardingTask: (id: string) => void
+  updateDocument: (id: string, patch: Partial<EmployeeDocument>) => void
+  deleteDocument: (id: string) => void
+  updateRequisition: (id: string, patch: Partial<Requisition>) => void
+  toggleClearance: (
+    caseId: string,
+    key: keyof OffboardingCase["clearance"]
+  ) => void
   toggleOnboardingTask: (id: string) => void
   moveCandidate: (id: string, stage: Candidate["stage"]) => void
   acknowledgeAlert: (id: string) => void
@@ -482,6 +492,112 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setState((s) => ({
           ...s,
           leaveRequests: [request, ...s.leaveRequests],
+        }))
+      },
+
+      cancelLeave: (id) => {
+        setState((s) => ({
+          ...s,
+          leaveRequests: s.leaveRequests.map((r) =>
+            r.id === id ? { ...r, status: "cancelled" as const } : r
+          ),
+          auditLog: [
+            {
+              id: uid("a"),
+              employeeId:
+                s.leaveRequests.find((r) => r.id === id)?.employeeId ?? null,
+              actorId,
+              action: "Cancelled leave request",
+              field: id,
+              after: "cancelled",
+              at: nowIso(),
+            },
+            ...s.auditLog,
+          ],
+        }))
+      },
+
+      addOnboardingTask: (task) => {
+        setState((s) => ({
+          ...s,
+          onboardingTasks: [...s.onboardingTasks, task],
+        }))
+      },
+
+      deleteOnboardingTask: (id) => {
+        setState((s) => ({
+          ...s,
+          onboardingTasks: s.onboardingTasks.filter((t) => t.id !== id),
+        }))
+      },
+
+      updateDocument: (id, patch) => {
+        setState((s) => {
+          const doc = s.documents.find((d) => d.id === id)
+          if (!doc) return s
+          return {
+            ...s,
+            documents: s.documents.map((d) =>
+              d.id === id ? { ...d, ...patch } : d
+            ),
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: doc.employeeId,
+                actorId,
+                action: `Updated document ${doc.name}`,
+                field: Object.keys(patch).join(", "),
+                after: Object.values(patch).map(String).join(", "),
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      deleteDocument: (id) => {
+        setState((s) => {
+          const doc = s.documents.find((d) => d.id === id)
+          if (!doc) return s
+          return {
+            ...s,
+            documents: s.documents.filter((d) => d.id !== id),
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: doc.employeeId,
+                actorId,
+                action: "Removed a document",
+                before: doc.name,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      updateRequisition: (id, patch) => {
+        setState((s) => ({
+          ...s,
+          requisitions: s.requisitions.map((r) =>
+            r.id === id ? { ...r, ...patch } : r
+          ),
+        }))
+      },
+
+      toggleClearance: (caseId, key) => {
+        setState((s) => ({
+          ...s,
+          offboarding: s.offboarding.map((c) =>
+            c.id === caseId
+              ? {
+                  ...c,
+                  clearance: { ...c.clearance, [key]: !c.clearance[key] },
+                }
+              : c
+          ),
         }))
       },
 

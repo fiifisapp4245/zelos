@@ -65,7 +65,7 @@ import { completeness } from "@/lib/selectors"
 import type { LifecycleState } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { ChangeStatusDialog } from "./change-status-dialog"
-import { EditRecordSheet } from "./edit-record-sheet"
+import { EditRecordDialog } from "./edit-record-dialog"
 
 export default function EmployeeRecordPage() {
   const params = useParams<{ id: string }>()
@@ -299,7 +299,7 @@ export default function EmployeeRecordPage() {
         open={statusOpen}
         onOpenChange={setStatusOpen}
       />
-      <EditRecordSheet
+      <EditRecordDialog
         employeeId={employee.id}
         open={editOpen}
         onOpenChange={setEditOpen}

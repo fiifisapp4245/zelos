@@ -6,17 +6,10 @@ import { Pencil, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Field, Panel, Pill, SectionGrid } from "@/components/common"
+import { FormDialog } from "@/components/common/form-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { useStore } from "@/lib/store"
 import { isOnStrength } from "@/lib/selectors"
 import type { CompanyProfile } from "@/lib/types"
@@ -94,7 +87,7 @@ export function CompanyInformation() {
 
       <Offices />
 
-      {editing && <EditCompanySheet onClose={() => setEditing(false)} />}
+      {editing && <EditCompanyDialog onClose={() => setEditing(false)} />}
     </div>
   )
 }
@@ -218,7 +211,7 @@ const GROUPS: { title: string; fields: FieldSpec[] }[] = [
 ]
 
 /** Mounted only while open, so the form seeds fresh each time. */
-function EditCompanySheet({ onClose }: { onClose: () => void }) {
+function EditCompanyDialog({ onClose }: { onClose: () => void }) {
   const store = useStore()
   const [values, setValues] = React.useState<CompanyProfile>({ ...store.company })
 
@@ -249,17 +242,28 @@ function EditCompanySheet({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Sheet open onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="flex w-full flex-col sm:max-w-[560px]">
-        <SheetHeader>
-          <SheetTitle>Edit company information</SheetTitle>
-          <SheetDescription>
-            These details appear on pay slips and statutory filings. Every change is
-            written to the audit log against your name.
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="flex-1 space-y-6 overflow-y-auto px-4">
+    <FormDialog
+      onClose={onClose}
+      width="lg"
+      title="Edit company information"
+      description="These details appear on pay slips and statutory filings. Every change is written to the audit log against your name."
+      footer={
+        <>
+          <p className="mr-auto self-center text-xs text-muted-foreground">
+            {changed.length === 0
+              ? "No changes yet"
+              : `${changed.length} field${changed.length === 1 ? "" : "s"} changed`}
+          </p>
+          <Button variant="ghost" size="lg" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button size="lg" onClick={save}>
+            Save changes
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-6">
           {GROUPS.map((group) => (
             <div key={group.title}>
               <p className="mb-3 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
@@ -287,22 +291,7 @@ function EditCompanySheet({ onClose }: { onClose: () => void }) {
               </div>
             </div>
           ))}
-        </div>
-
-        <SheetFooter>
-          <p className="mr-auto self-center text-xs text-muted-foreground">
-            {changed.length === 0
-              ? "No changes yet"
-              : `${changed.length} field${changed.length === 1 ? "" : "s"} changed`}
-          </p>
-          <Button variant="ghost" size="lg" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button size="lg" onClick={save}>
-            Save changes
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </FormDialog>
   )
 }

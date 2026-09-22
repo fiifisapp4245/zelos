@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { CalendarPlus, Check, ClipboardList, X } from "lucide-react"
+import { CalendarPlus, Check, ClipboardList, Ban, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { PageShell } from "@/components/shell/page-shell"
@@ -15,6 +15,7 @@ import {
   StatCard,
 } from "@/components/common"
 import { RequestBadge } from "@/components/common/status"
+import { RowActions } from "@/components/common/row-actions"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -374,6 +375,22 @@ function RequestList({
               )}
             </div>
             <RequestBadge status={r.status} />
+            {r.employeeId === store.viewer.employeeId && r.status === "pending" && (
+              <RowActions
+                label={`Actions for ${r.id}`}
+                actions={[
+                  {
+                    label: "Cancel request",
+                    icon: Ban,
+                    destructive: true,
+                    onSelect: () => {
+                      store.cancelLeave(r.id)
+                      toast.success(`${r.id} cancelled.`)
+                    },
+                  },
+                ]}
+              />
+            )}
           </li>
         )
       })}

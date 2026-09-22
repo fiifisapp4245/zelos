@@ -2,12 +2,21 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Briefcase, Plus, Star, UserPlus } from "lucide-react"
+import {
+  Briefcase,
+  CheckCircle2,
+  PauseCircle,
+  PlayCircle,
+  Plus,
+  Star,
+  UserPlus,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { PageShell } from "@/components/shell/page-shell"
 import { EmptyState, PageHeader, Panel, StatCard } from "@/components/common"
 import { RequisitionBadge } from "@/components/common/status"
+import { RowActions } from "@/components/common/row-actions"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useStore } from "@/lib/store"
@@ -176,6 +185,50 @@ export default function RecruitmentPage() {
                           </p>
                         </div>
                       )}
+                      <RowActions
+                        label={`Actions for ${r.title}`}
+                        actions={[
+                          r.status !== "open" && {
+                            label: "Open requisition",
+                            icon: PlayCircle,
+                            onSelect: () => {
+                              store.updateRequisition(r.id, { status: "open" })
+                              toast.success(`${r.title} is now open.`)
+                            },
+                          },
+                          r.status === "open" && {
+                            label: "Put on hold",
+                            icon: PauseCircle,
+                            onSelect: () => {
+                              store.updateRequisition(r.id, {
+                                status: "on_hold",
+                              })
+                              toast.success(`${r.title} put on hold.`)
+                            },
+                          },
+                          r.status !== "filled" && {
+                            label: "Mark filled",
+                            icon: CheckCircle2,
+                            onSelect: () => {
+                              store.updateRequisition(r.id, {
+                                status: "filled",
+                              })
+                              toast.success(`${r.title} marked filled.`)
+                            },
+                          },
+                          r.status !== "closed" && {
+                            label: "Close requisition",
+                            icon: Briefcase,
+                            destructive: true,
+                            onSelect: () => {
+                              store.updateRequisition(r.id, {
+                                status: "closed",
+                              })
+                              toast.success(`${r.title} closed.`)
+                            },
+                          },
+                        ]}
+                      />
                     </li>
                   )
                 })}

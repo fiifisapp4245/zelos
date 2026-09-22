@@ -2,7 +2,15 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { AlertTriangle, Lock, Play, Wallet } from "lucide-react"
+import {
+  AlertTriangle,
+  Eye,
+  FileText,
+  Lock,
+  Play,
+  Wallet,
+  XCircle,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { PageShell } from "@/components/shell/page-shell"
@@ -14,6 +22,7 @@ import {
   Pill,
   StatCard,
 } from "@/components/common"
+import { RowActions } from "@/components/common/row-actions"
 import { Button } from "@/components/ui/button"
 import { useStore } from "@/lib/store"
 import { has } from "@/lib/rbac"
@@ -164,6 +173,7 @@ export default function PayrollPage() {
                     "Gross",
                     "SSNIT 5.5%",
                     "Net (indicative)",
+                    "Actions",
                   ].map((h) => (
                     <th
                       key={h}
@@ -219,10 +229,41 @@ export default function PayrollPage() {
                       </td>
                       <td
                         className={cn(
-                          "tabular py-2.5 pr-5 text-right font-medium"
+                          "tabular px-3 py-2.5 text-right font-medium"
                         )}
                       >
                         {ghs(c.grossMonthly - deduction)}
+                      </td>
+                      <td className="py-2.5 pr-5">
+                        <div className="flex justify-end">
+                          <RowActions
+                            label={`Payroll actions for ${fullName(e)}`}
+                            actions={[
+                              {
+                                label: "View record",
+                                icon: Eye,
+                                href: `/employees/${e.id}`,
+                              },
+                              {
+                                label: "View pay slip",
+                                icon: FileText,
+                                onSelect: () =>
+                                  toast(
+                                    `Pay slip for ${fullName(e)} — September 2026.`
+                                  ),
+                              },
+                              {
+                                label: "Exclude from run",
+                                icon: XCircle,
+                                destructive: true,
+                                onSelect: () =>
+                                  toast(
+                                    `${fullName(e)} excluded from this run.`
+                                  ),
+                              },
+                            ]}
+                          />
+                        </div>
                       </td>
                     </tr>
                   )

@@ -240,17 +240,30 @@ function CaseCard({ offboarding: c }: { offboarding: OffboardingCase }) {
           </p>
           <ul className="space-y-2">
             {items.map(([key, value]) => (
-              <li key={key} className="flex items-center gap-2.5 text-sm">
-                {value ? (
-                  <CheckCircle2 className="size-4 shrink-0 text-primary" />
-                ) : (
-                  <Circle className="size-4 shrink-0 text-muted-foreground" />
-                )}
-                <span
-                  className={cn(value && "text-muted-foreground line-through")}
+              <li key={key}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    store.toggleClearance(c.id, key)
+                    toast.success(
+                      `${CLEARANCE_LABEL[key]} marked ${value ? "outstanding" : "done"}.`
+                    )
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-lg py-1 text-left text-sm transition-colors hover:text-foreground"
                 >
-                  {CLEARANCE_LABEL[key]}
-                </span>
+                  {value ? (
+                    <CheckCircle2 className="size-4 shrink-0 text-primary" />
+                  ) : (
+                    <Circle className="size-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <span
+                    className={cn(
+                      value && "text-muted-foreground line-through"
+                    )}
+                  >
+                    {CLEARANCE_LABEL[key]}
+                  </span>
+                </button>
               </li>
             ))}
             <li className="flex items-center gap-2.5 text-sm">

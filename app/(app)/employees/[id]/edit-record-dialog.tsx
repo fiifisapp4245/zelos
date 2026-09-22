@@ -4,15 +4,8 @@ import * as React from "react"
 import { Lock } from "lucide-react"
 import { toast } from "sonner"
 
+import { FormDialog } from "@/components/common/form-dialog"
 import { Button } from "@/components/ui/button"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useStore } from "@/lib/store"
@@ -60,7 +53,7 @@ function read(employee: Employee, path: string): string {
   )
 }
 
-export function EditRecordSheet({
+export function EditRecordDialog({
   employeeId,
   open,
   onOpenChange,
@@ -74,16 +67,11 @@ export function EditRecordSheet({
 
   if (!employee) return null
 
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col sm:max-w-[520px]">
-        <EditForm employeeId={employeeId} onOpenChange={onOpenChange} />
-      </SheetContent>
-    </Sheet>
-  )
+  if (!open) return null
+  return <EditForm employeeId={employeeId} onOpenChange={onOpenChange} />
 }
 
-/** Mounted with the sheet, so the form is seeded fresh each time it opens. */
+/** Mounted only while open, so the form is seeded fresh each time. */
 function EditForm({
   employeeId,
   onOpenChange,
@@ -141,17 +129,26 @@ function EditForm({
   }
 
   return (
-    <>
-      <SheetHeader>
-        <SheetTitle>Edit {fullName(employee)}</SheetTitle>
-        <SheetDescription>
-          {isHr
-            ? "Every change is written to the audit log against your name."
-            : "You can update your contact details. Anything else routes through HR."}
-        </SheetDescription>
-      </SheetHeader>
-
-      <div className="flex-1 space-y-4 overflow-y-auto px-4">
+    <FormDialog
+      onClose={() => onOpenChange(false)}
+      title={`Edit ${fullName(employee)}`}
+      description={
+        isHr
+          ? "Every change is written to the audit log against your name."
+          : "You can update your contact details. Anything else routes through HR."
+      }
+      footer={
+        <>
+          <Button variant="ghost" size="lg" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button size="lg" onClick={save}>
+            Save changes
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
         {FIELDS.map((f) => {
           const can = editable(f)
           return (
@@ -182,15 +179,6 @@ function EditForm({
           )
         })}
       </div>
-
-      <SheetFooter>
-        <Button variant="ghost" size="lg" onClick={() => onOpenChange(false)}>
-          Cancel
-        </Button>
-        <Button size="lg" onClick={save}>
-          Save changes
-        </Button>
-      </SheetFooter>
-    </>
+    </FormDialog>
   )
 }

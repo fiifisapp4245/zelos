@@ -4,6 +4,9 @@ import * as React from "react"
 import Link from "next/link"
 import {
   Download,
+  Eye,
+  Pencil,
+  RefreshCw,
   LayoutGrid,
   ListFilter,
   Rows3,
@@ -16,6 +19,7 @@ import {
 
 import { PageShell } from "@/components/shell/page-shell"
 import { EmptyState, Initials, PageHeader, Pill } from "@/components/common"
+import { RowActions } from "@/components/common/row-actions"
 import { LifecycleBadge } from "@/components/common/status"
 import { Button } from "@/components/ui/button"
 import {
@@ -29,7 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useStore } from "@/lib/store"
-import { has } from "@/lib/rbac"
+import { canChangeLifecycle, canEditRecord, has } from "@/lib/rbac"
 import { isOnStrength, visibleEmployees } from "@/lib/selectors"
 import {
   EMPLOYMENT_TYPE_LABEL,
@@ -41,6 +45,8 @@ import {
 import type { Employee, EmploymentType, LifecycleState } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { ChangeStatusDialog } from "./[id]/change-status-dialog"
+import { EditRecordDialog } from "./[id]/edit-record-dialog"
 
 type SortKey = "name" | "department" | "startDate" | "status"
 
@@ -474,6 +480,10 @@ function Chip({
 
 function DirectoryTable({ rows }: { rows: Employee[] }) {
   const store = useStore()
+  const { viewer } = store
+  const [editing, setEditing] = React.useState<string | null>(null)
+  const [changingStatus, setChangingStatus] = React.useState<string | null>(null)
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -485,7 +495,8 @@ function DirectoryTable({ rows }: { rows: Employee[] }) {
             <Th>Type</Th>
             <Th>Manager</Th>
             <Th>Contract</Th>
-            <Th className="pr-5">Status</Th>
+            <Th>Status</Th>
+            <Th className="w-16 pr-5 text-right">Actions</Th>
           </tr>
         </thead>
         <tbody className="divide-y">
@@ -546,14 +557,49 @@ function DirectoryTable({ rows }: { rows: Employee[] }) {
                     </span>
                   )}
                 </td>
-                <td className="py-3 pr-5">
+                <td className="px-3 py-3">
                   <LifecycleBadge state={e.lifecycleState} />
+                </td>
+                <td className="py-3 pr-5">
+                  <div className="flex justify-end">
+                    <RowActions
+                      label={`Actions for ${fullName(e)}`}
+                      actions={[
+                        { label: "View record", icon: Eye, href: `/employees/${e.id}` },
+                        canEditRecord(viewer, e) && {
+                          label: "Edit details",
+                          icon: Pencil,
+                          onSelect: () => setEditing(e.id),
+                        },
+                        canChangeLifecycle(viewer) && {
+                          label: "Change status",
+                          icon: RefreshCw,
+                          onSelect: () => setChangingStatus(e.id),
+                        },
+                      ]}
+                    />
+                  </div>
                 </td>
               </tr>
             )
           })}
         </tbody>
       </table>
+
+      {editing && (
+        <EditRecordDialog
+          employeeId={editing}
+          open
+          onOpenChange={() => setEditing(null)}
+        />
+      )}
+      {changingStatus && (
+        <ChangeStatusDialog
+          employeeId={changingStatus}
+          open
+          onOpenChange={() => setChangingStatus(null)}
+        />
+      )}
     </div>
   )
 }
