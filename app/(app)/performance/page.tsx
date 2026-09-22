@@ -118,7 +118,10 @@ export default function PerformancePage() {
       </div>
 
       <Tabs defaultValue="reviews">
-        <TabsList className="mb-5 h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0">
+        <TabsList
+          variant="line"
+          className="mb-5 h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0"
+        >
           {[
             ["reviews", "Review cycle"],
             ["notes", "Coaching notes"],
@@ -126,7 +129,7 @@ export default function PerformancePage() {
             <TabsTrigger
               key={v}
               value={v}
-              className="flex-none rounded-none border-0 border-b-2 border-transparent px-3.5 py-2.5 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:font-medium data-[state=active]:text-primary data-[state=active]:shadow-none"
+              className="flex-none rounded-none border-0 px-3.5 py-2.5 text-sm after:bottom-0 data-active:font-medium data-active:text-primary data-active:after:bg-primary"
             >
               {l}
             </TabsTrigger>

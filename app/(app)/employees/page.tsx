@@ -45,7 +45,7 @@ import {
 import type { Employee, EmploymentType, LifecycleState } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { ChangeStatusDialog } from "./[id]/change-status-dialog"
+import { ChangeStatusDialog } from "@/components/employees/change-status-dialog"
 import { EditRecordDialog } from "./[id]/edit-record-dialog"
 
 type SortKey = "name" | "department" | "startDate" | "status"
@@ -482,7 +482,9 @@ function DirectoryTable({ rows }: { rows: Employee[] }) {
   const store = useStore()
   const { viewer } = store
   const [editing, setEditing] = React.useState<string | null>(null)
-  const [changingStatus, setChangingStatus] = React.useState<string | null>(null)
+  const [changingStatus, setChangingStatus] = React.useState<string | null>(
+    null
+  )
 
   return (
     <div className="overflow-x-auto">
@@ -565,7 +567,11 @@ function DirectoryTable({ rows }: { rows: Employee[] }) {
                     <RowActions
                       label={`Actions for ${fullName(e)}`}
                       actions={[
-                        { label: "View record", icon: Eye, href: `/employees/${e.id}` },
+                        {
+                          label: "View record",
+                          icon: Eye,
+                          href: `/employees/${e.id}`,
+                        },
                         canEditRecord(viewer, e) && {
                           label: "Edit details",
                           icon: Pencil,

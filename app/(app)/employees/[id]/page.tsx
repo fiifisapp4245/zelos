@@ -5,18 +5,24 @@ import Link from "next/link"
 import { notFound, useParams } from "next/navigation"
 import {
   AlertTriangle,
+  ArrowLeftRight,
   CalendarDays,
   ChevronDown,
   Clock,
+  Download,
   Eye,
   EyeOff,
   Hash,
+  Link as LinkIcon,
+  ListChecks,
   Lock,
+  LogOut,
   Pencil,
-  Plus,
   RefreshCw,
   Send,
   ShieldAlert,
+  TrendingUp,
+  UserCog,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -31,6 +37,14 @@ import {
 } from "@/components/common"
 import { DocumentBadge, LifecycleBadge } from "@/components/common/status"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useStore } from "@/lib/store"
 import {
@@ -60,10 +74,36 @@ import {
   yearsOfService,
 } from "@/lib/format"
 import { completeness } from "@/lib/selectors"
-import type { LifecycleState } from "@/lib/types"
+import { lifecycleTasks } from "@/lib/lifecycle-actions"
+import { LifecycleWorklist } from "@/components/employees/lifecycle-worklist"
+import type { Employee, LifecycleState } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { ChangeStatusDialog } from "./change-status-dialog"
+import { ChangeStatusDialog } from "@/components/employees/change-status-dialog"
+import { RoleChangeDialog, type RoleChangeKind } from "./role-change-dialog"
 import { EditRecordDialog } from "./edit-record-dialog"
+
+/** Share a link to this record without leaving the page. */
+function copyLink(id: string) {
+  const url = `${window.location.origin}/employees/${id}`
+  navigator.clipboard
+    .writeText(url)
+    .then(() => toast.success("Record link copied to your clipboard."))
+    .catch(() => toast.error("Your browser blocked clipboard access."))
+}
+
+/** A plain export so the record can leave the prototype as data. */
+function exportRecord(employee: Employee) {
+  const blob = new Blob([JSON.stringify(employee, null, 2)], {
+    type: "application/json",
+  })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${employee.employeeId}-${employee.lastName.toLowerCase()}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  toast.success(`Exported ${fullName(employee)}'s record.`)
+}
 
 export default function EmployeeRecordPage() {
   const params = useParams<{ id: string }>()
@@ -72,7 +112,18 @@ export default function EmployeeRecordPage() {
   const employee = store.employeeById(params.id)
 
   const [statusOpen, setStatusOpen] = React.useState(false)
+  const [statusTarget, setStatusTarget] = React.useState<
+    LifecycleState | undefined
+  >(undefined)
   const [editOpen, setEditOpen] = React.useState(false)
+  const [roleChange, setRoleChange] = React.useState<RoleChangeKind | null>(
+    null
+  )
+
+  function openStatus(target?: LifecycleState) {
+    setStatusTarget(target)
+    setStatusOpen(true)
+  }
 
   if (!employee) notFound()
 
@@ -108,6 +159,7 @@ export default function EmployeeRecordPage() {
   const contractEndsIn = daysUntil(employee.contractEndDate)
   const mayEdit = canEditRecord(viewer, employee)
   const mayChangeState = canChangeLifecycle(viewer)
+  const onStrength = !IRREVERSIBLE.includes(employee.lifecycleState)
   const record = completeness(employee)
 
   return (
@@ -190,48 +242,102 @@ export default function EmployeeRecordPage() {
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              {employee.lifecycleState === "pre_hire" &&
-                has(viewer, "hr_admin") && (
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() =>
+          {/* One primary action with everything else folded into the caret,
+              so the masthead does not turn into a wall of buttons. */}
+          <div className="flex shrink-0 items-center">
+            {mayEdit && (
+              <Button
+                size="lg"
+                className="rounded-r-none"
+                onClick={() => setEditOpen(true)}
+              >
+                <Pencil className="size-4" />
+                Edit profile
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="lg"
+                  variant={mayEdit ? "default" : "outline"}
+                  aria-label="More actions"
+                  className={cn(
+                    mayEdit &&
+                      "rounded-l-none border-l border-primary-foreground/25 px-2.5"
+                  )}
+                >
+                  {!mayEdit && "Actions"}
+                  <ChevronDown className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[248px]">
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                  {fullName(employee)}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+
+                {mayChangeState && (
+                  <DropdownMenuItem onSelect={() => openStatus()}>
+                    <RefreshCw className="size-4" />
+                    Change status
+                  </DropdownMenuItem>
+                )}
+                {mayChangeState && employee.lifecycleState === "pre_hire" && (
+                  <DropdownMenuItem
+                    onSelect={() =>
                       toast.success(`Invite sent to ${employee.personalEmail}.`)
                     }
                   >
                     <Send className="size-4" />
                     Send invite
-                  </Button>
+                  </DropdownMenuItem>
                 )}
-              {mayEdit && (
-                <Button size="lg" onClick={() => setEditOpen(true)}>
-                  <Pencil className="size-4" />
-                  Edit profile
-                </Button>
-              )}
-              {mayChangeState && (
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={() => setStatusOpen(true)}
-                >
-                  <RefreshCw className="size-4" />
-                  Change status
-                </Button>
-              )}
-            </div>
-            {mayChangeState &&
-              !IRREVERSIBLE.includes(employee.lifecycleState) && (
-                <Button
-                  variant="destructive"
-                  size="lg"
-                  onClick={() => setStatusOpen(true)}
-                >
-                  Initiate exit
-                </Button>
-              )}
+                {mayChangeState && onStrength && (
+                  <>
+                    <DropdownMenuItem
+                      onSelect={() => setRoleChange("transfer")}
+                    >
+                      <ArrowLeftRight className="size-4" />
+                      Initiate transfer
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => setRoleChange("promotion")}
+                    >
+                      <TrendingUp className="size-4" />
+                      Initiate promotion
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setRoleChange("acting")}>
+                      <UserCog className="size-4" />
+                      Assign acting role
+                    </DropdownMenuItem>
+                  </>
+                )}
+
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => copyLink(employee.id)}>
+                  <LinkIcon className="size-4" />
+                  Copy record link
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => exportRecord(employee)}>
+                  <Download className="size-4" />
+                  Export record (JSON)
+                </DropdownMenuItem>
+
+                {mayChangeState &&
+                  !IRREVERSIBLE.includes(employee.lifecycleState) && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={() => openStatus("notice")}
+                      >
+                        <LogOut className="size-4" />
+                        Initiate exit
+                      </DropdownMenuItem>
+                    </>
+                  )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </section>
@@ -266,7 +372,10 @@ export default function EmployeeRecordPage() {
         defaultValue="overview"
         className="overflow-hidden rounded-xl border bg-card"
       >
-        <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b bg-transparent px-4 py-0">
+        <TabsList
+          variant="line"
+          className="h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b bg-transparent px-4 py-0"
+        >
           {[
             ["overview", "Profile"],
             ["employment", "Employment"],
@@ -279,7 +388,7 @@ export default function EmployeeRecordPage() {
             <TabsTrigger
               key={value}
               value={value}
-              className="relative flex-none rounded-none border-0 border-b-2 border-transparent px-3.5 py-2.5 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:font-medium data-[state=active]:text-primary data-[state=active]:shadow-none"
+              className="relative flex-none rounded-none border-0 px-3.5 py-2.5 text-sm after:bottom-0 data-active:font-medium data-active:text-primary data-active:after:bg-primary"
             >
               {label}
               {value === "compensation" &&
@@ -293,11 +402,14 @@ export default function EmployeeRecordPage() {
         <TabsContent value="overview" className="p-5">
           <OverviewTab
             employeeId={employee.id}
-            onChangeStatus={() => setStatusOpen(true)}
+            onChangeStatus={() => openStatus()}
           />
         </TabsContent>
         <TabsContent value="employment" className="p-5">
-          <EmploymentTab employeeId={employee.id} />
+          <EmploymentTab
+            employeeId={employee.id}
+            onRoleChange={setRoleChange}
+          />
         </TabsContent>
         <TabsContent value="compensation" className="p-5">
           <CompensationTab employeeId={employee.id} />
@@ -311,7 +423,7 @@ export default function EmployeeRecordPage() {
         <TabsContent value="lifecycle" className="p-5">
           <LifecycleTab
             employeeId={employee.id}
-            onChangeStatus={() => setStatusOpen(true)}
+            onChangeStatus={() => openStatus()}
           />
         </TabsContent>
         <TabsContent value="audit" className="p-5">
@@ -323,6 +435,12 @@ export default function EmployeeRecordPage() {
         employeeId={employee.id}
         open={statusOpen}
         onOpenChange={setStatusOpen}
+        presetTarget={statusTarget}
+      />
+      <RoleChangeDialog
+        employeeId={employee.id}
+        kind={roleChange}
+        onClose={() => setRoleChange(null)}
       />
       <EditRecordDialog
         employeeId={employee.id}
@@ -633,7 +751,13 @@ function Section({
   )
 }
 
-function EmploymentTab({ employeeId }: { employeeId: string }) {
+function EmploymentTab({
+  employeeId,
+  onRoleChange,
+}: {
+  employeeId: string
+  onRoleChange: (kind: RoleChangeKind) => void
+}) {
   const store = useStore()
   const { viewer } = store
   const employee = store.employeeById(employeeId)!
@@ -767,31 +891,25 @@ function EmploymentTab({ employeeId }: { employeeId: string }) {
             <Button
               variant="outline"
               size="lg"
-              onClick={() =>
-                toast("Opens a transfer to another department or branch.")
-              }
+              onClick={() => onRoleChange("transfer")}
             >
-              <Plus className="size-4" />
+              <ArrowLeftRight className="size-4" />
               Initiate transfer
             </Button>
             <Button
               variant="outline"
               size="lg"
-              onClick={() =>
-                toast("Opens a promotion with a new title and grade.")
-              }
+              onClick={() => onRoleChange("promotion")}
             >
-              <Plus className="size-4" />
+              <TrendingUp className="size-4" />
               Initiate promotion
             </Button>
             <Button
               variant="outline"
               size="lg"
-              onClick={() =>
-                toast("Assigns an acting role with a start and end date.")
-              }
+              onClick={() => onRoleChange("acting")}
             >
-              <Plus className="size-4" />
+              <UserCog className="size-4" />
               Assign acting role
             </Button>
           </div>
@@ -1186,64 +1304,87 @@ function LifecycleTab({
     .filter((e) => e.employeeId === employeeId)
     .sort((a, b) => b.at.localeCompare(a.at))
 
-  return (
-    <Section
-      title="Lifecycle history"
-      actions={
-        canChangeLifecycle(viewer) && (
-          <Button size="sm" onClick={onChangeStatus}>
-            <RefreshCw className="size-3.5" />
-            Change status
-          </Button>
-        )
-      }
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-5 py-3">
-        <span className="flex items-center gap-2.5 text-sm">
-          <span className="text-[11px] tracking-wide text-muted-foreground uppercase">
-            Current state
-          </span>
-          <LifecycleBadge state={employee.lifecycleState} />
-        </span>
-        <AllowedTransitions state={employee.lifecycleState} />
-      </div>
+  // What this person's current state has made due — the same worklist the
+  // Lifecycle events page runs, narrowed to one record.
+  const tasks = lifecycleTasks([employee], lifecycleEvents, store.leaveRequests)
 
-      {events.length === 0 ? (
-        <EmptyState icon={RefreshCw} title="No state changes recorded" />
-      ) : (
-        <ul className="divide-y">
-          {events.map((e) => (
-            <li key={e.id} className="flex gap-3.5 px-5 py-4">
-              <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-success-muted text-primary">
-                <RefreshCw className="size-3.5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-1.5 text-sm">
-                  {e.from && (
-                    <>
-                      <LifecycleBadge state={e.from} />
-                      <span className="text-muted-foreground/50">›</span>
-                    </>
-                  )}
-                  <LifecycleBadge state={e.to} />
-                </p>
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  by {fullName(store.employeeById(e.actorId))} ·{" "}
-                  {formatDateTime(e.at)} · effective{" "}
-                  {formatDate(e.effectiveDate)}
-                </p>
-                {e.reason && (
-                  <p className="mt-2 rounded-lg border-l-2 border-border bg-muted/50 px-3 py-2 text-sm">
-                    <span className="text-muted-foreground">Reason:</span>{" "}
-                    {e.reason}
-                  </p>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
+  return (
+    <div className="space-y-5">
+      {tasks.length > 0 && (
+        <div className="overflow-hidden rounded-xl border border-warning/35">
+          <div className="border-b border-warning/35 bg-warning-muted px-5 py-3">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <ListChecks className="size-4 text-warning-foreground" />
+              {tasks.length} decision{tasks.length === 1 ? "" : "s"} due on this
+              record
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Acting here writes a lifecycle event and an audit entry against
+              your name, exactly as a manual status change would.
+            </p>
+          </div>
+          <LifecycleWorklist tasks={tasks} showPerson={false} />
+        </div>
       )}
-    </Section>
+
+      <Section
+        title="Lifecycle history"
+        actions={
+          canChangeLifecycle(viewer) && (
+            <Button size="sm" onClick={onChangeStatus}>
+              <RefreshCw className="size-3.5" />
+              Change status
+            </Button>
+          )
+        }
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-5 py-3">
+          <span className="flex items-center gap-2.5 text-sm">
+            <span className="text-[11px] tracking-wide text-muted-foreground uppercase">
+              Current state
+            </span>
+            <LifecycleBadge state={employee.lifecycleState} />
+          </span>
+          <AllowedTransitions state={employee.lifecycleState} />
+        </div>
+
+        {events.length === 0 ? (
+          <EmptyState icon={RefreshCw} title="No state changes recorded" />
+        ) : (
+          <ul className="divide-y">
+            {events.map((e) => (
+              <li key={e.id} className="flex gap-3.5 px-5 py-4">
+                <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-success-muted text-primary">
+                  <RefreshCw className="size-3.5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-1.5 text-sm">
+                    {e.from && (
+                      <>
+                        <LifecycleBadge state={e.from} />
+                        <span className="text-muted-foreground/50">›</span>
+                      </>
+                    )}
+                    <LifecycleBadge state={e.to} />
+                  </p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    by {fullName(store.employeeById(e.actorId))} ·{" "}
+                    {formatDateTime(e.at)} · effective{" "}
+                    {formatDate(e.effectiveDate)}
+                  </p>
+                  {e.reason && (
+                    <p className="mt-2 rounded-lg border-l-2 border-border bg-muted/50 px-3 py-2 text-sm">
+                      <span className="text-muted-foreground">Reason:</span>{" "}
+                      {e.reason}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+    </div>
   )
 }
 

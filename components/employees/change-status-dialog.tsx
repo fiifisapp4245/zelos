@@ -47,15 +47,22 @@ export function ChangeStatusDialog({
   employeeId,
   open,
   onOpenChange,
+  presetTarget,
 }: {
   employeeId: string
   open: boolean
   onOpenChange: (v: boolean) => void
+  /** Opens with this transition already chosen, e.g. from "Initiate exit". */
+  presetTarget?: LifecycleState
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[560px]">
-        <ChangeStatusForm employeeId={employeeId} onOpenChange={onOpenChange} />
+        <ChangeStatusForm
+          employeeId={employeeId}
+          onOpenChange={onOpenChange}
+          presetTarget={presetTarget}
+        />
       </DialogContent>
     </Dialog>
   )
@@ -68,13 +75,24 @@ export function ChangeStatusDialog({
 function ChangeStatusForm({
   employeeId,
   onOpenChange,
+  presetTarget,
 }: {
   employeeId: string
   onOpenChange: (v: boolean) => void
+  presetTarget?: LifecycleState
 }) {
   const store = useStore()
   const employee = store.employeeById(employeeId)
-  const [target, setTarget] = React.useState<LifecycleState | null>(null)
+  // The preset is only honoured when the state machine actually allows it,
+  // so "Initiate exit" from, say, Probation opens on the picker instead.
+  const [target, setTarget] = React.useState<LifecycleState | null>(() =>
+    presetTarget &&
+    LIFECYCLE_TRANSITIONS[employee?.lifecycleState ?? "active"].includes(
+      presetTarget
+    )
+      ? presetTarget
+      : null
+  )
   const [reason, setReason] = React.useState("")
   const [effective, setEffective] = React.useState("2026-09-18")
   const [confirmText, setConfirmText] = React.useState("")

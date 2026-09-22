@@ -89,6 +89,12 @@ and are load-bearing, not cosmetic.
   [lib/format.ts](lib/format.ts) defines what may follow what. Resigned, Terminated and Retired
   are end states with no way out — re-employment means a new record, so service history stays
   intact.
+- **A state is an obligation, not a label.** `lifecycleTasks()` in
+  [lib/lifecycle-actions.ts](lib/lifecycle-actions.ts) derives the decisions the current states
+  have made due — probation confirmations, returns from leave, notice served, suspension
+  reviews, retirements, contracts running out — and `/lifecycle` puts them at the top as a
+  worklist. It only ever offers transitions the state machine permits, and every outcome goes
+  through the same reason-and-audit dialog as a manual change.
 - **Every write is attributed.** The audit log cannot be edited or cleared by anyone, including
   HR. Revealing a statutory ID is itself a logged event with its stated purpose.
 - **Data completeness is surfaced early.** A payroll run that discovers a missing SSNIT number
@@ -114,6 +120,7 @@ lib/data/settings.ts  the Company Settings catalogue (categories → items)
 lib/rbac.ts           the permission layer
 lib/selectors.ts      role-scoped queries (visibleEmployees, completeness, …)
 lib/format.ts         labels, dates, GHS, the lifecycle state machine
+lib/lifecycle-actions.ts  the decisions each lifecycle state has made due
 ```
 
 ## Company Settings

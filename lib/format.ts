@@ -17,6 +17,8 @@ import type {
 
 /** The prototype runs against a fixed "today" so mock dates stay meaningful. */
 export const TODAY = new Date("2026-09-18T09:00:00")
+/** The same fixed day as a yyyy-mm-dd string, for date inputs. */
+export const TODAY_ISO = "2026-09-18"
 
 export function fullName(e: Employee | undefined | null) {
   return e ? `${e.firstName} ${e.lastName}` : "—"

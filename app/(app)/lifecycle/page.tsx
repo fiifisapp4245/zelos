@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { RefreshCw } from "lucide-react"
+import { ListChecks, RefreshCw } from "lucide-react"
 
 import { PageShell } from "@/components/shell/page-shell"
 import {
@@ -15,6 +15,8 @@ import {
 import { LifecycleBadge } from "@/components/common/status"
 import { useStore } from "@/lib/store"
 import { visibleEmployees } from "@/lib/selectors"
+import { lifecycleTasks } from "@/lib/lifecycle-actions"
+import { LifecycleWorklist } from "@/components/employees/lifecycle-worklist"
 import {
   LIFECYCLE_LABEL,
   formatDate,
@@ -31,6 +33,10 @@ export default function LifecycleEventsPage() {
   const scopeIds = new Set(scope.map((e) => e.id))
 
   const [filter, setFilter] = React.useState<LifecycleState | "all">("all")
+
+  // Decisions the current states have made due, newest deadline first.
+  const tasks = lifecycleTasks(scope, lifecycleEvents, store.leaveRequests)
+  const overdue = tasks.filter((t) => t.daysLeft < 0).length
 
   const events = lifecycleEvents
     .filter((e) => scopeIds.has(e.employeeId))
@@ -54,7 +60,7 @@ export default function LifecycleEventsPage() {
     >
       <PageHeader
         title="Lifecycle events"
-        description="Every movement through the employee journey, from pre-hire to retirement. Nothing here can be edited or deleted."
+        description="Every movement through the employee journey, from pre-hire to retirement. Decisions that have fallen due sit at the top; the history below can never be edited or deleted."
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -80,15 +86,30 @@ export default function LifecycleEventsPage() {
           hint="Needs attention"
         />
         <StatCard
-          label="Separated"
-          value={
-            (counts.find((c) => c.state === "resigned")?.count ?? 0) +
-            (counts.find((c) => c.state === "terminated")?.count ?? 0) +
-            (counts.find((c) => c.state === "retired")?.count ?? 0)
-          }
-          hint="End states"
+          label="Awaiting a decision"
+          value={tasks.length}
+          hint={overdue > 0 ? `${overdue} already overdue` : "Nothing overdue"}
         />
       </div>
+
+      <Panel
+        title="Needs a decision"
+        description="Lifecycle states carry obligations. These are the ones that have fallen due in the next 30 days — acting here writes the same audited event as a manual status change."
+        className="mb-6"
+        bodyClassName="p-0"
+        actions={
+          tasks.length > 0 && (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ListChecks className="size-3.5" />
+              {tasks.length} open
+            </span>
+          )
+        }
+      >
+        <LifecycleWorklist tasks={tasks} />
+      </Panel>
+
+      <h2 className="mb-3 text-sm font-semibold">History</h2>
 
       <div className="mb-4 flex flex-wrap gap-2">
         <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>

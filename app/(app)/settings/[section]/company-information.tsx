@@ -110,8 +110,22 @@ function ProfileCard({ onEdit }: { onEdit: () => void }) {
             fill="currentColor"
             opacity=".16"
           />
-          <ellipse cx="690" cy="34" rx="130" ry="76" fill="currentColor" opacity=".2" />
-          <ellipse cx="120" cy="-10" rx="90" ry="60" fill="currentColor" opacity=".14" />
+          <ellipse
+            cx="690"
+            cy="34"
+            rx="130"
+            ry="76"
+            fill="currentColor"
+            opacity=".2"
+          />
+          <ellipse
+            cx="120"
+            cy="-10"
+            rx="90"
+            ry="60"
+            fill="currentColor"
+            opacity=".14"
+          />
           <path
             d="M150 -20c46 54 6 108 92 150M420 -30c-24 64 44 86 32 172M640 -16c12 56-64 76-30 164"
             stroke="currentColor"
@@ -173,13 +187,19 @@ function Offices() {
             <p className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-medium">
                 {/* "Accra HQ" already reads as an office; "Kumasi" does not. */}
-                {/office|hq/i.test(branch.name) ? branch.name : `${branch.name} Office`}
+                {/office|hq/i.test(branch.name)
+                  ? branch.name
+                  : `${branch.name} Office`}
               </span>
               {i === 0 && <Pill tone="success">Head office</Pill>}
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Ghana &bull; {branch.city} &bull; +233 24 ****4567 &bull;{" "}
-              {employees.filter((e) => e.branch === branch.name && isOnStrength(e)).length}{" "}
+              {
+                employees.filter(
+                  (e) => e.branch === branch.name && isOnStrength(e)
+                ).length
+              }{" "}
               people
             </p>
           </div>
@@ -193,7 +213,9 @@ function Offices() {
           <button
             type="button"
             aria-label={`Remove ${branch.name}`}
-            onClick={() => toast("Archive a branch from Organizational structure.")}
+            onClick={() =>
+              toast("Archive a branch from Organizational structure.")
+            }
             className="grid size-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           >
             <Trash2 className="size-4" />
@@ -213,16 +235,20 @@ const GROUPS: { title: string; fields: FieldSpec[] }[] = [
 /** Mounted only while open, so the form seeds fresh each time. */
 function EditCompanyDialog({ onClose }: { onClose: () => void }) {
   const store = useStore()
-  const [values, setValues] = React.useState<CompanyProfile>({ ...store.company })
+  const [values, setValues] = React.useState<CompanyProfile>({
+    ...store.company,
+  })
 
   const changed = (Object.keys(values) as (keyof CompanyProfile)[]).filter(
     (k) => values[k] !== store.company[k]
   )
 
   function save() {
-    const blank = [...PROFILE_FIELDS, ...REGISTRATION_FIELDS, ...CONTACT_FIELDS].find(
-      (f) => !values[f.key].trim()
-    )
+    const blank = [
+      ...PROFILE_FIELDS,
+      ...REGISTRATION_FIELDS,
+      ...CONTACT_FIELDS,
+    ].find((f) => !values[f.key].trim())
     if (blank) {
       toast.error(`${blank.label} cannot be empty.`)
       return
@@ -264,33 +290,35 @@ function EditCompanyDialog({ onClose }: { onClose: () => void }) {
       }
     >
       <div className="space-y-6">
-          {GROUPS.map((group) => (
-            <div key={group.title}>
-              <p className="mb-3 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                {group.title}
-              </p>
-              <div className="space-y-4">
-                {group.fields.map((f) => (
-                  <div key={f.key}>
-                    <Label htmlFor={f.key} className="mb-1.5 block text-sm">
-                      {f.label}
-                    </Label>
-                    <Input
-                      id={f.key}
-                      value={values[f.key]}
-                      onChange={(e) =>
-                        setValues((v) => ({ ...v, [f.key]: e.target.value }))
-                      }
-                      className="h-10"
-                    />
-                    {f.hint && (
-                      <p className="mt-1 text-xs text-muted-foreground">{f.hint}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
+        {GROUPS.map((group) => (
+          <div key={group.title}>
+            <p className="mb-3 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              {group.title}
+            </p>
+            <div className="space-y-4">
+              {group.fields.map((f) => (
+                <div key={f.key}>
+                  <Label htmlFor={f.key} className="mb-1.5 block text-sm">
+                    {f.label}
+                  </Label>
+                  <Input
+                    id={f.key}
+                    value={values[f.key]}
+                    onChange={(e) =>
+                      setValues((v) => ({ ...v, [f.key]: e.target.value }))
+                    }
+                    className="h-10"
+                  />
+                  {f.hint && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {f.hint}
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+        ))}
       </div>
     </FormDialog>
   )

@@ -111,7 +111,10 @@ export default function LeavePage() {
       </div>
 
       <Tabs defaultValue={approvals.length > 0 ? "approvals" : "mine"}>
-        <TabsList className="mb-5 h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0">
+        <TabsList
+          variant="line"
+          className="mb-5 h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0"
+        >
           {[
             [
               "approvals",
@@ -124,7 +127,7 @@ export default function LeavePage() {
             <TabsTrigger
               key={v}
               value={v}
-              className="flex-none rounded-none border-0 border-b-2 border-transparent px-3.5 py-2.5 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:font-medium data-[state=active]:text-primary data-[state=active]:shadow-none"
+              className="flex-none rounded-none border-0 px-3.5 py-2.5 text-sm after:bottom-0 data-active:font-medium data-active:text-primary data-active:after:bg-primary"
             >
               {l}
             </TabsTrigger>
@@ -375,22 +378,23 @@ function RequestList({
               )}
             </div>
             <RequestBadge status={r.status} />
-            {r.employeeId === store.viewer.employeeId && r.status === "pending" && (
-              <RowActions
-                label={`Actions for ${r.id}`}
-                actions={[
-                  {
-                    label: "Cancel request",
-                    icon: Ban,
-                    destructive: true,
-                    onSelect: () => {
-                      store.cancelLeave(r.id)
-                      toast.success(`${r.id} cancelled.`)
+            {r.employeeId === store.viewer.employeeId &&
+              r.status === "pending" && (
+                <RowActions
+                  label={`Actions for ${r.id}`}
+                  actions={[
+                    {
+                      label: "Cancel request",
+                      icon: Ban,
+                      destructive: true,
+                      onSelect: () => {
+                        store.cancelLeave(r.id)
+                        toast.success(`${r.id} cancelled.`)
+                      },
                     },
-                  },
-                ]}
-              />
-            )}
+                  ]}
+                />
+              )}
           </li>
         )
       })}

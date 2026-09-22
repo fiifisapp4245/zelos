@@ -18,9 +18,7 @@ export default function CompanySettingsPage() {
 
   if (!has(viewer, "hr_admin")) {
     return (
-      <PageShell
-        crumbs={[{ label: "Company settings" }, { label: "Summary" }]}
-      >
+      <PageShell crumbs={[{ label: "Company settings" }, { label: "Summary" }]}>
         <Panel>
           <EmptyState
             icon={Lock}
@@ -75,7 +73,7 @@ export default function CompanySettingsPage() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search settings ..."
             aria-label="Search settings"
-            className="h-11 w-full rounded-lg border bg-card pr-3 pl-10 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+            className="h-11 w-full rounded-lg border bg-card pr-3 pl-10 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
           />
         </div>
         {q && (
