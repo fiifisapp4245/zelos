@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { notFound, useParams } from "next/navigation"
 import {
+  ArrowLeft,
   Check,
   Construction,
   Globe,
@@ -20,6 +21,7 @@ import { RETIREMENT_AGE } from "@/lib/format"
 import { findSetting } from "@/lib/data/settings"
 import { SETTINGS_CONTENT } from "@/lib/data/settings-content"
 import { SettingBlocks } from "./blocks"
+import { CompanyInformation } from "./company-information"
 import type { PermissionRole } from "@/lib/types"
 
 export default function SettingDetailPage() {
@@ -57,6 +59,13 @@ export default function SettingDetailPage() {
     >
       {/* Title band, matching the hub: white, full width, divider beneath. */}
       <div className="border-b pb-6">
+        <Link
+          href="/settings"
+          className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" />
+          Back to Company Settings
+        </Link>
         <h1 className="text-[26px] leading-tight font-semibold tracking-tight">
           {item.label}
         </h1>
@@ -66,7 +75,9 @@ export default function SettingDetailPage() {
       </div>
 
       <div className="py-6">
-        {section === "localization" ? (
+        {section === "company-information" ? (
+          <CompanyInformation />
+        ) : section === "localization" ? (
           <LocalizationPanel />
         ) : section === "role-assignment" ? (
           <RoleAssignmentPanel />

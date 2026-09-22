@@ -1,5 +1,6 @@
 import type {
   Alert,
+  CompanyProfile,
   AttendanceRecord,
   AuditEntry,
   Branch,
@@ -19,24 +20,133 @@ import type {
 } from "../types"
 import { EMPLOYEES } from "./employees"
 
+export const COMPANY: CompanyProfile = {
+  legalName: "Xanthan Services Limited",
+  tradingName: "Xanthan",
+  industry: "Technology",
+  companySize: "11-50 employees",
+  registrationNumber: "CS-04829-2019",
+  tin: "C0009827451",
+  ssnitEmployerNumber: "E0012345678",
+  incorporatedOn: "4 February 2019",
+  companyEmail: "work@xanthan.com",
+  website: "xanthan.com",
+  mainLine: "+233 30 254 1180",
+  postalAddress: "P.O. Box CT 8241, Cantonments, Accra",
+}
+
 export const BRANCHES: Branch[] = [
-  { id: "accra", name: "Accra HQ", city: "Accra", region: "Greater Accra", archived: false },
-  { id: "kumasi", name: "Kumasi", city: "Kumasi", region: "Ashanti", archived: false },
-  { id: "takoradi", name: "Takoradi", city: "Takoradi", region: "Western", archived: false },
-  { id: "tamale", name: "Tamale", city: "Tamale", region: "Northern", archived: true },
+  {
+    id: "accra",
+    name: "Accra HQ",
+    city: "Accra",
+    region: "Greater Accra",
+    archived: false,
+  },
+  {
+    id: "kumasi",
+    name: "Kumasi",
+    city: "Kumasi",
+    region: "Ashanti",
+    archived: false,
+  },
+  {
+    id: "takoradi",
+    name: "Takoradi",
+    city: "Takoradi",
+    region: "Western",
+    archived: false,
+  },
+  {
+    id: "tamale",
+    name: "Tamale",
+    city: "Tamale",
+    region: "Northern",
+    archived: true,
+  },
 ]
 
 export const DEPARTMENTS: Department[] = [
-  { id: "exec", name: "Executive", headId: "esi", parentId: null, branchId: "accra", archived: false },
-  { id: "eng", name: "Engineering", headId: "adwoa", parentId: null, branchId: "accra", archived: false },
-  { id: "product", name: "Product", headId: "kwesi", parentId: null, branchId: "accra", archived: false },
-  { id: "marketing", name: "Marketing", headId: "yaw", parentId: null, branchId: "accra", archived: false },
-  { id: "people", name: "People", headId: "fiifi", parentId: null, branchId: "accra", archived: false },
-  { id: "finance", name: "Finance", headId: "akwasi", parentId: null, branchId: "accra", archived: false },
-  { id: "ops", name: "Operations", headId: "kojo", parentId: null, branchId: "kumasi", archived: false },
-  { id: "data", name: "Data & Insights", headId: "adwoa", parentId: "eng", branchId: "accra", archived: false },
-  { id: "cs", name: "Customer Success", headId: "akos", parentId: "product", branchId: "accra", archived: false },
-  { id: "legacy", name: "Field Services", headId: null, parentId: null, branchId: "tamale", archived: true },
+  {
+    id: "exec",
+    name: "Executive",
+    headId: "esi",
+    parentId: null,
+    branchId: "accra",
+    archived: false,
+  },
+  {
+    id: "eng",
+    name: "Engineering",
+    headId: "adwoa",
+    parentId: null,
+    branchId: "accra",
+    archived: false,
+  },
+  {
+    id: "product",
+    name: "Product",
+    headId: "kwesi",
+    parentId: null,
+    branchId: "accra",
+    archived: false,
+  },
+  {
+    id: "marketing",
+    name: "Marketing",
+    headId: "yaw",
+    parentId: null,
+    branchId: "accra",
+    archived: false,
+  },
+  {
+    id: "people",
+    name: "People",
+    headId: "fiifi",
+    parentId: null,
+    branchId: "accra",
+    archived: false,
+  },
+  {
+    id: "finance",
+    name: "Finance",
+    headId: "akwasi",
+    parentId: null,
+    branchId: "accra",
+    archived: false,
+  },
+  {
+    id: "ops",
+    name: "Operations",
+    headId: "kojo",
+    parentId: null,
+    branchId: "kumasi",
+    archived: false,
+  },
+  {
+    id: "data",
+    name: "Data & Insights",
+    headId: "adwoa",
+    parentId: "eng",
+    branchId: "accra",
+    archived: false,
+  },
+  {
+    id: "cs",
+    name: "Customer Success",
+    headId: "akos",
+    parentId: "product",
+    branchId: "accra",
+    archived: false,
+  },
+  {
+    id: "legacy",
+    name: "Field Services",
+    headId: null,
+    parentId: null,
+    branchId: "tamale",
+    archived: true,
+  },
 ]
 
 export const LIFECYCLE_EVENTS: LifecycleEvent[] = [
@@ -231,24 +341,116 @@ function doc(
 }
 
 export const DOCUMENTS: EmployeeDocument[] = [
-  doc("d-1", "kofi", "Employment contract.pdf", "contract", "verified", "2026-10-18"),
-  doc("d-2", "kofi", "Ghana Card (front & back).pdf", "identity", "verified", "2031-04-18"),
-  doc("d-3", "kofi", "BSc Computer Science certificate.pdf", "certificate", "verified", null),
+  doc(
+    "d-1",
+    "kofi",
+    "Employment contract.pdf",
+    "contract",
+    "verified",
+    "2026-10-18"
+  ),
+  doc(
+    "d-2",
+    "kofi",
+    "Ghana Card (front & back).pdf",
+    "identity",
+    "verified",
+    "2031-04-18"
+  ),
+  doc(
+    "d-3",
+    "kofi",
+    "BSc Computer Science certificate.pdf",
+    "certificate",
+    "verified",
+    null
+  ),
   doc("d-4", "kofi", "SSNIT registration.pdf", "statutory", "verified", null),
-  doc("d-5", "kofi", "Pre-employment medical.pdf", "medical", "verified", null, true),
+  doc(
+    "d-5",
+    "kofi",
+    "Pre-employment medical.pdf",
+    "medical",
+    "verified",
+    null,
+    true
+  ),
   doc("d-6", "ama", "Employment contract.pdf", "contract", "verified", null),
-  doc("d-7", "ama", "Ghana Card (front & back).pdf", "identity", "expiring", "2026-11-02"),
-  doc("d-8", "abena", "Employment contract.pdf", "contract", "expiring", "2026-10-03"),
-  doc("d-9", "kwame", "Consultancy agreement.pdf", "contract", "expiring", "2026-09-25"),
-  doc("d-10", "kwame", "Ghana Card (front & back).pdf", "identity", "verified", "2029-08-30"),
+  doc(
+    "d-7",
+    "ama",
+    "Ghana Card (front & back).pdf",
+    "identity",
+    "expiring",
+    "2026-11-02"
+  ),
+  doc(
+    "d-8",
+    "abena",
+    "Employment contract.pdf",
+    "contract",
+    "expiring",
+    "2026-10-03"
+  ),
+  doc(
+    "d-9",
+    "kwame",
+    "Consultancy agreement.pdf",
+    "contract",
+    "expiring",
+    "2026-09-25"
+  ),
+  doc(
+    "d-10",
+    "kwame",
+    "Ghana Card (front & back).pdf",
+    "identity",
+    "verified",
+    "2029-08-30"
+  ),
   doc("d-11", "afia", "Employment contract.pdf", "contract", "verified", null),
-  doc("d-12", "afia", "Ghana Card (front & back).pdf", "identity", "pending", null),
+  doc(
+    "d-12",
+    "afia",
+    "Ghana Card (front & back).pdf",
+    "identity",
+    "pending",
+    null
+  ),
   doc("d-13", "nana", "Signed offer letter.pdf", "contract", "verified", null),
-  doc("d-14", "nana", "Ghana Card (front & back).pdf", "identity", "missing", null),
-  doc("d-15", "efua", "NSS appointment letter.pdf", "statutory", "verified", "2026-11-30"),
-  doc("d-16", "akwasi", "Employment contract.pdf", "contract", "expiring", "2026-12-12"),
+  doc(
+    "d-14",
+    "nana",
+    "Ghana Card (front & back).pdf",
+    "identity",
+    "missing",
+    null
+  ),
+  doc(
+    "d-15",
+    "efua",
+    "NSS appointment letter.pdf",
+    "statutory",
+    "verified",
+    "2026-11-30"
+  ),
+  doc(
+    "d-16",
+    "akwasi",
+    "Employment contract.pdf",
+    "contract",
+    "expiring",
+    "2026-12-12"
+  ),
   doc("d-17", "kobby", "Employment contract.pdf", "contract", "verified", null),
-  doc("d-18", "selorm", "AWS certification.pdf", "certificate", "expired", "2026-09-14"),
+  doc(
+    "d-18",
+    "selorm",
+    "AWS certification.pdf",
+    "certificate",
+    "expired",
+    "2026-09-14"
+  ),
 ]
 
 export const LEAVE_BALANCES: LeaveBalance[] = EMPLOYEES.map((e, i) => ({
@@ -340,7 +542,8 @@ export const LEAVE_REQUESTS: LeaveRequest[] = [
     submittedAt: "2026-09-02T15:30:00",
     decidedBy: "abena",
     decidedAt: "2026-09-03T09:18:00",
-    decisionNote: "Campaign launch falls in that week — please re-submit for October.",
+    decisionNote:
+      "Campaign launch falls in that week — please re-submit for October.",
   },
   {
     id: "LR-2026-027",
@@ -380,21 +583,34 @@ export const ATTENDANCE: AttendanceRecord[] = (() => {
     const iso = date.toISOString().slice(0, 10)
     const weekend = date.getDay() === 0 || date.getDay() === 6
     EMPLOYEES.forEach((e, i) => {
-      if (["pre_hire", "retired", "resigned", "terminated"].includes(e.lifecycleState)) return
+      if (
+        ["pre_hire", "retired", "resigned", "terminated"].includes(
+          e.lifecycleState
+        )
+      )
+        return
       let status: AttendanceRecord["status"] = weekend
         ? "weekend"
         : e.lifecycleState === "on_leave"
           ? "on_leave"
           : ATT_STATUSES[(i + d) % ATT_STATUSES.length]
-      if (!weekend && e.workArrangement === "remote" && status === "present") status = "remote"
-      const worked = status === "present" || status === "remote" || status === "late"
+      if (!weekend && e.workArrangement === "remote" && status === "present")
+        status = "remote"
+      const worked =
+        status === "present" || status === "remote" || status === "late"
       out.push({
         id: `att-${e.id}-${iso}`,
         employeeId: e.id,
         date: iso,
         status,
-        clockIn: worked ? (status === "late" ? "09:42" : "08:0" + (i % 9)) : null,
-        clockOut: worked ? "17:" + String(10 + (i % 45)).padStart(2, "0") : null,
+        clockIn: worked
+          ? status === "late"
+            ? "09:42"
+            : "08:0" + (i % 9)
+          : null,
+        clockOut: worked
+          ? "17:" + String(10 + (i % 45)).padStart(2, "0")
+          : null,
         hours: worked ? 8 + ((i % 3) - 1) * 0.5 : 0,
       })
     })
@@ -470,7 +686,13 @@ export const REQUISITIONS: Requisition[] = [
   },
 ]
 
-const CAND_TONES = ["bg-emerald-600", "bg-blue-600", "bg-amber-700", "bg-violet-600", "bg-rose-600"]
+const CAND_TONES = [
+  "bg-emerald-600",
+  "bg-blue-600",
+  "bg-amber-700",
+  "bg-violet-600",
+  "bg-rose-600",
+]
 
 function cand(
   id: string,
@@ -498,42 +720,301 @@ function cand(
 }
 
 export const CANDIDATES: Candidate[] = [
-  cand("c-1", "REQ-014", "Kwaku Boateng", "interview", "LinkedIn", 4, "2026-08-08", 0),
-  cand("c-2", "REQ-014", "Naa Ayikai Quaye", "assessment", "Referral", 5, "2026-08-06", 1),
-  cand("c-3", "REQ-014", "Samuel Adom", "screening", "Job board", 3, "2026-08-21", 2),
-  cand("c-4", "REQ-014", "Priscilla Mensah", "applied", "Careers page", 3, "2026-09-02", 3),
-  cand("c-5", "REQ-014", "Daniel Ofori", "offer", "Referral", 5, "2026-07-30", 4),
-  cand("c-6", "REQ-015", "Linda Amoah", "interview", "LinkedIn", 4, "2026-08-25", 5),
-  cand("c-7", "REQ-015", "Gideon Tetteh", "applied", "Job board", 2, "2026-09-05", 6),
-  cand("c-8", "REQ-015", "Hannah Sarpong", "screening", "Careers page", 4, "2026-09-01", 7),
-  cand("c-9", "REQ-016", "Isaac Nkrumah", "applied", "Walk-in", 3, "2026-08-14", 8),
-  cand("c-10", "REQ-013", "Nana Adjei", "hired", "Referral", 5, "2026-06-18", 9),
-  cand("c-11", "REQ-014", "Comfort Baidoo", "rejected", "Job board", 2, "2026-08-12", 10),
+  cand(
+    "c-1",
+    "REQ-014",
+    "Kwaku Boateng",
+    "interview",
+    "LinkedIn",
+    4,
+    "2026-08-08",
+    0
+  ),
+  cand(
+    "c-2",
+    "REQ-014",
+    "Naa Ayikai Quaye",
+    "assessment",
+    "Referral",
+    5,
+    "2026-08-06",
+    1
+  ),
+  cand(
+    "c-3",
+    "REQ-014",
+    "Samuel Adom",
+    "screening",
+    "Job board",
+    3,
+    "2026-08-21",
+    2
+  ),
+  cand(
+    "c-4",
+    "REQ-014",
+    "Priscilla Mensah",
+    "applied",
+    "Careers page",
+    3,
+    "2026-09-02",
+    3
+  ),
+  cand(
+    "c-5",
+    "REQ-014",
+    "Daniel Ofori",
+    "offer",
+    "Referral",
+    5,
+    "2026-07-30",
+    4
+  ),
+  cand(
+    "c-6",
+    "REQ-015",
+    "Linda Amoah",
+    "interview",
+    "LinkedIn",
+    4,
+    "2026-08-25",
+    5
+  ),
+  cand(
+    "c-7",
+    "REQ-015",
+    "Gideon Tetteh",
+    "applied",
+    "Job board",
+    2,
+    "2026-09-05",
+    6
+  ),
+  cand(
+    "c-8",
+    "REQ-015",
+    "Hannah Sarpong",
+    "screening",
+    "Careers page",
+    4,
+    "2026-09-01",
+    7
+  ),
+  cand(
+    "c-9",
+    "REQ-016",
+    "Isaac Nkrumah",
+    "applied",
+    "Walk-in",
+    3,
+    "2026-08-14",
+    8
+  ),
+  cand(
+    "c-10",
+    "REQ-013",
+    "Nana Adjei",
+    "hired",
+    "Referral",
+    5,
+    "2026-06-18",
+    9
+  ),
+  cand(
+    "c-11",
+    "REQ-014",
+    "Comfort Baidoo",
+    "rejected",
+    "Job board",
+    2,
+    "2026-08-12",
+    10
+  ),
 ]
 
 export const ONBOARDING_TASKS: OnboardingTask[] = [
-  { id: "ot-1", employeeId: "nana", title: "Return signed employment contract", owner: "employee", dueOn: "2026-09-25", done: true, category: "paperwork" },
-  { id: "ot-2", employeeId: "nana", title: "Submit Ghana Card & SSNIT number", owner: "employee", dueOn: "2026-09-26", done: false, category: "compliance" },
-  { id: "ot-3", employeeId: "nana", title: "Create work email & Slack account", owner: "it", dueOn: "2026-10-01", done: true, category: "access" },
-  { id: "ot-4", employeeId: "nana", title: "Issue laptop and access badge", owner: "it", dueOn: "2026-10-03", done: false, category: "access" },
-  { id: "ot-5", employeeId: "nana", title: "Register on payroll (Tier 2 provider)", owner: "hr", dueOn: "2026-10-02", done: false, category: "compliance" },
-  { id: "ot-6", employeeId: "nana", title: "Day-one orientation session", owner: "hr", dueOn: "2026-10-05", done: false, category: "orientation" },
-  { id: "ot-7", employeeId: "nana", title: "Assign onboarding buddy", owner: "manager", dueOn: "2026-10-05", done: true, category: "orientation" },
-  { id: "ot-8", employeeId: "nana", title: "First-week goals conversation", owner: "manager", dueOn: "2026-10-09", done: false, category: "orientation" },
-  { id: "ot-9", employeeId: "afia", title: "Probation mid-point check-in", owner: "manager", dueOn: "2026-02-03", done: true, category: "orientation" },
-  { id: "ot-10", employeeId: "afia", title: "Confirm Ghana Card upload", owner: "hr", dueOn: "2026-09-30", done: false, category: "compliance" },
-  { id: "ot-11", employeeId: "efua", title: "NSS placement letter to Finance", owner: "hr", dueOn: "2025-09-15", done: true, category: "paperwork" },
+  {
+    id: "ot-1",
+    employeeId: "nana",
+    title: "Return signed employment contract",
+    owner: "employee",
+    dueOn: "2026-09-25",
+    done: true,
+    category: "paperwork",
+  },
+  {
+    id: "ot-2",
+    employeeId: "nana",
+    title: "Submit Ghana Card & SSNIT number",
+    owner: "employee",
+    dueOn: "2026-09-26",
+    done: false,
+    category: "compliance",
+  },
+  {
+    id: "ot-3",
+    employeeId: "nana",
+    title: "Create work email & Slack account",
+    owner: "it",
+    dueOn: "2026-10-01",
+    done: true,
+    category: "access",
+  },
+  {
+    id: "ot-4",
+    employeeId: "nana",
+    title: "Issue laptop and access badge",
+    owner: "it",
+    dueOn: "2026-10-03",
+    done: false,
+    category: "access",
+  },
+  {
+    id: "ot-5",
+    employeeId: "nana",
+    title: "Register on payroll (Tier 2 provider)",
+    owner: "hr",
+    dueOn: "2026-10-02",
+    done: false,
+    category: "compliance",
+  },
+  {
+    id: "ot-6",
+    employeeId: "nana",
+    title: "Day-one orientation session",
+    owner: "hr",
+    dueOn: "2026-10-05",
+    done: false,
+    category: "orientation",
+  },
+  {
+    id: "ot-7",
+    employeeId: "nana",
+    title: "Assign onboarding buddy",
+    owner: "manager",
+    dueOn: "2026-10-05",
+    done: true,
+    category: "orientation",
+  },
+  {
+    id: "ot-8",
+    employeeId: "nana",
+    title: "First-week goals conversation",
+    owner: "manager",
+    dueOn: "2026-10-09",
+    done: false,
+    category: "orientation",
+  },
+  {
+    id: "ot-9",
+    employeeId: "afia",
+    title: "Probation mid-point check-in",
+    owner: "manager",
+    dueOn: "2026-02-03",
+    done: true,
+    category: "orientation",
+  },
+  {
+    id: "ot-10",
+    employeeId: "afia",
+    title: "Confirm Ghana Card upload",
+    owner: "hr",
+    dueOn: "2026-09-30",
+    done: false,
+    category: "compliance",
+  },
+  {
+    id: "ot-11",
+    employeeId: "efua",
+    title: "NSS placement letter to Finance",
+    owner: "hr",
+    dueOn: "2025-09-15",
+    done: true,
+    category: "paperwork",
+  },
 ]
 
 export const REVIEWS: PerformanceReview[] = [
-  { id: "pr-1", employeeId: "kofi", cycle: "H2 2026", status: "self_review", rating: null, managerId: "adwoa", dueOn: "2026-10-15", sharedOn: null },
-  { id: "pr-2", employeeId: "ama", cycle: "H2 2026", status: "manager_review", rating: null, managerId: "kwesi", dueOn: "2026-10-15", sharedOn: null },
-  { id: "pr-3", employeeId: "selorm", cycle: "H2 2026", status: "complete", rating: 4.5, managerId: "adwoa", dueOn: "2026-10-15", sharedOn: "2026-09-12" },
-  { id: "pr-4", employeeId: "afia", cycle: "Probation", status: "manager_review", rating: null, managerId: "adwoa", dueOn: "2026-04-20", sharedOn: null },
-  { id: "pr-5", employeeId: "abena", cycle: "H2 2026", status: "not_started", rating: null, managerId: "yaw", dueOn: "2026-10-15", sharedOn: null },
-  { id: "pr-6", employeeId: "kwabena", cycle: "H1 2026", status: "complete", rating: 3.5, managerId: "yaw", dueOn: "2026-04-15", sharedOn: "2026-04-11" },
-  { id: "pr-7", employeeId: "abla", cycle: "H2 2026", status: "calibration", rating: 4, managerId: "abena", dueOn: "2026-10-15", sharedOn: null },
-  { id: "pr-8", employeeId: "adjoa", cycle: "H2 2026", status: "shared", rating: 4, managerId: "akwasi", dueOn: "2026-10-15", sharedOn: "2026-09-14" },
+  {
+    id: "pr-1",
+    employeeId: "kofi",
+    cycle: "H2 2026",
+    status: "self_review",
+    rating: null,
+    managerId: "adwoa",
+    dueOn: "2026-10-15",
+    sharedOn: null,
+  },
+  {
+    id: "pr-2",
+    employeeId: "ama",
+    cycle: "H2 2026",
+    status: "manager_review",
+    rating: null,
+    managerId: "kwesi",
+    dueOn: "2026-10-15",
+    sharedOn: null,
+  },
+  {
+    id: "pr-3",
+    employeeId: "selorm",
+    cycle: "H2 2026",
+    status: "complete",
+    rating: 4.5,
+    managerId: "adwoa",
+    dueOn: "2026-10-15",
+    sharedOn: "2026-09-12",
+  },
+  {
+    id: "pr-4",
+    employeeId: "afia",
+    cycle: "Probation",
+    status: "manager_review",
+    rating: null,
+    managerId: "adwoa",
+    dueOn: "2026-04-20",
+    sharedOn: null,
+  },
+  {
+    id: "pr-5",
+    employeeId: "abena",
+    cycle: "H2 2026",
+    status: "not_started",
+    rating: null,
+    managerId: "yaw",
+    dueOn: "2026-10-15",
+    sharedOn: null,
+  },
+  {
+    id: "pr-6",
+    employeeId: "kwabena",
+    cycle: "H1 2026",
+    status: "complete",
+    rating: 3.5,
+    managerId: "yaw",
+    dueOn: "2026-04-15",
+    sharedOn: "2026-04-11",
+  },
+  {
+    id: "pr-7",
+    employeeId: "abla",
+    cycle: "H2 2026",
+    status: "calibration",
+    rating: 4,
+    managerId: "abena",
+    dueOn: "2026-10-15",
+    sharedOn: null,
+  },
+  {
+    id: "pr-8",
+    employeeId: "adjoa",
+    cycle: "H2 2026",
+    status: "shared",
+    rating: 4,
+    managerId: "akwasi",
+    dueOn: "2026-10-15",
+    sharedOn: "2026-09-14",
+  },
 ]
 
 export const COACHING_NOTES: CoachingNote[] = [
@@ -638,14 +1119,78 @@ export const OFFBOARDING: OffboardingCase[] = [
 
 export const ALERTS: Alert[] = [
   // Thresholds match the days actually remaining, so each row reads truthfully.
-  { id: "al-1", kind: "contract_expiry", employeeId: "abena", thresholdDays: 15, dueOn: "2026-10-03", acknowledged: false, ref: "001" },
-  { id: "al-2", kind: "contract_expiry", employeeId: "kofi", thresholdDays: 30, dueOn: "2026-10-18", acknowledged: false, ref: "002" },
-  { id: "al-3", kind: "contract_expiry", employeeId: "kwame", thresholdDays: 7, dueOn: "2026-09-25", acknowledged: false, ref: "003" },
-  { id: "al-4", kind: "contract_expiry", employeeId: "akwasi", thresholdDays: 30, dueOn: "2026-12-12", acknowledged: true, ref: "004" },
-  { id: "al-5", kind: "probation_end", employeeId: "afia", thresholdDays: 30, dueOn: "2026-10-10", acknowledged: false, ref: "005" },
-  { id: "al-6", kind: "document_expiry", employeeId: "ama", thresholdDays: 60, dueOn: "2026-11-02", acknowledged: false, ref: "006" },
-  { id: "al-7", kind: "document_expiry", employeeId: "selorm", thresholdDays: 60, dueOn: "2026-09-14", acknowledged: false, ref: "007" },
-  { id: "al-8", kind: "retirement", employeeId: "yaa", thresholdDays: 180, dueOn: "2027-03-02", acknowledged: false, ref: "008" },
+  {
+    id: "al-1",
+    kind: "contract_expiry",
+    employeeId: "abena",
+    thresholdDays: 15,
+    dueOn: "2026-10-03",
+    acknowledged: false,
+    ref: "001",
+  },
+  {
+    id: "al-2",
+    kind: "contract_expiry",
+    employeeId: "kofi",
+    thresholdDays: 30,
+    dueOn: "2026-10-18",
+    acknowledged: false,
+    ref: "002",
+  },
+  {
+    id: "al-3",
+    kind: "contract_expiry",
+    employeeId: "kwame",
+    thresholdDays: 7,
+    dueOn: "2026-09-25",
+    acknowledged: false,
+    ref: "003",
+  },
+  {
+    id: "al-4",
+    kind: "contract_expiry",
+    employeeId: "akwasi",
+    thresholdDays: 30,
+    dueOn: "2026-12-12",
+    acknowledged: true,
+    ref: "004",
+  },
+  {
+    id: "al-5",
+    kind: "probation_end",
+    employeeId: "afia",
+    thresholdDays: 30,
+    dueOn: "2026-10-10",
+    acknowledged: false,
+    ref: "005",
+  },
+  {
+    id: "al-6",
+    kind: "document_expiry",
+    employeeId: "ama",
+    thresholdDays: 60,
+    dueOn: "2026-11-02",
+    acknowledged: false,
+    ref: "006",
+  },
+  {
+    id: "al-7",
+    kind: "document_expiry",
+    employeeId: "selorm",
+    thresholdDays: 60,
+    dueOn: "2026-09-14",
+    acknowledged: false,
+    ref: "007",
+  },
+  {
+    id: "al-8",
+    kind: "retirement",
+    employeeId: "yaa",
+    thresholdDays: 180,
+    dueOn: "2027-03-02",
+    acknowledged: false,
+    ref: "008",
+  },
 ]
 
 export const NOTIFICATIONS: Notification[] = [

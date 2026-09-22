@@ -11,6 +11,7 @@ import * as React from "react"
 import { EMPLOYEES, DEFAULT_VIEWER_BY_ROLE } from "./data/employees"
 import {
   ALERTS,
+  COMPANY,
   ATTENDANCE,
   AUDIT_LOG,
   BRANCHES,
@@ -30,6 +31,7 @@ import {
 } from "./data/records"
 import type {
   Alert,
+  CompanyProfile,
   AttendanceRecord,
   AuditEntry,
   Branch,
@@ -71,6 +73,7 @@ interface State {
   branches: Branch[]
   alerts: Alert[]
   notifications: Notification[]
+  company: CompanyProfile
   activeRole: PermissionRole
 }
 
@@ -93,6 +96,7 @@ const INITIAL: State = {
   branches: BRANCHES,
   alerts: ALERTS,
   notifications: NOTIFICATIONS,
+  company: COMPANY,
   activeRole: "hr_admin",
 }
 
@@ -104,9 +108,19 @@ interface StoreValue extends State {
   employeeById: (id: string | null | undefined) => Employee | undefined
   update: <K extends keyof State>(key: K, value: State[K]) => void
   patchEmployee: (id: string, patch: Partial<Employee>, note?: string) => void
+  updateCompany: (patch: Partial<CompanyProfile>) => void
   addEmployee: (employee: Employee) => void
-  changeLifecycle: (id: string, to: LifecycleState, reason: string, effectiveDate: string) => void
-  decideLeave: (id: string, status: "approved" | "rejected", note: string) => void
+  changeLifecycle: (
+    id: string,
+    to: LifecycleState,
+    reason: string,
+    effectiveDate: string
+  ) => void
+  decideLeave: (
+    id: string,
+    status: "approved" | "rejected",
+    note: string
+  ) => void
   submitLeave: (request: LeaveRequest) => void
   toggleOnboardingTask: (id: string) => void
   moveCandidate: (id: string, stage: Candidate["stage"]) => void
@@ -114,7 +128,9 @@ interface StoreValue extends State {
   markNotificationsRead: () => void
   addCoachingNote: (note: CoachingNote) => void
   escalateNote: (id: string) => void
-  log: (entry: Omit<AuditEntry, "id" | "at" | "actorId"> & { actorId?: string }) => void
+  log: (
+    entry: Omit<AuditEntry, "id" | "at" | "actorId"> & { actorId?: string }
+  ) => void
   reset: () => void
 }
 
@@ -174,11 +190,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                 : ["employee"],
     }
 
-    function log(entry: Omit<AuditEntry, "id" | "at" | "actorId"> & { actorId?: string }) {
+    function log(
+      entry: Omit<AuditEntry, "id" | "at" | "actorId"> & { actorId?: string }
+    ) {
       setState((s) => ({
         ...s,
         auditLog: [
-          { id: uid("a"), at: nowIso(), actorId: entry.actorId ?? actorId, ...entry },
+          {
+            id: uid("a"),
+            at: nowIso(),
+            actorId: entry.actorId ?? actorId,
+            ...entry,
+          },
           ...s.auditLog,
         ],
       }))
@@ -188,31 +211,69 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       ...state,
       viewer,
       setActiveRole: (role) => setState((s) => ({ ...s, activeRole: role })),
-      employeeById: (id) => (id ? state.employees.find((e) => e.id === id) : undefined),
+      employeeById: (id) =>
+        id ? state.employees.find((e) => e.id === id) : undefined,
       update: (key, val) => setState((s) => ({ ...s, [key]: val })),
 
       patchEmployee: (id, patch, note) => {
         setState((s) => {
           const before = s.employees.find((e) => e.id === id)
-          const entries: AuditEntry[] = Object.entries(patch).flatMap(([field, after]) => {
-            const prev = before ? (before as unknown as Record<string, unknown>)[field] : undefined
-            if (typeof after === "object" || prev === after) return []
-            return [
-              {
-                id: uid("a"),
-                employeeId: id,
-                actorId,
-                action: note ?? `Updated ${field}`,
-                field,
-                before: String(prev ?? ""),
-                after: String(after ?? ""),
-                at: nowIso(),
-              },
-            ]
-          })
+          const entries: AuditEntry[] = Object.entries(patch).flatMap(
+            ([field, after]) => {
+              const prev = before
+                ? (before as unknown as Record<string, unknown>)[field]
+                : undefined
+              if (typeof after === "object" || prev === after) return []
+              return [
+                {
+                  id: uid("a"),
+                  employeeId: id,
+                  actorId,
+                  action: note ?? `Updated ${field}`,
+                  field,
+                  before: String(prev ?? ""),
+                  after: String(after ?? ""),
+                  at: nowIso(),
+                },
+              ]
+            }
+          )
           return {
             ...s,
-            employees: s.employees.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+            employees: s.employees.map((e) =>
+              e.id === id ? { ...e, ...patch } : e
+            ),
+            auditLog: [...entries, ...s.auditLog],
+          }
+        })
+      },
+
+      updateCompany: (patch) => {
+        setState((s) => {
+          const entries: AuditEntry[] = Object.entries(patch).flatMap(
+            ([field, after]) => {
+              const before = (s.company as unknown as Record<string, unknown>)[
+                field
+              ]
+              if (before === after) return []
+              return [
+                {
+                  id: uid("a"),
+                  employeeId: null,
+                  actorId,
+                  action: "Updated company information",
+                  field,
+                  before: String(before ?? ""),
+                  after: String(after ?? ""),
+                  at: nowIso(),
+                },
+              ]
+            }
+          )
+          if (entries.length === 0) return s
+          return {
+            ...s,
+            company: { ...s.company, ...patch },
             auditLog: [...entries, ...s.auditLog],
           }
         })
@@ -254,7 +315,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           if (!emp) return s
           return {
             ...s,
-            employees: s.employees.map((e) => (e.id === id ? { ...e, lifecycleState: to } : e)),
+            employees: s.employees.map((e) =>
+              e.id === id ? { ...e, lifecycleState: to } : e
+            ),
             lifecycleEvents: [
               {
                 id: uid("le"),
@@ -290,13 +353,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ...s,
           leaveRequests: s.leaveRequests.map((r) =>
             r.id === id
-              ? { ...r, status, decidedBy: actorId, decidedAt: nowIso(), decisionNote: note }
+              ? {
+                  ...r,
+                  status,
+                  decidedBy: actorId,
+                  decidedAt: nowIso(),
+                  decisionNote: note,
+                }
               : r
           ),
           auditLog: [
             {
               id: uid("a"),
-              employeeId: s.leaveRequests.find((r) => r.id === id)?.employeeId ?? null,
+              employeeId:
+                s.leaveRequests.find((r) => r.id === id)?.employeeId ?? null,
               actorId,
               action: `${status === "approved" ? "Approved" : "Rejected"} leave request`,
               field: id,
@@ -309,7 +379,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       },
 
       submitLeave: (request) => {
-        setState((s) => ({ ...s, leaveRequests: [request, ...s.leaveRequests] }))
+        setState((s) => ({
+          ...s,
+          leaveRequests: [request, ...s.leaveRequests],
+        }))
       },
 
       toggleOnboardingTask: (id) => {
@@ -324,14 +397,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       moveCandidate: (id, stage) => {
         setState((s) => ({
           ...s,
-          candidates: s.candidates.map((c) => (c.id === id ? { ...c, stage } : c)),
+          candidates: s.candidates.map((c) =>
+            c.id === id ? { ...c, stage } : c
+          ),
         }))
       },
 
       acknowledgeAlert: (id) => {
         setState((s) => ({
           ...s,
-          alerts: s.alerts.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)),
+          alerts: s.alerts.map((a) =>
+            a.id === id ? { ...a, acknowledged: true } : a
+          ),
         }))
       },
 
@@ -355,7 +432,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           auditLog: [
             {
               id: uid("a"),
-              employeeId: s.coachingNotes.find((n) => n.id === id)?.employeeId ?? null,
+              employeeId:
+                s.coachingNotes.find((n) => n.id === id)?.employeeId ?? null,
               actorId,
               action: "Escalated coaching note to official record",
               at: nowIso(),

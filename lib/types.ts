@@ -7,11 +7,7 @@
  */
 
 export type PermissionRole =
-  | "hr_admin"
-  | "line_manager"
-  | "head_of_department"
-  | "employee"
-  | "payroll"
+  "hr_admin" | "line_manager" | "head_of_department" | "employee" | "payroll"
 
 export type LifecycleState =
   | "pre_hire"
@@ -25,11 +21,7 @@ export type LifecycleState =
   | "retired"
 
 export type EmploymentType =
-  | "full_time"
-  | "part_time"
-  | "contractor"
-  | "intern"
-  | "nsp"
+  "full_time" | "part_time" | "contractor" | "intern" | "nsp"
 
 export type ContractType = "permanent" | "fixed_term" | "probationary"
 
@@ -119,13 +111,15 @@ export interface AuditEntry {
   purpose?: string
 }
 
-export type DocumentStatus = "verified" | "pending" | "expiring" | "expired" | "missing"
+export type DocumentStatus =
+  "verified" | "pending" | "expiring" | "expired" | "missing"
 
 export interface EmployeeDocument {
   id: string
   employeeId: string
   name: string
-  category: "contract" | "identity" | "certificate" | "statutory" | "medical" | "other"
+  category:
+    "contract" | "identity" | "certificate" | "statutory" | "medical" | "other"
   status: DocumentStatus
   uploadedAt: string
   uploadedBy: string
@@ -171,13 +165,7 @@ export interface LeaveBalance {
 }
 
 export type AttendanceStatus =
-  | "present"
-  | "remote"
-  | "late"
-  | "absent"
-  | "on_leave"
-  | "holiday"
-  | "weekend"
+  "present" | "remote" | "late" | "absent" | "on_leave" | "holiday" | "weekend"
 
 export interface AttendanceRecord {
   id: string
@@ -190,7 +178,8 @@ export interface AttendanceRecord {
   note?: string
 }
 
-export type RequisitionStatus = "draft" | "open" | "on_hold" | "filled" | "closed"
+export type RequisitionStatus =
+  "draft" | "open" | "on_hold" | "filled" | "closed"
 
 export interface Requisition {
   id: string
@@ -238,7 +227,13 @@ export interface OnboardingTask {
   category: "paperwork" | "access" | "orientation" | "compliance"
 }
 
-export type ReviewStatus = "not_started" | "self_review" | "manager_review" | "calibration" | "shared" | "complete"
+export type ReviewStatus =
+  | "not_started"
+  | "self_review"
+  | "manager_review"
+  | "calibration"
+  | "shared"
+  | "complete"
 
 export interface PerformanceReview {
   id: string
@@ -262,7 +257,8 @@ export interface CoachingNote {
   escalatedAt: string | null
 }
 
-export type CaseState = "open" | "investigation" | "hearing" | "finalised" | "dismissed"
+export type CaseState =
+  "open" | "investigation" | "hearing" | "finalised" | "dismissed"
 
 export interface DisciplinaryCase {
   id: string
@@ -291,7 +287,12 @@ export interface OffboardingCase {
   noticeGivenOn: string
   lastWorkingDay: string
   exitInterviewDone: boolean
-  clearance: { assets: boolean; access: boolean; finance: boolean; handover: boolean }
+  clearance: {
+    assets: boolean
+    access: boolean
+    finance: boolean
+    handover: boolean
+  }
   finalSettlement: number | null
   state: "notice" | "clearing" | "settled" | "closed"
 }
@@ -313,7 +314,8 @@ export interface Branch {
   archived: boolean
 }
 
-export type AlertKind = "contract_expiry" | "probation_end" | "document_expiry" | "retirement"
+export type AlertKind =
+  "contract_expiry" | "probation_end" | "document_expiry" | "retirement"
 
 export interface Alert {
   id: string
@@ -333,4 +335,20 @@ export interface Notification {
   read: boolean
   kind: "approval" | "alert" | "mention" | "system"
   href?: string
+}
+
+/** The organisation's own record, edited under Company Settings. */
+export interface CompanyProfile {
+  legalName: string
+  tradingName: string
+  industry: string
+  companySize: string
+  registrationNumber: string
+  tin: string
+  ssnitEmployerNumber: string
+  incorporatedOn: string
+  companyEmail: string
+  website: string
+  mainLine: string
+  postalAddress: string
 }

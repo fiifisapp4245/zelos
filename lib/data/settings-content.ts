@@ -72,40 +72,6 @@ const mono = (text: string): Cell => ({ text, mono: true })
 
 export const SETTINGS_CONTENT: Record<string, Block[]> = {
   // ---------------------------------------------------------------- Company
-  "company-information": [
-    {
-      kind: "cover",
-      rows: [
-        ["Legal name", "Xanthan Services Limited"],
-        ["Trading name", "Xanthan"],
-        ["Industry", "Technology"],
-        ["Company size", "11-50 employees"],
-      ],
-      action: "Edit profile",
-    },
-    {
-      kind: "grid",
-      title: "Registration",
-      rows: [
-        ["Business registration number", "CS-04829-2019"],
-        ["TIN", "C0009827451"],
-        ["SSNIT employer number", "E0012345678"],
-        ["Date of incorporation", "4 February 2019"],
-      ],
-    },
-    {
-      kind: "grid",
-      title: "Contact",
-      rows: [
-        ["Company email", "work@xanthan.com"],
-        ["Website", "xanthan.com"],
-        ["Main line", "+233 30 254 1180"],
-        ["Postal address", "P.O. Box CT 8241, Cantonments, Accra"],
-      ],
-    },
-    { kind: "offices", title: "Offices" },
-  ],
-
   "job-catalog": [
     {
       kind: "table",
