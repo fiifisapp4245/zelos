@@ -298,7 +298,7 @@ export default function NewEmployeePage() {
 
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <aside className="lg:sticky lg:top-20 lg:self-start">
-          <div className="rounded-xl bg-card p-4 shadow-sm">
+          <div className="rounded-xl bg-card p-4">
             <ol className="space-y-1">
               {STEPS.map((s, i) => {
                 const done = step > s.id
@@ -405,7 +405,7 @@ export default function NewEmployeePage() {
           {step === 4 && <StepDocuments />}
           {step === 5 && <StepReview draft={draft} />}
 
-          <div className="flex items-center justify-between rounded-xl bg-card px-5 py-3.5 shadow-sm">
+          <div className="flex items-center justify-between rounded-xl bg-card px-5 py-3.5">
             <Button
               variant="ghost"
               size="lg"
@@ -583,7 +583,7 @@ function StepPersonal({
             </div>
             <button
               type="button"
-              className="absolute right-0 bottom-0 grid size-7 place-items-center rounded-full border bg-background shadow-sm transition-colors hover:bg-muted"
+              className="absolute right-0 bottom-0 grid size-7 place-items-center rounded-full border bg-background transition-colors hover:bg-muted"
               aria-label="Upload photo"
             >
               <Camera className="size-3.5" />

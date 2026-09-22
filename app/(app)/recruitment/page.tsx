@@ -266,7 +266,7 @@ function StageColumn({
   }
 
   return (
-    <div className="w-[230px] shrink-0 self-start rounded-xl bg-card shadow-sm">
+    <div className="w-[230px] shrink-0 self-start rounded-xl bg-card">
       <div className="flex items-center justify-between border-b px-3 py-2.5">
         <p className="text-sm font-medium">{STAGE_LABEL[stage]}</p>
         <span className="tabular rounded-full bg-muted px-1.5 text-xs text-muted-foreground">

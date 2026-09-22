@@ -182,7 +182,7 @@ function OrgTreeBlock({
             const children = active.filter((d) => d.parentId === dept.id)
 
             return (
-              <li key={dept.id} className="rounded-xl bg-card p-4 shadow-sm">
+              <li key={dept.id} className="rounded-xl bg-card p-4">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-semibold">{dept.name}</p>
                   <span className="tabular flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
@@ -275,7 +275,7 @@ function CoverBlock({
   action?: string
 }) {
   return (
-    <section className="overflow-hidden rounded-xl bg-card shadow-sm">
+    <section className="overflow-hidden rounded-xl bg-card">
       <div className="relative h-36 overflow-hidden bg-success-muted">
         <svg
           viewBox="0 0 800 160"
@@ -316,7 +316,7 @@ function CoverBlock({
 
       {/* Positioned so the logo tile sits above the banner, which is relative. */}
       <div className="relative z-10 px-6 pb-6">
-        <div className="-mt-12 mb-5 grid size-24 place-items-center rounded-xl border-4 border-card bg-card shadow-sm">
+        <div className="-mt-12 mb-5 grid size-24 place-items-center rounded-xl border-4 border-card bg-card">
           <span className="grid size-14 place-items-center rounded-lg bg-primary text-xl font-semibold text-primary-foreground">
             X
           </span>

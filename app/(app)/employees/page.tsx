@@ -165,7 +165,7 @@ export default function DirectoryPage() {
         }
       />
 
-      <div className="rounded-xl bg-card shadow-sm">
+      <div className="rounded-xl bg-card">
         <div className="flex flex-wrap items-center gap-3 border-b p-3">
           <div className="relative min-w-[260px] flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -637,7 +637,7 @@ function DirectoryGrid({ rows }: { rows: Employee[] }) {
         <Link
           key={e.id}
           href={`/employees/${e.id}`}
-          className="rounded-xl bg-card p-4 shadow-sm transition-colors hover:bg-muted/30"
+          className="rounded-xl bg-card p-4 transition-colors hover:bg-muted/30"
         >
           <div className="flex items-start gap-3">
             <Initials person={e} size="lg" />

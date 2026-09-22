@@ -112,7 +112,7 @@ function CategoryCard({ category }: { category: SettingCategory }) {
   const Icon = category.icon
 
   return (
-    <section className="flex flex-col rounded-xl bg-card p-5 shadow-sm">
+    <section className="flex flex-col rounded-xl bg-card p-5">
       <header className="flex items-center gap-2.5">
         <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-success-muted text-primary">
           <Icon className="size-4" />

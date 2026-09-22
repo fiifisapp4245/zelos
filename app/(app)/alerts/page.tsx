@@ -342,7 +342,7 @@ function Timeline({ alerts }: { alerts: Alert[] }) {
                   top: i % 2 === 0 ? 8 : 78,
                 }}
               >
-                <span className="block -translate-x-1/2 rounded-md border bg-card px-2 py-1 text-[10px] whitespace-nowrap shadow-sm">
+                <span className="block -translate-x-1/2 rounded-md border bg-card px-2 py-1 text-[10px] whitespace-nowrap">
                   {emp?.firstName} {emp?.lastName} · {days}d
                 </span>
                 <span

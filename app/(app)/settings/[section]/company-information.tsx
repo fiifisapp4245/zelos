@@ -97,7 +97,7 @@ function ProfileCard({ onEdit }: { onEdit: () => void }) {
   const initial = company.tradingName.trim().charAt(0).toUpperCase() || "?"
 
   return (
-    <section className="overflow-hidden rounded-xl bg-card shadow-sm">
+    <section className="overflow-hidden rounded-xl bg-card">
       <div className="relative h-36 overflow-hidden bg-success-muted">
         <svg
           viewBox="0 0 800 160"
@@ -138,7 +138,7 @@ function ProfileCard({ onEdit }: { onEdit: () => void }) {
 
       {/* Positioned so the logo tile sits above the banner, which is relative. */}
       <div className="relative z-10 px-6 pb-6">
-        <div className="-mt-12 mb-5 grid size-24 place-items-center rounded-xl border-4 border-card bg-card shadow-sm">
+        <div className="-mt-12 mb-5 grid size-24 place-items-center rounded-xl border-4 border-card bg-card">
           <span className="grid size-14 place-items-center rounded-lg bg-primary text-xl font-semibold text-primary-foreground">
             {initial}
           </span>
