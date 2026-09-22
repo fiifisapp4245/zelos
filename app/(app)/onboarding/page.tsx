@@ -245,10 +245,7 @@ function JoinerCard({ employeeId }: { employeeId: string }) {
       )}
 
       {adding && (
-        <AddTaskDialog
-          employeeId={employeeId}
-          onClose={() => setAdding(false)}
-        />
+        <AddTaskDialog employeeId={employeeId} onClose={() => setAdding(false)} />
       )}
     </Panel>
   )
@@ -324,9 +321,7 @@ function AddTaskDialog({
             <select
               id="task-owner"
               value={owner}
-              onChange={(e) =>
-                setOwner(e.target.value as OnboardingTask["owner"])
-              }
+              onChange={(e) => setOwner(e.target.value as OnboardingTask["owner"])}
               className="h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
             >
               {(["hr", "manager", "employee", "it"] as const).map((o) => (
@@ -348,13 +343,13 @@ function AddTaskDialog({
               }
               className="h-10 w-full rounded-lg border bg-background px-3 text-sm capitalize outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
             >
-              {(
-                ["paperwork", "access", "orientation", "compliance"] as const
-              ).map((c) => (
-                <option key={c} value={c} className="capitalize">
-                  {c}
-                </option>
-              ))}
+              {(["paperwork", "access", "orientation", "compliance"] as const).map(
+                (c) => (
+                  <option key={c} value={c} className="capitalize">
+                    {c}
+                  </option>
+                )
+              )}
             </select>
           </div>
         </div>

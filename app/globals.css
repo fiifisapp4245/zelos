@@ -183,3 +183,26 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* Dotted canvas behind the org chart, so the tree reads as a diagram. */
+:root {
+    --chart-canvas: oklch(0.985 0 0);
+    --chart-dot: oklch(0.86 0 0);
+}
+
+.dark {
+    --chart-canvas: oklch(0.165 0 0);
+    --chart-dot: oklch(0.3 0 0);
+}
+
+@theme inline {
+    --color-chart-canvas: var(--chart-canvas);
+}
+
+@layer components {
+  .bg-chart-canvas {
+    background-color: var(--chart-canvas);
+    background-image: radial-gradient(var(--chart-dot) 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+}

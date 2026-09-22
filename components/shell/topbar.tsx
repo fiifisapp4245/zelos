@@ -52,7 +52,7 @@ export function Topbar({ crumbs }: { crumbs: Crumb[] }) {
   }, [])
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 bg-card px-5">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b bg-card px-5">
       <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
         <ol className="flex items-center gap-1.5 text-sm">
           {crumbs.map((c, i) => (

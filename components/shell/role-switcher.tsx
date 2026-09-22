@@ -60,7 +60,7 @@ export function RoleSwitcherFab() {
       className="fixed right-5 bottom-5 z-50 flex flex-col items-end gap-2"
     >
       {open && (
-        <div className="w-[300px] overflow-hidden rounded-xl bg-popover shadow-xl">
+        <div className="w-[300px] overflow-hidden rounded-xl border bg-popover shadow-xl">
           <div className="flex items-start justify-between gap-2 border-b px-3.5 py-3">
             <div className="min-w-0">
               <p className="text-sm font-semibold">Viewing as</p>

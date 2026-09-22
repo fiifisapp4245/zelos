@@ -6,15 +6,14 @@ import { notFound, useParams } from "next/navigation"
 import {
   AlertTriangle,
   CalendarDays,
+  ChevronDown,
   Clock,
   Eye,
   EyeOff,
   Hash,
   Lock,
-  Mail,
-  MapPin,
   Pencil,
-  Phone,
+  Plus,
   RefreshCw,
   Send,
   ShieldAlert,
@@ -50,6 +49,7 @@ import {
   CONTRACT_TYPE_LABEL,
   EMPLOYMENT_TYPE_LABEL,
   LIFECYCLE_LABEL,
+  IRREVERSIBLE,
   LIFECYCLE_TRANSITIONS,
   age,
   daysUntil,
@@ -58,7 +58,6 @@ import {
   fullName,
   ghs,
   maskId,
-  relativeTime,
   yearsOfService,
 } from "@/lib/format"
 import { completeness } from "@/lib/selectors"
@@ -107,7 +106,6 @@ export default function EmployeeRecordPage() {
     )
   }
 
-  const manager = store.employeeById(employee.managerId)
   const contractEndsIn = daysUntil(employee.contractEndDate)
   const mayEdit = canEditRecord(viewer, employee)
   const mayChangeState = canChangeLifecycle(viewer)
@@ -122,97 +120,122 @@ export default function EmployeeRecordPage() {
         { label: fullName(employee) },
       ]}
     >
-      <header className="mb-6 flex flex-wrap items-start gap-5">
-        <Initials person={employee} size="xl" />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2.5">
+      {/* Cover, avatar and identity — the record's masthead. */}
+      <section className="mb-5 overflow-hidden rounded-xl border bg-card">
+        <div className="relative h-32 overflow-hidden bg-success-muted">
+          <svg
+            viewBox="0 0 800 140"
+            preserveAspectRatio="xMidYMid slice"
+            className="absolute inset-0 size-full text-primary"
+            aria-hidden
+          >
+            <path
+              d="M0 86c90-46 150 30 250 8s130-76 230-62 150 86 240 66v44H0Z"
+              fill="currentColor"
+              opacity=".16"
+            />
+            <ellipse
+              cx="690"
+              cy="30"
+              rx="130"
+              ry="70"
+              fill="currentColor"
+              opacity=".2"
+            />
+            <ellipse
+              cx="120"
+              cy="-8"
+              rx="90"
+              ry="56"
+              fill="currentColor"
+              opacity=".14"
+            />
+          </svg>
+        </div>
+
+        <div className="relative z-10 flex flex-wrap items-end justify-between gap-4 px-6 pb-5">
+          <div className="min-w-0">
+            <Initials
+              person={employee}
+              size="xl"
+              className="-mt-10 mb-3 rounded-xl border-4 border-card"
+            />
             <h1 className="text-[26px] leading-tight font-semibold tracking-tight">
               {fullName(employee)}
             </h1>
-            <LifecycleBadge state={employee.lifecycleState} />
-            {contractEndsIn !== null && contractEndsIn <= 90 && (
-              <Pill tone={contractEndsIn <= 7 ? "danger" : "warning"}>
-                <Clock className="size-3" />
-                Contract ends {formatDate(employee.contractEndDate)}
+            <p className="mt-1 text-sm text-muted-foreground">
+              {employee.jobTitle} · {employee.department}
+            </p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {employee.branch} · Since {formatDate(employee.startDate)}
+            </p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <LifecycleBadge state={employee.lifecycleState} />
+              <Pill tone="neutral">{employee.compensation.payGrade}</Pill>
+              <Pill tone="neutral">{employee.phone}</Pill>
+              <Pill tone="neutral">
+                <Hash className="size-3" />
+                {employee.employeeId}
               </Pill>
-            )}
-            {isSelf(viewer, employee) && <Pill tone="info">This is you</Pill>}
-            {isDottedReport(viewer, employee) && (
-              <Pill tone="neutral">Dotted-line report</Pill>
-            )}
+              {contractEndsIn !== null && contractEndsIn <= 90 && (
+                <Pill tone={contractEndsIn <= 7 ? "danger" : "warning"}>
+                  <Clock className="size-3" />
+                  Contract ends {formatDate(employee.contractEndDate)}
+                </Pill>
+              )}
+              {isSelf(viewer, employee) && <Pill tone="info">This is you</Pill>}
+              {isDottedReport(viewer, employee) && (
+                <Pill tone="neutral">Dotted-line report</Pill>
+              )}
+            </div>
           </div>
 
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            {employee.jobTitle} · {employee.department}
-            {manager && (
-              <>
-                {" · Reports to "}
-                <Link
-                  href={`/employees/${manager.id}`}
-                  className="text-foreground hover:underline"
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {employee.lifecycleState === "pre_hire" &&
+                has(viewer, "hr_admin") && (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() =>
+                      toast.success(`Invite sent to ${employee.personalEmail}.`)
+                    }
+                  >
+                    <Send className="size-4" />
+                    Send invite
+                  </Button>
+                )}
+              {mayEdit && (
+                <Button size="lg" onClick={() => setEditOpen(true)}>
+                  <Pencil className="size-4" />
+                  Edit profile
+                </Button>
+              )}
+              {mayChangeState && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => setStatusOpen(true)}
                 >
-                  {fullName(manager)}
-                </Link>
-              </>
-            )}
-          </p>
-
-          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <Hash className="size-3.5" />
-              <span className="font-mono text-xs">{employee.employeeId}</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Mail className="size-3.5" />
-              {employee.email}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Phone className="size-3.5" />
-              {employee.phone}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <MapPin className="size-3.5" />
-              {employee.branch}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <CalendarDays className="size-3.5" />
-              Joined {formatDate(employee.startDate)}
-            </span>
+                  <RefreshCw className="size-4" />
+                  Change status
+                </Button>
+              )}
+            </div>
+            {mayChangeState &&
+              !IRREVERSIBLE.includes(employee.lifecycleState) && (
+                <Button
+                  variant="destructive"
+                  size="lg"
+                  onClick={() => setStatusOpen(true)}
+                >
+                  Initiate exit
+                </Button>
+              )}
           </div>
         </div>
-
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {employee.lifecycleState === "pre_hire" &&
-            has(viewer, "hr_admin") && (
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() =>
-                  toast.success(`Invite sent to ${employee.personalEmail}.`)
-                }
-              >
-                <Send className="size-4" />
-                Send invite
-              </Button>
-            )}
-          {mayEdit && (
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => setEditOpen(true)}
-            >
-              <Pencil className="size-4" />
-              Edit
-            </Button>
-          )}
-          {mayChangeState && (
-            <Button size="lg" onClick={() => setStatusOpen(true)}>
-              <RefreshCw className="size-4" />
-              Change status
-            </Button>
-          )}
-        </div>
-      </header>
+      </section>
 
       {record.missing.length > 0 && has(viewer, "hr_admin") && (
         <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-warning/35 bg-warning-muted px-4 py-3">
@@ -243,12 +266,12 @@ export default function EmployeeRecordPage() {
       <Tabs defaultValue="overview">
         <TabsList className="mb-5 h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-0">
           {[
-            ["overview", "Overview"],
+            ["overview", "Profile"],
             ["employment", "Employment"],
             ["compensation", "Compensation"],
-            ["documents", "Documents"],
             ["time", "Time & leave"],
-            ["lifecycle", "Lifecycle"],
+            ["documents", "Documents"],
+            ["lifecycle", "History"],
             ["audit", "Audit log"],
           ].map(([value, label]) => (
             <TabsTrigger
@@ -567,112 +590,212 @@ function PersonLink({ id }: { id: string }) {
   )
 }
 
+/** A labelled value in its own bordered box, as on the employment design. */
+function Cell({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border bg-muted/20 px-4 py-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-semibold break-words">{value ?? "—"}</p>
+    </div>
+  )
+}
+
+function Section({
+  title,
+  children,
+  defaultOpen = true,
+}: {
+  title: string
+  children: React.ReactNode
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = React.useState(defaultOpen)
+  return (
+    <section className="border-b last:border-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between py-4 text-left"
+      >
+        <span className="text-sm text-muted-foreground">{title}</span>
+        <ChevronDown
+          className={cn(
+            "size-4 text-muted-foreground transition-transform",
+            open && "rotate-180"
+          )}
+        />
+      </button>
+      {open && <div className="pb-5">{children}</div>}
+    </section>
+  )
+}
+
 function EmploymentTab({ employeeId }: { employeeId: string }) {
   const store = useStore()
+  const { viewer } = store
   const employee = store.employeeById(employeeId)!
+  const manager = store.employeeById(employee.managerId)
+  const dotted = store.employeeById(employee.dottedLineManagerId)
+  const mayAct = has(viewer, "hr_admin")
+
+  const probationDone =
+    employee.probationEndDate !== null &&
+    (daysUntil(employee.probationEndDate) ?? 0) < 0
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
-      <Panel title="Position">
-        <SectionGrid>
-          <Field label="Job title" value={employee.jobTitle} />
-          <Field label="Department" value={employee.department} />
-          <Field label="Work location" value={employee.branch} />
-          <Field
-            label="Work arrangement"
-            value={ARRANGEMENT_LABEL[employee.workArrangement]}
-          />
-          <Field
-            label="Employment type"
+    <Panel bodyClassName="px-5 py-0">
+      <Section title="Current Role">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Cell label="Job Title" value={employee.jobTitle} />
+          <Cell label="Department" value={employee.department} />
+          <Cell label="Branch" value={employee.branch} />
+          <Cell
+            label="Employment Type"
             value={EMPLOYMENT_TYPE_LABEL[employee.employmentType]}
           />
-          <Field
-            label="Contract type"
-            value={CONTRACT_TYPE_LABEL[employee.contractType]}
+          <Cell label="Start Date" value={formatDate(employee.startDate)} />
+          <Cell
+            label="Work Arrangement"
+            value={ARRANGEMENT_LABEL[employee.workArrangement]}
           />
-          <Field
-            label="Working hours"
-            value={`${employee.workingHoursPerWeek} hrs / week`}
-          />
-          <Field label="Pay grade" value={employee.compensation.payGrade} />
-        </SectionGrid>
-      </Panel>
+        </div>
+      </Section>
 
-      <Panel title="Dates">
-        <SectionGrid>
-          <Field
-            label="Start date"
-            value={formatDate(employee.startDate)}
-            hint={`${yearsOfService(employee.startDate)} years of service`}
-          />
-          <Field
-            label="Probation ends"
-            value={
-              employee.probationEndDate
-                ? formatDate(employee.probationEndDate)
-                : "N/A"
-            }
-          />
-          <Field
-            label="Contract ends"
-            value={
-              employee.contractEndDate ? (
-                <span
-                  className={cn(
-                    (daysUntil(employee.contractEndDate) ?? 999) <= 30 &&
-                      "text-destructive"
-                  )}
-                >
-                  {formatDate(employee.contractEndDate)}
-                </span>
-              ) : (
-                "No end date — permanent"
-              )
-            }
-            hint={
-              employee.contractEndDate
-                ? relativeTime(employee.contractEndDate)
-                : undefined
-            }
-          />
-          <Field
-            label="Notice period"
-            value={`${employee.noticePeriodDays} days`}
-          />
-        </SectionGrid>
-      </Panel>
-
-      <Panel title="Reporting line" className="lg:col-span-2">
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
-              Reports to (line manager)
-            </p>
-            {employee.managerId ? (
-              <PersonLink id={employee.managerId} />
+      <Section title="Reporting Lines">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border bg-muted/20 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Primary Manager</p>
+            {manager ? (
+              <Link href={`/employees/${manager.id}`} className="group">
+                <p className="mt-1 text-sm font-semibold group-hover:text-primary">
+                  {fullName(manager)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {manager.jobTitle}
+                </p>
+              </Link>
             ) : (
-              <p className="mt-1.5 text-sm text-muted-foreground">—</p>
+              <p className="mt-1 text-sm font-semibold">Not set</p>
             )}
-            <p className="mt-2 text-xs text-muted-foreground">
-              Approves leave and timesheets. Cannot see salary.
-            </p>
           </div>
-          <div>
-            <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
-              Dotted-line manager
-            </p>
-            {employee.dottedLineManagerId ? (
-              <PersonLink id={employee.dottedLineManagerId} />
+          <div className="rounded-xl border bg-muted/20 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Dotted-Line Manager</p>
+            {dotted ? (
+              <Link href={`/employees/${dotted.id}`} className="group">
+                <p className="mt-1 text-sm font-semibold group-hover:text-primary">
+                  {fullName(dotted)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {dotted.jobTitle}
+                </p>
+              </Link>
             ) : (
-              <p className="mt-1.5 text-sm text-muted-foreground">None.</p>
+              <p className="mt-1 text-sm font-semibold">None</p>
             )}
-            <p className="mt-2 text-xs text-muted-foreground">
-              Secondary/matrix line. Can also approve leave; no salary access.
-            </p>
           </div>
         </div>
-      </Panel>
-    </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          A dotted-line manager can approve leave and see operational data, but
+          never compensation.
+        </p>
+      </Section>
+
+      <Section title="Acting / Interim Assignments">
+        <div className="rounded-xl border bg-muted/20 px-4 py-3">
+          <p className="flex flex-wrap items-center gap-2">
+            <Pill tone="warning">Acting</Pill>
+            <span className="text-sm font-semibold">None recorded</span>
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Cover arrangements appear here with the person covered and the
+            dates, so an interim title never becomes permanent by accident.
+          </p>
+        </div>
+      </Section>
+
+      <Section title="Contract Details">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Cell
+            label="Contract Type"
+            value={
+              employee.contractType === "permanent"
+                ? "Open-Ended (Permanent)"
+                : CONTRACT_TYPE_LABEL[employee.contractType]
+            }
+          />
+          <div className="rounded-xl border bg-muted/20 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Probation Status</p>
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+              {employee.probationEndDate === null ? (
+                <Pill tone="neutral">Not applicable</Pill>
+              ) : probationDone ? (
+                <>
+                  <Pill tone="success">Confirmed</Pill>
+                  <span className="text-muted-foreground">
+                    since {formatDate(employee.probationEndDate)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Pill tone="warning">In probation</Pill>
+                  <span className="text-muted-foreground">
+                    until {formatDate(employee.probationEndDate)}
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+          <Cell
+            label="Contract End"
+            value={
+              employee.contractEndDate
+                ? formatDate(employee.contractEndDate)
+                : "No end date"
+            }
+          />
+          <Cell
+            label="Notice Period"
+            value={`${employee.noticePeriodDays} days`}
+          />
+        </div>
+
+        {mayAct && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() =>
+                toast("Opens a transfer to another department or branch.")
+              }
+            >
+              <Plus className="size-4" />
+              Initiate transfer
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() =>
+                toast("Opens a promotion with a new title and grade.")
+              }
+            >
+              <Plus className="size-4" />
+              Initiate promotion
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() =>
+                toast("Assigns an acting role with a start and end date.")
+              }
+            >
+              <Plus className="size-4" />
+              Assign acting role
+            </Button>
+          </div>
+        )}
+      </Section>
+    </Panel>
   )
 }
 

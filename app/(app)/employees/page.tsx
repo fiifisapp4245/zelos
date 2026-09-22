@@ -165,7 +165,7 @@ export default function DirectoryPage() {
         }
       />
 
-      <div className="rounded-xl bg-card">
+      <div className="rounded-xl border bg-card">
         <div className="flex flex-wrap items-center gap-3 border-b p-3">
           <div className="relative min-w-[260px] flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -482,9 +482,7 @@ function DirectoryTable({ rows }: { rows: Employee[] }) {
   const store = useStore()
   const { viewer } = store
   const [editing, setEditing] = React.useState<string | null>(null)
-  const [changingStatus, setChangingStatus] = React.useState<string | null>(
-    null
-  )
+  const [changingStatus, setChangingStatus] = React.useState<string | null>(null)
 
   return (
     <div className="overflow-x-auto">
@@ -567,11 +565,7 @@ function DirectoryTable({ rows }: { rows: Employee[] }) {
                     <RowActions
                       label={`Actions for ${fullName(e)}`}
                       actions={[
-                        {
-                          label: "View record",
-                          icon: Eye,
-                          href: `/employees/${e.id}`,
-                        },
+                        { label: "View record", icon: Eye, href: `/employees/${e.id}` },
                         canEditRecord(viewer, e) && {
                           label: "Edit details",
                           icon: Pencil,
@@ -637,7 +631,7 @@ function DirectoryGrid({ rows }: { rows: Employee[] }) {
         <Link
           key={e.id}
           href={`/employees/${e.id}`}
-          className="rounded-xl bg-card p-4 transition-colors hover:bg-muted/30"
+          className="rounded-xl border p-4 transition-colors hover:border-ring/50 hover:bg-muted/30"
         >
           <div className="flex items-start gap-3">
             <Initials person={e} size="lg" />
