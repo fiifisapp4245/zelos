@@ -21,7 +21,8 @@ export function PageShell({
       <main className="flex-1 overflow-y-auto">
         <div
           className={cn(
-            "mx-auto px-5 py-6 sm:px-7",
+            // 80% of the content area, centred, so the page never runs edge to edge.
+            "mx-auto w-[80%] py-6",
             width === "wide" ? "max-w-[1600px]" : "max-w-[1280px]"
           )}
         >

@@ -25,7 +25,6 @@ import {
   EmptyState,
   Field,
   Initials,
-  Panel,
   Pill,
   Restricted,
   SectionGrid,
@@ -263,8 +262,11 @@ export default function EmployeeRecordPage() {
         </div>
       )}
 
-      <Tabs defaultValue="overview">
-        <TabsList className="mb-5 h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-0">
+      <Tabs
+        defaultValue="overview"
+        className="overflow-hidden rounded-xl border bg-card"
+      >
+        <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b bg-transparent px-4 py-0">
           {[
             ["overview", "Profile"],
             ["employment", "Employment"],
@@ -288,31 +290,31 @@ export default function EmployeeRecordPage() {
           ))}
         </TabsList>
 
-        <TabsContent value="overview">
+        <TabsContent value="overview" className="p-5">
           <OverviewTab
             employeeId={employee.id}
             onChangeStatus={() => setStatusOpen(true)}
           />
         </TabsContent>
-        <TabsContent value="employment">
+        <TabsContent value="employment" className="p-5">
           <EmploymentTab employeeId={employee.id} />
         </TabsContent>
-        <TabsContent value="compensation">
+        <TabsContent value="compensation" className="p-5">
           <CompensationTab employeeId={employee.id} />
         </TabsContent>
-        <TabsContent value="documents">
+        <TabsContent value="documents" className="p-5">
           <DocumentsTab employeeId={employee.id} />
         </TabsContent>
-        <TabsContent value="time">
+        <TabsContent value="time" className="p-5">
           <TimeTab employeeId={employee.id} />
         </TabsContent>
-        <TabsContent value="lifecycle">
+        <TabsContent value="lifecycle" className="p-5">
           <LifecycleTab
             employeeId={employee.id}
             onChangeStatus={() => setStatusOpen(true)}
           />
         </TabsContent>
-        <TabsContent value="audit">
+        <TabsContent value="audit" className="p-5">
           <AuditTab employeeId={employee.id} />
         </TabsContent>
       </Tabs>
@@ -331,6 +333,11 @@ export default function EmployeeRecordPage() {
   )
 }
 
+/**
+ * Profile reads top to bottom in the order someone actually asks about a
+ * person: who they are, who to call, where they are in their employment, who
+ * they report to, then the job itself.
+ */
 function OverviewTab({
   employeeId,
   onChangeStatus,
@@ -353,217 +360,207 @@ function OverviewTab({
     .slice(0, 5)
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-      <div className="space-y-5">
-        <Panel title="Personal">
-          <SectionGrid>
-            <Field label="Full name" value={fullName(employee)} />
-            <Field
-              label="Date of birth"
-              value={formatDate(employee.dateOfBirth)}
-              hint={`${age(employee.dateOfBirth)} years old`}
-            />
-            <Field
-              label="Gender"
-              value={<span className="capitalize">{employee.gender}</span>}
-            />
-            <Field label="Nationality" value={employee.nationality} />
-            <Field
-              label="Ghana Card"
-              value={<span className="font-mono">{employee.ghanaCard}</span>}
-            />
-            <Field label="Personal email" value={employee.personalEmail} />
-            <Field
-              label="GhanaPost GPS"
-              value={<span className="font-mono">{employee.gpsAddress}</span>}
-            />
-            <Field
-              label="Residential address"
-              value={employee.residentialAddress}
-            />
-          </SectionGrid>
-        </Panel>
+    <div>
+      <Section title="Personal">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Cell label="Full name" value={fullName(employee)} />
+          <Cell
+            label="Date of birth"
+            value={`${formatDate(employee.dateOfBirth)} · ${age(employee.dateOfBirth)} years`}
+          />
+          <Cell
+            label="Gender"
+            value={<span className="capitalize">{employee.gender}</span>}
+          />
+          <Cell label="Nationality" value={employee.nationality} />
+          <Cell
+            label="Ghana Card"
+            value={<span className="font-mono">{employee.ghanaCard}</span>}
+          />
+          <Cell label="Personal email" value={employee.personalEmail} />
+          <Cell label="Work email" value={employee.email} />
+          <Cell label="Phone" value={employee.phone} />
+          <Cell
+            label="GhanaPost GPS"
+            value={<span className="font-mono">{employee.gpsAddress}</span>}
+          />
+          <Cell
+            label="Residential address"
+            value={employee.residentialAddress}
+          />
+        </div>
+      </Section>
 
-        <Panel title="Emergency contact">
-          <SectionGrid>
-            <Field label="Name" value={employee.emergencyContact.name} />
-            <Field
-              label="Relationship"
-              value={employee.emergencyContact.relationship}
-            />
-            <Field label="Phone" value={employee.emergencyContact.phone} />
-            <Field label="Email" value={employee.emergencyContact.email} />
-          </SectionGrid>
-        </Panel>
+      <Section title="Emergency contact">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Cell label="Name" value={employee.emergencyContact.name} />
+          <Cell
+            label="Relationship"
+            value={employee.emergencyContact.relationship}
+          />
+          <Cell label="Phone" value={employee.emergencyContact.phone} />
+          <Cell label="Email" value={employee.emergencyContact.email} />
+        </div>
+      </Section>
 
-        <Panel title="Employment">
-          <SectionGrid>
-            <Field
-              label="Employee ID"
-              value={<span className="font-mono">{employee.employeeId}</span>}
-            />
-            <Field label="Job title" value={employee.jobTitle} />
-            <Field label="Department" value={employee.department} />
-            <Field
-              label="Employment type"
-              value={EMPLOYMENT_TYPE_LABEL[employee.employmentType]}
-            />
-            <Field
-              label="Contract"
-              value={CONTRACT_TYPE_LABEL[employee.contractType]}
-            />
-            <Field
-              label="Start date"
-              value={formatDate(employee.startDate)}
-              hint={`${yearsOfService(employee.startDate)} years of service`}
-            />
-            <Field
-              label="Work arrangement"
-              value={ARRANGEMENT_LABEL[employee.workArrangement]}
-            />
-            <Field
-              label="Notice period"
-              value={`${employee.noticePeriodDays} days`}
-            />
-          </SectionGrid>
-        </Panel>
-      </div>
-
-      <div className="space-y-5">
-        <Panel
-          title="Lifecycle"
-          actions={
-            canChangeLifecycle(viewer) && (
-              <Button variant="outline" size="sm" onClick={onChangeStatus}>
-                <RefreshCw className="size-3.5" />
-                Change
-              </Button>
-            )
-          }
-        >
+      <Section title="Lifecycle">
+        <div className="flex flex-wrap items-center gap-3">
           <LifecycleBadge state={employee.lifecycleState} />
-          <ol className="mt-4 space-y-3.5">
-            {events.map((e, i) => (
-              <li key={e.id} className="relative flex gap-3 pl-1">
-                {i < events.length - 1 && (
-                  <span className="absolute top-4 left-[7px] h-full w-px bg-border" />
+          {canChangeLifecycle(viewer) && (
+            <Button variant="outline" size="sm" onClick={onChangeStatus}>
+              <RefreshCw className="size-3.5" />
+              Change status
+            </Button>
+          )}
+        </div>
+        <ol className="mt-4 space-y-3.5">
+          {events.map((e, i) => (
+            <li key={e.id} className="relative flex gap-3 pl-1">
+              {i < events.length - 1 && (
+                <span className="absolute top-4 left-[7px] h-full w-px bg-border" />
+              )}
+              <span
+                className={cn(
+                  "relative z-10 mt-1 size-2.5 shrink-0 rounded-full ring-4 ring-card",
+                  i === events.length - 1 ? "bg-primary" : "bg-primary/35"
                 )}
-                <span
-                  className={cn(
-                    "relative z-10 mt-1 size-2.5 shrink-0 rounded-full ring-4 ring-card",
-                    i === events.length - 1 ? "bg-primary" : "bg-primary/35"
+              />
+              <div className="min-w-0">
+                <p className="text-sm font-medium">
+                  {LIFECYCLE_LABEL[e.to]}
+                  {i === events.length - 1 && (
+                    <span className="font-normal text-muted-foreground">
+                      {" "}
+                      (current)
+                    </span>
                   )}
-                />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">
-                    {LIFECYCLE_LABEL[e.to]}
-                    {i === events.length - 1 && (
-                      <span className="font-normal text-muted-foreground">
-                        {" "}
-                        (current)
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDate(e.effectiveDate)}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </Panel>
-
-        <Panel title="Reporting">
-          <div className="space-y-4 text-sm">
-            <div>
-              <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
-                Line manager
-              </p>
-              {employee.managerId ? (
-                <PersonLink id={employee.managerId} />
-              ) : (
-                <p className="mt-1.5 text-muted-foreground">
-                  No line manager set.
                 </p>
-              )}
-            </div>
-            <div>
-              <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
-                Dotted-line manager
-              </p>
-              {employee.dottedLineManagerId ? (
-                <PersonLink id={employee.dottedLineManagerId} />
-              ) : (
-                <p className="mt-1.5 text-muted-foreground">None.</p>
-              )}
-            </div>
-            <div>
-              <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
-                Direct reports ({reports.length})
-              </p>
-              {reports.length === 0 ? (
-                <p className="mt-1.5 text-muted-foreground">
-                  {employee.firstName} doesn&apos;t manage anyone yet.
+                <p className="text-xs text-muted-foreground">
+                  {formatDate(e.effectiveDate)}
+                  {e.reason && ` · ${e.reason}`}
                 </p>
-              ) : (
-                <ul className="mt-1.5 space-y-1.5">
-                  {reports.map((r) => (
-                    <li key={r.id}>
-                      <PersonLink id={r.id} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            {dottedReports.length > 0 && (
-              <div>
-                <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
-                  Dotted-line reports ({dottedReports.length})
-                </p>
-                <ul className="mt-1.5 space-y-1.5">
-                  {dottedReports.map((r) => (
-                    <li key={r.id}>
-                      <PersonLink id={r.id} />
-                    </li>
-                  ))}
-                </ul>
               </div>
+            </li>
+          ))}
+        </ol>
+      </Section>
+
+      <Section title="Reporting">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border bg-muted/20 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Line manager</p>
+            {employee.managerId ? (
+              <PersonLink id={employee.managerId} />
+            ) : (
+              <p className="mt-1 text-sm font-semibold">Not set</p>
             )}
           </div>
-        </Panel>
+          <div className="rounded-xl border bg-muted/20 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Dotted-line manager</p>
+            {employee.dottedLineManagerId ? (
+              <PersonLink id={employee.dottedLineManagerId} />
+            ) : (
+              <p className="mt-1 text-sm font-semibold">None</p>
+            )}
+          </div>
+        </div>
 
-        <Panel title="Recent activity" bodyClassName="px-5 py-4">
-          {activity.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Nothing recorded yet.
+        <div className="mt-3 rounded-xl border bg-muted/20 px-4 py-3">
+          <p className="text-xs text-muted-foreground">
+            Direct reports ({reports.length})
+          </p>
+          {reports.length === 0 ? (
+            <p className="mt-1 text-sm">
+              {employee.firstName} doesn&apos;t manage anyone yet.
             </p>
           ) : (
-            <ul className="space-y-3">
-              {activity.map((a) => (
-                <li key={a.id} className="flex gap-2.5">
-                  <Initials
-                    person={store.employeeById(a.actorId) ?? "System"}
-                    size="xs"
-                  />
-                  <div className="min-w-0 text-sm">
-                    <p className="leading-snug">
-                      <span className="font-medium">
-                        {fullName(store.employeeById(a.actorId))}
-                      </span>{" "}
-                      <span className="text-muted-foreground">
-                        {a.action.toLowerCase()}
-                      </span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDateTime(a.at)}
-                    </p>
-                  </div>
+            <ul className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {reports.map((r) => (
+                <li key={r.id}>
+                  <PersonLink id={r.id} />
                 </li>
               ))}
             </ul>
           )}
-        </Panel>
-      </div>
+        </div>
+
+        {dottedReports.length > 0 && (
+          <div className="mt-3 rounded-xl border bg-muted/20 px-4 py-3">
+            <p className="text-xs text-muted-foreground">
+              Dotted-line reports ({dottedReports.length})
+            </p>
+            <ul className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {dottedReports.map((r) => (
+                <li key={r.id}>
+                  <PersonLink id={r.id} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </Section>
+
+      <Section title="Employment">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Cell
+            label="Employee ID"
+            value={<span className="font-mono">{employee.employeeId}</span>}
+          />
+          <Cell label="Job title" value={employee.jobTitle} />
+          <Cell label="Department" value={employee.department} />
+          <Cell label="Branch" value={employee.branch} />
+          <Cell
+            label="Employment type"
+            value={EMPLOYMENT_TYPE_LABEL[employee.employmentType]}
+          />
+          <Cell
+            label="Contract"
+            value={CONTRACT_TYPE_LABEL[employee.contractType]}
+          />
+          <Cell
+            label="Start date"
+            value={`${formatDate(employee.startDate)} · ${yearsOfService(employee.startDate)} yrs`}
+          />
+          <Cell
+            label="Work arrangement"
+            value={ARRANGEMENT_LABEL[employee.workArrangement]}
+          />
+          <Cell
+            label="Notice period"
+            value={`${employee.noticePeriodDays} days`}
+          />
+        </div>
+      </Section>
+
+      <Section title="Recent activity" defaultOpen={false}>
+        {activity.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nothing recorded yet.</p>
+        ) : (
+          <ul className="space-y-3">
+            {activity.map((a) => (
+              <li key={a.id} className="flex gap-2.5">
+                <Initials
+                  person={store.employeeById(a.actorId) ?? "System"}
+                  size="xs"
+                />
+                <div className="min-w-0 text-sm">
+                  <p className="leading-snug">
+                    <span className="font-medium">
+                      {fullName(store.employeeById(a.actorId))}
+                    </span>{" "}
+                    <span className="text-muted-foreground">
+                      {a.action.toLowerCase()}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDateTime(a.at)}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
     </div>
   )
 }
@@ -603,29 +600,34 @@ function Cell({ label, value }: { label: string; value: React.ReactNode }) {
 function Section({
   title,
   children,
+  actions,
   defaultOpen = true,
 }: {
   title: string
   children: React.ReactNode
+  actions?: React.ReactNode
   defaultOpen?: boolean
 }) {
   const [open, setOpen] = React.useState(defaultOpen)
   return (
     <section className="border-b last:border-0">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between py-4 text-left"
-      >
-        <span className="text-sm text-muted-foreground">{title}</span>
-        <ChevronDown
-          className={cn(
-            "size-4 text-muted-foreground transition-transform",
-            open && "rotate-180"
-          )}
-        />
-      </button>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex flex-1 items-center justify-between py-4 text-left"
+        >
+          <span className="text-sm text-muted-foreground">{title}</span>
+          <ChevronDown
+            className={cn(
+              "size-4 text-muted-foreground transition-transform",
+              open && "rotate-180"
+            )}
+          />
+        </button>
+        {actions}
+      </div>
       {open && <div className="pb-5">{children}</div>}
     </section>
   )
@@ -644,7 +646,7 @@ function EmploymentTab({ employeeId }: { employeeId: string }) {
     (daysUntil(employee.probationEndDate) ?? 0) < 0
 
   return (
-    <Panel bodyClassName="px-5 py-0">
+    <div>
       <Section title="Current Role">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Cell label="Job Title" value={employee.jobTitle} />
@@ -795,7 +797,7 @@ function EmploymentTab({ employeeId }: { employeeId: string }) {
           </div>
         )}
       </Section>
-    </Panel>
+    </div>
   )
 }
 
@@ -808,13 +810,13 @@ function CompensationTab({ employeeId }: { employeeId: string }) {
 
   if (!canViewCompensation(viewer, employee)) {
     return (
-      <Panel>
+      <div className="py-2">
         <EmptyState
           icon={Lock}
           title="Compensation is not visible to your role"
           description="Salary is restricted to the employee, HR Admin, Payroll and the Owner. Line managers route compensation conversations through HR — this is a deliberate boundary, not a missing permission."
         />
-      </Panel>
+      </div>
     )
   }
 
@@ -839,10 +841,9 @@ function CompensationTab({ employeeId }: { employeeId: string }) {
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
-      <Panel
+    <div>
+      <Section
         title="Compensation"
-        description="All amounts in Ghana Cedis (GHS)."
         actions={
           <Restricted reason="Visible to employee, HR Admin and Payroll only" />
         }
@@ -864,11 +865,10 @@ function CompensationTab({ employeeId }: { employeeId: string }) {
           <Field label="Effective from" value={formatDate(c.effectiveFrom)} />
           <Field label="Currency" value="GHS — Ghana Cedi" />
         </SectionGrid>
-      </Panel>
+      </Section>
 
-      <Panel
+      <Section
         title="Statutory & tax"
-        description="Revealing these numbers is logged against your name with the purpose you state."
         actions={
           mayReveal && (
             <Button variant="outline" size="sm" onClick={reveal}>
@@ -915,9 +915,9 @@ function CompensationTab({ employeeId }: { employeeId: string }) {
           <Field label="Tier 2 provider" value={c.tier2Provider} />
           <Field label="Tier 3 (voluntary)" value={c.tier3Provider ?? "None"} />
         </SectionGrid>
-      </Panel>
+      </Section>
 
-      <Panel title="Payment method" className="lg:col-span-2">
+      <Section title="Payment method">
         <SectionGrid cols={3}>
           <Field
             label="Method"
@@ -944,7 +944,7 @@ function CompensationTab({ employeeId }: { employeeId: string }) {
             </>
           )}
         </SectionGrid>
-      </Panel>
+      </Section>
     </div>
   )
 }
@@ -959,10 +959,8 @@ function DocumentsTab({ employeeId }: { employeeId: string }) {
   const hidden = mine.length - visible.length
 
   return (
-    <Panel
-      title="Documents"
-      description={`${visible.length} on file${hidden > 0 ? ` · ${hidden} withheld from your role` : ""}`}
-      bodyClassName="p-0"
+    <Section
+      title={`Documents · ${visible.length} on file${hidden > 0 ? `, ${hidden} withheld` : ""}`}
       actions={
         (has(viewer, "hr_admin") || isSelf(viewer, employee)) && (
           <Button
@@ -1045,7 +1043,7 @@ function DocumentsTab({ employeeId }: { employeeId: string }) {
           seniority alone does not grant it.
         </div>
       )}
-    </Panel>
+    </Section>
   )
 }
 
@@ -1066,8 +1064,8 @@ function TimeTab({ employeeId }: { employeeId: string }) {
     : 0
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
-      <Panel title="Leave balance">
+    <div>
+      <Section title="Leave balance">
         <SectionGrid>
           <Field
             label="Annual entitlement"
@@ -1091,9 +1089,9 @@ function TimeTab({ employeeId }: { employeeId: string }) {
             value={`${balance?.sickTaken ?? 0} of ${balance?.sickEntitlement ?? 0} days`}
           />
         </SectionGrid>
-      </Panel>
+      </Section>
 
-      <Panel title="Recent attendance" bodyClassName="p-0">
+      <Section title="Recent attendance">
         {records.length === 0 ? (
           <EmptyState icon={Clock} title="No attendance recorded" />
         ) : (
@@ -1128,13 +1126,9 @@ function TimeTab({ employeeId }: { employeeId: string }) {
             ))}
           </ul>
         )}
-      </Panel>
+      </Section>
 
-      <Panel
-        title="Leave history"
-        className="lg:col-span-2"
-        bodyClassName="p-0"
-      >
+      <Section title="Leave history">
         {requests.length === 0 ? (
           <EmptyState icon={CalendarDays} title="No leave requests" />
         ) : (
@@ -1173,7 +1167,7 @@ function TimeTab({ employeeId }: { employeeId: string }) {
             ))}
           </ul>
         )}
-      </Panel>
+      </Section>
     </div>
   )
 }
@@ -1193,10 +1187,8 @@ function LifecycleTab({
     .sort((a, b) => b.at.localeCompare(a.at))
 
   return (
-    <Panel
+    <Section
       title="Lifecycle history"
-      description="Every state change is logged with actor, timestamp and reason. Records cannot be deleted."
-      bodyClassName="p-0"
       actions={
         canChangeLifecycle(viewer) && (
           <Button size="sm" onClick={onChangeStatus}>
@@ -1251,7 +1243,7 @@ function LifecycleTab({
           ))}
         </ul>
       )}
-    </Panel>
+    </Section>
   )
 }
 
@@ -1289,24 +1281,20 @@ function AuditTab({ employeeId }: { employeeId: string }) {
 
   if (!has(viewer, "hr_admin")) {
     return (
-      <Panel>
+      <div className="py-2">
         <EmptyState
           icon={Lock}
           title="The audit log is restricted to HR Admin"
           description="Attribution exists so that every edit is answerable to a person. Read access to the full log is narrower than write access to the record."
         />
-      </Panel>
+      </div>
     )
   }
 
   const entries = auditLog.filter((a) => a.employeeId === employeeId)
 
   return (
-    <Panel
-      title="Audit log"
-      description="Immutable. Every entry is attributed to an individual and cannot be edited or removed."
-      bodyClassName="p-0"
-    >
+    <Section title="Audit log">
       {entries.length === 0 ? (
         <EmptyState icon={Clock} title="No entries yet" />
       ) : (
@@ -1355,6 +1343,6 @@ function AuditTab({ employeeId }: { employeeId: string }) {
           ))}
         </ul>
       )}
-    </Panel>
+    </Section>
   )
 }
