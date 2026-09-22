@@ -1,0 +1,41 @@
+# dependencies
+node_modules/
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Design reference material, kept out of the repo deliberately:
+# ~230 MB of single-file HTML exports from the design tool, plus a nested
+# git repository (zelos_design system). Delete this line to include them.
+zelos files/
