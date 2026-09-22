@@ -298,7 +298,7 @@ export default function NewEmployeePage() {
 
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <aside className="lg:sticky lg:top-20 lg:self-start">
-          <div className="rounded-xl border bg-card p-4">
+          <div className="rounded-xl bg-card p-4 shadow-sm">
             <ol className="space-y-1">
               {STEPS.map((s, i) => {
                 const done = step > s.id
@@ -405,7 +405,7 @@ export default function NewEmployeePage() {
           {step === 4 && <StepDocuments />}
           {step === 5 && <StepReview draft={draft} />}
 
-          <div className="flex items-center justify-between rounded-xl border bg-card px-5 py-3.5">
+          <div className="flex items-center justify-between rounded-xl bg-card px-5 py-3.5 shadow-sm">
             <Button
               variant="ghost"
               size="lg"
@@ -1259,7 +1259,7 @@ function StepCompensation({
               type="button"
               onClick={() => set("paymentMethod", o.value)}
               className={cn(
-                "rounded-xl border p-4 text-left transition-colors",
+                "rounded-xl bg-muted/40 p-4 text-left transition-colors",
                 draft.paymentMethod === o.value
                   ? "border-primary bg-success-muted"
                   : "hover:bg-muted/50"

@@ -95,11 +95,17 @@ export function SettingsTable({ tableId }: { tableId: string }) {
             </thead>
             <tbody className="divide-y">
               {rows.map((row) => (
-                <tr key={row.id} className="group transition-colors hover:bg-muted/30">
+                <tr
+                  key={row.id}
+                  className="group transition-colors hover:bg-muted/30"
+                >
                   {shown.map((c, i) => (
                     <td
                       key={c.key}
-                      className={cn("px-3 py-2.5 align-top", i === 0 && "pl-5 font-medium")}
+                      className={cn(
+                        "px-3 py-2.5 align-top",
+                        i === 0 && "pl-5 font-medium"
+                      )}
                     >
                       <CellValue column={c} value={row[c.key]} />
                     </td>
@@ -134,7 +140,9 @@ export function SettingsTable({ tableId }: { tableId: string }) {
       )}
 
       {spec.footnote && (
-        <p className="border-t px-5 py-3 text-xs text-muted-foreground">{spec.footnote}</p>
+        <p className="border-t px-5 py-3 text-xs text-muted-foreground">
+          {spec.footnote}
+        </p>
       )}
 
       {editing && (
@@ -146,7 +154,11 @@ export function SettingsTable({ tableId }: { tableId: string }) {
       )}
 
       {deleting && (
-        <DeleteDialog spec={spec} row={deleting} onClose={() => setDeleting(null)} />
+        <DeleteDialog
+          spec={spec}
+          row={deleting}
+          onClose={() => setDeleting(null)}
+        />
       )}
     </Panel>
   )
@@ -160,7 +172,11 @@ function CellValue({
   value: string | number | boolean | undefined
 }) {
   if (column.type === "toggle") {
-    return value ? <Pill tone="success">Yes</Pill> : <Pill tone="neutral">No</Pill>
+    return value ? (
+      <Pill tone="success">Yes</Pill>
+    ) : (
+      <Pill tone="neutral">No</Pill>
+    )
   }
   const text = String(value ?? "—")
   const tone = column.tone?.[text]
@@ -181,21 +197,22 @@ function RowDialog({
   const store = useStore()
   const isNew = row === null
 
-  const [values, setValues] = React.useState<Record<string, string | boolean>>(() =>
-    Object.fromEntries(
-      spec.columns.map((c) => [
-        c.key,
-        row
-          ? c.type === "toggle"
-            ? Boolean(row[c.key])
-            : String(row[c.key] ?? "")
-          : c.type === "toggle"
-            ? false
-            : c.type === "select"
-              ? (c.options?.[0] ?? "")
-              : "",
-      ])
-    )
+  const [values, setValues] = React.useState<Record<string, string | boolean>>(
+    () =>
+      Object.fromEntries(
+        spec.columns.map((c) => [
+          c.key,
+          row
+            ? c.type === "toggle"
+              ? Boolean(row[c.key])
+              : String(row[c.key] ?? "")
+            : c.type === "toggle"
+              ? false
+              : c.type === "select"
+                ? (c.options?.[0] ?? "")
+                : "",
+        ])
+      )
   )
 
   function set(key: string, v: string | boolean) {
@@ -236,7 +253,9 @@ function RowDialog({
   return (
     <FormDialog
       onClose={onClose}
-      title={isNew ? (spec.addLabel ?? "Add row") : `Edit ${row[spec.labelKey]}`}
+      title={
+        isNew ? (spec.addLabel ?? "Add row") : `Edit ${row[spec.labelKey]}`
+      }
       description={`${spec.title}. Every change is written to the audit log against your name.`}
       footer={
         <>
@@ -250,52 +269,56 @@ function RowDialog({
       }
     >
       <div className="space-y-4">
-          {spec.columns.map((c) => (
-            <div key={c.key}>
-              {c.type === "toggle" ? (
-                <div className="flex items-center justify-between gap-6 rounded-lg border px-3.5 py-3">
-                  <Label htmlFor={c.key} className="text-sm">
-                    {c.label}
-                  </Label>
-                  <Switch
-                    id={c.key}
-                    checked={Boolean(values[c.key])}
-                    onCheckedChange={(v) => set(c.key, v)}
-                  />
-                </div>
-              ) : (
-                <>
-                  <Label htmlFor={c.key} className="mb-1.5 block text-sm">
-                    {c.label}
-                    {c.required && <span className="ml-0.5 text-destructive">*</span>}
-                  </Label>
-                  {c.type === "select" ? (
-                    <select
-                      id={c.key}
-                      value={String(values[c.key] ?? "")}
-                      onChange={(e) => set(c.key, e.target.value)}
-                      className="h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
-                    >
-                      {c.options?.map((o) => (
-                        <option key={o} value={o}>
-                          {o}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <Input
-                      id={c.key}
-                      type={c.type === "number" ? "number" : "text"}
-                      value={String(values[c.key] ?? "")}
-                      onChange={(e) => set(c.key, e.target.value)}
-                      className="h-10"
-                    />
+        {spec.columns.map((c) => (
+          <div key={c.key}>
+            {c.type === "toggle" ? (
+              <div className="flex items-center justify-between gap-6 rounded-lg bg-muted/40 px-3.5 py-3">
+                <Label htmlFor={c.key} className="text-sm">
+                  {c.label}
+                </Label>
+                <Switch
+                  id={c.key}
+                  checked={Boolean(values[c.key])}
+                  onCheckedChange={(v) => set(c.key, v)}
+                />
+              </div>
+            ) : (
+              <>
+                <Label htmlFor={c.key} className="mb-1.5 block text-sm">
+                  {c.label}
+                  {c.required && (
+                    <span className="ml-0.5 text-destructive">*</span>
                   )}
-                </>
-              )}
-              {c.hint && <p className="mt-1 text-xs text-muted-foreground">{c.hint}</p>}
-            </div>
-          ))}
+                </Label>
+                {c.type === "select" ? (
+                  <select
+                    id={c.key}
+                    value={String(values[c.key] ?? "")}
+                    onChange={(e) => set(c.key, e.target.value)}
+                    className="h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+                  >
+                    {c.options?.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    id={c.key}
+                    type={c.type === "number" ? "number" : "text"}
+                    value={String(values[c.key] ?? "")}
+                    onChange={(e) => set(c.key, e.target.value)}
+                    className="h-10"
+                  />
+                )}
+              </>
+            )}
+            {c.hint && (
+              <p className="mt-1 text-xs text-muted-foreground">{c.hint}</p>
+            )}
+          </div>
+        ))}
       </div>
     </FormDialog>
   )
@@ -319,8 +342,8 @@ function DeleteDialog({
         <DialogHeader>
           <DialogTitle>Remove {name}?</DialogTitle>
           <DialogDescription>
-            It will be taken out of {spec.title.toLowerCase()}. The removal is written to
-            the audit log, so the change stays traceable.
+            It will be taken out of {spec.title.toLowerCase()}. The removal is
+            written to the audit log, so the change stays traceable.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

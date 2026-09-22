@@ -60,7 +60,7 @@ export function ProfileMenu({
     return (
       <div ref={containerRef} className="relative border-t p-3">
         {open && (
-          <div className="absolute bottom-full left-3 z-50 mb-2 w-[44px] space-y-0.5 rounded-xl border bg-popover p-1.5 shadow-xl">
+          <div className="absolute bottom-full left-3 z-50 mb-2 w-[44px] space-y-0.5 rounded-xl bg-popover p-1.5 shadow-xl">
             {items.map((item) => (
               <Tooltip key={item.href}>
                 <TooltipTrigger asChild>
@@ -123,7 +123,7 @@ export function ProfileMenu({
   return (
     <div ref={containerRef} className="relative border-t p-3">
       {open && (
-        <div className="absolute right-3 bottom-full left-3 z-50 mb-2 rounded-xl border bg-popover p-1.5 shadow-xl">
+        <div className="absolute right-3 bottom-full left-3 z-50 mb-2 rounded-xl bg-popover p-1.5 shadow-xl">
           <ul className="space-y-0.5">
             {items.map((item) => (
               <li key={item.href}>

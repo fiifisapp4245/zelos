@@ -375,22 +375,23 @@ function RequestList({
               )}
             </div>
             <RequestBadge status={r.status} />
-            {r.employeeId === store.viewer.employeeId && r.status === "pending" && (
-              <RowActions
-                label={`Actions for ${r.id}`}
-                actions={[
-                  {
-                    label: "Cancel request",
-                    icon: Ban,
-                    destructive: true,
-                    onSelect: () => {
-                      store.cancelLeave(r.id)
-                      toast.success(`${r.id} cancelled.`)
+            {r.employeeId === store.viewer.employeeId &&
+              r.status === "pending" && (
+                <RowActions
+                  label={`Actions for ${r.id}`}
+                  actions={[
+                    {
+                      label: "Cancel request",
+                      icon: Ban,
+                      destructive: true,
+                      onSelect: () => {
+                        store.cancelLeave(r.id)
+                        toast.success(`${r.id} cancelled.`)
+                      },
                     },
-                  },
-                ]}
-              />
-            )}
+                  ]}
+                />
+              )}
           </li>
         )
       })}
@@ -530,7 +531,7 @@ function RequestLeaveDialog({
           {days > 0 && (
             <div
               className={cn(
-                "rounded-lg border px-3.5 py-2.5 text-sm",
+                "rounded-lg bg-muted/40 px-3.5 py-2.5 text-sm",
                 overBalance
                   ? "border-destructive/30 bg-danger-muted text-destructive"
                   : "bg-muted/50"

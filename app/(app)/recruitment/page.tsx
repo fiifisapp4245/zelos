@@ -266,7 +266,7 @@ function StageColumn({
   }
 
   return (
-    <div className="w-[230px] shrink-0 self-start rounded-xl border bg-card">
+    <div className="w-[230px] shrink-0 self-start rounded-xl bg-card shadow-sm">
       <div className="flex items-center justify-between border-b px-3 py-2.5">
         <p className="text-sm font-medium">{STAGE_LABEL[stage]}</p>
         <span className="tabular rounded-full bg-muted px-1.5 text-xs text-muted-foreground">
@@ -280,7 +280,7 @@ function StageColumn({
           </li>
         )}
         {rows.map((c) => (
-          <li key={c.id} className="rounded-lg border p-2.5">
+          <li key={c.id} className="rounded-lg bg-muted/40 p-2.5">
             <div className="flex items-start gap-2">
               <span
                 className={cn(
