@@ -32,7 +32,7 @@ function defaults(seed: Seed, index: number): Employee {
     lifecycleState: "active",
     managerId: null,
     dottedLineManagerId: null,
-    email: `${first.toLowerCase()}.${last.toLowerCase()}@amalitech.com`,
+    email: `${first.toLowerCase()}.${last.toLowerCase()}@xanthan.com`,
     personalEmail: `${first.toLowerCase()}${last.toLowerCase()}@gmail.com`,
     phone: `+233 2${index % 10} ${300 + index} ${1000 + index * 7}`,
     dateOfBirth: "1992-08-14",

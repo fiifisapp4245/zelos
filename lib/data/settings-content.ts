@@ -48,6 +48,22 @@ export type Block =
       title?: string
       description?: string
     }
+  /** Banner + logo + headline facts, as on the company profile. */
+  | {
+      kind: "cover"
+      rows: [string, string][]
+      action?: string
+    }
+  /** Label above value, in columns — the card layout used on company details. */
+  | {
+      kind: "grid"
+      title?: string
+      description?: string
+      columns?: 2 | 3
+      rows: [string, string][]
+    }
+  /** Offices, read from the branches configured in the org structure. */
+  | { kind: "offices"; title?: string; description?: string }
 
 const on = (text: string): Cell => ({ text, tone: "success" })
 const off = (text: string): Cell => ({ text, tone: "neutral" })
@@ -58,49 +74,36 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
   // ---------------------------------------------------------------- Company
   "company-information": [
     {
-      kind: "fields",
-      title: "Legal entity",
-      description: "As registered with the Registrar-General's Department.",
+      kind: "cover",
       rows: [
-        ["Registered name", "AmaliTech Services Limited"],
-        ["Trading name", "AmaliTech"],
-        ["Company type", "Company Limited by Shares"],
-        ["Registration number", "CS-0432198765"],
-        ["Date of incorporation", "4 February 2019"],
-        ["Industry", "Information technology services"],
+        ["Legal name", "Xanthan Services Limited"],
+        ["Trading name", "Xanthan"],
+        ["Industry", "Technology"],
+        ["Company size", "11-50 employees"],
       ],
+      action: "Edit profile",
     },
     {
-      kind: "fields",
-      title: "Statutory identifiers",
-      description:
-        "Used on payroll filings, pay slips and every statutory return.",
+      kind: "grid",
+      title: "Registration",
       rows: [
-        ["TIN", "C0009876543"],
+        ["Business registration number", "CS-04829-2019"],
+        ["TIN", "C0009827451"],
         ["SSNIT employer number", "E0012345678"],
-        ["GRA tax office", "Large Taxpayer Office, Accra"],
-        ["VAT registration", "Not registered — services below threshold"],
+        ["Date of incorporation", "4 February 2019"],
       ],
     },
     {
-      kind: "fields",
-      title: "Registered address & contact",
+      kind: "grid",
+      title: "Contact",
       rows: [
-        ["Street", "12 Nii Sai Street, East Legon"],
-        ["City", "Accra"],
-        ["Region", "Greater Accra"],
-        ["GhanaPost GPS", "GA-183-4290"],
-        ["Postal address", "P.O. Box CT 8241, Cantonments, Accra"],
+        ["Company email", "work@xanthan.com"],
+        ["Website", "xanthan.com"],
         ["Main line", "+233 30 254 1180"],
-        ["HR email", "people@amalitech.com"],
-        ["Website", "amalitech.com"],
+        ["Postal address", "P.O. Box CT 8241, Cantonments, Accra"],
       ],
     },
-    {
-      kind: "note",
-      title: "Who can change this",
-      text: "Only HR Admin and the Company Owner. Changes to the registered name, TIN or SSNIT employer number are written to the audit log and flagged to Payroll, because they appear on statutory filings.",
-    },
+    { kind: "offices", title: "Offices" },
   ],
 
   "job-catalog": [
@@ -706,7 +709,7 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
       title: "Disbursement account",
       rows: [
         ["Bank", "Ecobank Ghana"],
-        ["Account name", "AmaliTech Services Ltd — Payroll"],
+        ["Account name", "Xanthan Services Ltd — Payroll"],
         ["Account number", "1441000987654"],
         ["Branch", "Airport City, Accra"],
         ["Approval before release", "Two signatories"],
@@ -767,56 +770,56 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
       rows: [
         [
           "Fiifi Boakye",
-          mono("fiifi.boakye@amalitech.com"),
+          mono("fiifi.boakye@xanthan.com"),
           "HR Admin, Employee",
           on("Active"),
           "Today, 09:12",
         ],
         [
           "Esi Quainoo",
-          mono("esi.quainoo@amalitech.com"),
+          mono("esi.quainoo@xanthan.com"),
           "Owner, HR Admin, Employee",
           on("Active"),
           "Today, 08:40",
         ],
         [
           "Maame Yeboah",
-          mono("maame.yeboah@amalitech.com"),
+          mono("maame.yeboah@xanthan.com"),
           "Payroll, Employee",
           on("Active"),
           "Yesterday, 16:55",
         ],
         [
           "Adwoa Bediako",
-          mono("adwoa.bediako@amalitech.com"),
+          mono("adwoa.bediako@xanthan.com"),
           "Line Manager, Employee",
           on("Active"),
           "Today, 10:03",
         ],
         [
           "Kwesi Owusu",
-          mono("kwesi.owusu@amalitech.com"),
+          mono("kwesi.owusu@xanthan.com"),
           "Head of Department, Employee",
           on("Active"),
           "Today, 07:58",
         ],
         [
           "Serwa Acheampong",
-          mono("serwa.acheampong@amalitech.com"),
+          mono("serwa.acheampong@xanthan.com"),
           "HR Admin, Employee",
           on("Active"),
           "2 days ago",
         ],
         [
           "Kobby Ansah",
-          mono("kobby.ansah@amalitech.com"),
+          mono("kobby.ansah@xanthan.com"),
           "Employee",
           { text: "Suspended", tone: "danger" },
           "24 Aug 2026",
         ],
         [
           "Nii Lartey",
-          mono("nii.lartey@amalitech.com"),
+          mono("nii.lartey@xanthan.com"),
           "Employee",
           off("Deactivated"),
           "31 Dec 2025",
@@ -1109,25 +1112,25 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
       rows: [
         [
           "employee.created",
-          mono("https://it.amalitech.com/hooks/zelos"),
+          mono("https://it.xanthan.com/hooks/zelos"),
           on("Healthy"),
           "Today, 09:14 — 200",
         ],
         [
           "employee.lifecycle_changed",
-          mono("https://it.amalitech.com/hooks/zelos"),
+          mono("https://it.xanthan.com/hooks/zelos"),
           on("Healthy"),
           "Yesterday, 11:02 — 200",
         ],
         [
           "leave.approved",
-          mono("https://ops.amalitech.com/rota"),
+          mono("https://ops.xanthan.com/rota"),
           warn("Retrying"),
           "Today, 07:31 — 503",
         ],
         [
           "payroll.run_completed",
-          mono("https://finance.amalitech.com/hooks"),
+          mono("https://finance.xanthan.com/hooks"),
           on("Healthy"),
           "28 Aug 2026 — 200",
         ],

@@ -4,7 +4,6 @@ import * as React from "react"
 import Link from "next/link"
 import { notFound, useParams } from "next/navigation"
 import {
-  ArrowLeft,
   Check,
   Construction,
   Globe,
@@ -56,48 +55,38 @@ export default function SettingDetailPage() {
         { label: item.label },
       ]}
     >
-      <div className="mb-6 flex items-start gap-3">
-        <Button
-          variant="outline"
-          size="icon-lg"
-          asChild
-          aria-label="Back to settings"
-        >
-          <Link href="/settings">
-            <ArrowLeft className="size-4" />
-          </Link>
-        </Button>
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">{category.label}</p>
-          <h1 className="text-[26px] leading-tight font-semibold tracking-tight">
-            {item.label}
-          </h1>
-          <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">
-            {item.blurb}
-          </p>
-        </div>
+      {/* Title band, matching the hub: white, full width, divider beneath. */}
+      <div className="border-b pb-6">
+        <h1 className="text-[26px] leading-tight font-semibold tracking-tight">
+          {item.label}
+        </h1>
+        <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">
+          {item.blurb}
+        </p>
       </div>
 
-      {section === "localization" ? (
-        <LocalizationPanel />
-      ) : section === "role-assignment" ? (
-        <RoleAssignmentPanel />
-      ) : blocks ? (
-        <SettingBlocks blocks={blocks} />
-      ) : (
-        <Panel>
-          <EmptyState
-            icon={Construction}
-            title="Not built in this round"
-            description="The hub, its structure and the areas already wired up are in. This screen is scheduled for a later round."
-            action={
-              <Button variant="outline" asChild>
-                <Link href="/settings">Back to Company Settings</Link>
-              </Button>
-            }
-          />
-        </Panel>
-      )}
+      <div className="py-6">
+        {section === "localization" ? (
+          <LocalizationPanel />
+        ) : section === "role-assignment" ? (
+          <RoleAssignmentPanel />
+        ) : blocks ? (
+          <SettingBlocks blocks={blocks} />
+        ) : (
+          <Panel>
+            <EmptyState
+              icon={Construction}
+              title="Not built in this round"
+              description="The hub, its structure and the areas already wired up are in. This screen is scheduled for a later round."
+              action={
+                <Button variant="outline" asChild>
+                  <Link href="/settings">Back to Company Settings</Link>
+                </Button>
+              }
+            />
+          </Panel>
+        )}
+      </div>
     </PageShell>
   )
 }

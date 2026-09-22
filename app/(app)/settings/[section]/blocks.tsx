@@ -1,9 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { Info, Users } from "lucide-react"
+import { Info, Pencil, Trash2, Users } from "lucide-react"
+import { toast } from "sonner"
 
-import { Panel, Pill, Initials } from "@/components/common"
+import { Panel, Pill, Initials, Field, SectionGrid } from "@/components/common"
+import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { useStore } from "@/lib/store"
 import { isOnStrength } from "@/lib/selectors"
@@ -95,6 +97,26 @@ function SettingBlock({ block }: { block: Block }) {
 
   if (block.kind === "orgTree") {
     return <OrgTreeBlock title={block.title} description={block.description} />
+  }
+
+  if (block.kind === "cover") {
+    return <CoverBlock rows={block.rows} action={block.action} />
+  }
+
+  if (block.kind === "grid") {
+    return (
+      <Panel title={block.title} description={block.description}>
+        <SectionGrid cols={block.columns ?? 2}>
+          {block.rows.map(([label, value]) => (
+            <Field key={label} label={label} value={value} />
+          ))}
+        </SectionGrid>
+      </Panel>
+    )
+  }
+
+  if (block.kind === "offices") {
+    return <OfficesBlock title={block.title} description={block.description} />
   }
 
   return (
@@ -197,7 +219,7 @@ function OrgTreeBlock({
     >
       <div className="min-w-[680px]">
         <div className="mx-auto w-fit rounded-xl border-2 border-primary bg-success-muted px-5 py-3 text-center">
-          <p className="text-sm font-semibold">AmaliTech Services Limited</p>
+          <p className="text-sm font-semibold">Xanthan Services Limited</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {employees.filter(isOnStrength).length} people ·{" "}
             {branches.filter((b) => !b.archived).length} branches
@@ -297,6 +319,166 @@ function OrgTreeBlock({
           )}
         </div>
       </div>
+    </Panel>
+  )
+}
+
+/**
+ * The company profile: a decorative cover, the logo tile and the handful of
+ * facts people actually look for first.
+ */
+function CoverBlock({
+  rows,
+  action,
+}: {
+  rows: [string, string][]
+  action?: string
+}) {
+  return (
+    <section className="overflow-hidden rounded-xl border bg-card">
+      <div className="relative h-36 overflow-hidden bg-success-muted">
+        <svg
+          viewBox="0 0 800 160"
+          preserveAspectRatio="xMidYMid slice"
+          className="absolute inset-0 size-full text-primary"
+          aria-hidden
+        >
+          <path
+            d="M0 96c90-52 150 34 250 10s130-86 230-70 150 96 240 74v50H0Z"
+            fill="currentColor"
+            opacity=".16"
+          />
+          <ellipse
+            cx="690"
+            cy="34"
+            rx="130"
+            ry="76"
+            fill="currentColor"
+            opacity=".2"
+          />
+          <ellipse
+            cx="120"
+            cy="-10"
+            rx="90"
+            ry="60"
+            fill="currentColor"
+            opacity=".14"
+          />
+          <path
+            d="M150 -20c46 54 6 108 92 150M420 -30c-24 64 44 86 32 172M640 -16c12 56-64 76-30 164"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            fill="none"
+            opacity=".22"
+          />
+        </svg>
+      </div>
+
+      {/* Positioned so the logo tile sits above the banner, which is relative. */}
+      <div className="relative z-10 px-6 pb-6">
+        <div className="-mt-12 mb-5 grid size-24 place-items-center rounded-xl border-4 border-card bg-card shadow-sm">
+          <span className="grid size-14 place-items-center rounded-lg bg-primary text-xl font-semibold text-primary-foreground">
+            X
+          </span>
+        </div>
+
+        <SectionGrid>
+          {rows.map(([label, value]) => (
+            <Field key={label} label={label} value={value} />
+          ))}
+        </SectionGrid>
+
+        {action && (
+          <Button
+            size="lg"
+            className="mt-6"
+            onClick={() =>
+              toast("Editing the company profile is not wired up yet.")
+            }
+          >
+            {action}
+          </Button>
+        )}
+      </div>
+    </section>
+  )
+}
+
+/**
+ * Offices are the branches configured under Organizational structure, so the
+ * two screens can never drift apart.
+ */
+function OfficesBlock({
+  title,
+  description,
+}: {
+  title?: string
+  description?: string
+}) {
+  const { branches, employees } = useStore()
+  const active = branches.filter((b) => !b.archived)
+
+  return (
+    <Panel
+      title={title ?? "Offices"}
+      description={description}
+      bodyClassName="space-y-3 p-4"
+      actions={
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() =>
+            toast("Add an office from Organizational structure -> Branches.")
+          }
+        >
+          Add office
+        </Button>
+      }
+    >
+      {active.map((branch, i) => (
+        <div
+          key={branch.id}
+          className="flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">
+                {/* "Accra HQ" already reads as an office; "Kumasi" does not. */}
+                {/office|hq/i.test(branch.name)
+                  ? branch.name
+                  : `${branch.name} Office`}
+              </span>
+              {i === 0 && <Pill tone="success">Head office</Pill>}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Ghana &bull; {branch.city} &bull; +233 24 ****4567 &bull;{" "}
+              {
+                employees.filter(
+                  (e) => e.branch === branch.name && isOnStrength(e)
+                ).length
+              }{" "}
+              people
+            </p>
+          </div>
+          <Link
+            href="/structure"
+            aria-label={`Edit ${branch.name}`}
+            className="grid size-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Pencil className="size-4" />
+          </Link>
+          <button
+            type="button"
+            aria-label={`Remove ${branch.name}`}
+            onClick={() =>
+              toast("Archive a branch from Organizational structure.")
+            }
+            className="grid size-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        </div>
+      ))}
     </Panel>
   )
 }

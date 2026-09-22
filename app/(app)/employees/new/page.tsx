@@ -198,7 +198,7 @@ export default function NewEmployeePage() {
         draft.email ||
         `${draft.firstName}.${draft.lastName}`
           .toLowerCase()
-          .replace(/\s+/g, "") + "@amalitech.com",
+          .replace(/\s+/g, "") + "@xanthan.com",
       personalEmail: draft.personalEmail,
       phone: draft.phone,
       dateOfBirth: draft.dateOfBirth,
@@ -688,7 +688,7 @@ function StepPersonal({
             value={draft.email}
             onChange={(v) => set("email", v)}
             hint="Generated from the name if left blank."
-            placeholder="abena.mensah@amalitech.com"
+            placeholder="abena.mensah@xanthan.com"
           />
           <TextField
             label="LinkedIn"
