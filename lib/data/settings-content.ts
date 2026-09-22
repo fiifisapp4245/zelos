@@ -1,5 +1,3 @@
-import type { Tone } from "@/components/common"
-
 /**
  * Sample content for each Company Settings screen.
  *
@@ -8,29 +6,12 @@ import type { Tone } from "@/components/common"
  * empty shell. Rendered generically by the settings detail route.
  */
 
-export interface Cell {
-  text: string
-  tone?: Tone
-  mono?: boolean
-  muted?: boolean
-}
-
-export type Row = (string | Cell)[]
-
 export type Block =
   | {
       kind: "fields"
       title?: string
       description?: string
       rows: [string, string][]
-    }
-  | {
-      kind: "table"
-      title?: string
-      description?: string
-      columns: string[]
-      rows: Row[]
-      footnote?: string
     }
   | {
       kind: "toggles"
@@ -64,134 +45,23 @@ export type Block =
     }
   /** Offices, read from the branches configured in the org structure. */
   | { kind: "offices"; title?: string; description?: string }
-
-const on = (text: string): Cell => ({ text, tone: "success" })
-const off = (text: string): Cell => ({ text, tone: "neutral" })
-const warn = (text: string): Cell => ({ text, tone: "warning" })
-const mono = (text: string): Cell => ({ text, mono: true })
+  /** An editable table, defined in settings-tables.ts. */
+  | { kind: "managedTable"; tableId: string }
 
 export const SETTINGS_CONTENT: Record<string, Block[]> = {
   // ---------------------------------------------------------------- Company
   "job-catalog": [
-    {
-      kind: "table",
-      title: "Job titles",
-      description:
-        "Every title an employee record can be assigned to, with its family and pay grade band.",
-      columns: ["Job title", "Family", "Grade band", "Filled", "Open reqs"],
-      rows: [
-        ["Managing Director", "Executive", "L7", "1", "—"],
-        ["VP Engineering", "Engineering", "L6", "1", "—"],
-        ["Director of Product", "Product", "L6", "1", "—"],
-        ["Head of Marketing", "Marketing", "L6", "1", "—"],
-        ["Head of People", "People", "L6", "1", "—"],
-        ["Finance Manager", "Finance", "L5", "1", "—"],
-        ["DevOps Engineer", "Engineering", "L5", "1", "—"],
-        ["Regional Sales Manager", "Marketing", "L5", "1", "—"],
-        ["Senior Product Designer", "Product", "L4", "1", "—"],
-        ["Software Engineer", "Engineering", "L3", "2", warn("2")],
-        ["Data Analyst", "Data & Insights", "L3", "1", "—"],
-        ["QA Engineer", "Engineering", "L2", "1", "—"],
-        ["HR Intern", "People", "L1", "1", "—"],
-      ],
-      footnote:
-        "A title cannot be removed while an employee still holds it — reassign first.",
-    },
-    {
-      kind: "table",
-      title: "Pay grade bands",
-      description: "Monthly gross range per grade, in Ghana Cedis.",
-      columns: ["Grade", "Minimum", "Midpoint", "Maximum", "People"],
-      rows: [
-        ["L1", "GHS 1,500", "GHS 1,800", "GHS 2,200", "1"],
-        ["L2", "GHS 5,500", "GHS 6,400", "GHS 7,500", "1"],
-        ["L3", "GHS 6,800", "GHS 8,000", "GHS 9,500", "7"],
-        ["L4", "GHS 9,000", "GHS 10,500", "GHS 12,500", "4"],
-        ["L5", "GHS 12,000", "GHS 14,500", "GHS 17,000", "3"],
-        ["L6", "GHS 19,000", "GHS 23,000", "GHS 27,000", "4"],
-        ["L7", "GHS 30,000", "GHS 38,000", "GHS 46,000", "1"],
-      ],
-    },
+    { kind: "managedTable", tableId: "job-titles" },
+    { kind: "managedTable", tableId: "pay-grades" },
   ],
 
   // -------------------------------------------------- Organisational shape
   "org-structure-diagram": [{ kind: "orgTree" }],
 
   // --------------------------------------------------------------- Employee
-  "custom-fields": [
-    {
-      kind: "table",
-      title: "Fields on the employee record",
-      description:
-        "Added on top of the standard record. Visibility is enforced by the permission layer, not by hiding the field in the UI.",
-      columns: ["Field", "Type", "Applies to", "Visible to", "Required"],
-      rows: [
-        ["T-shirt size", "Select", "All employees", "HR", off("No")],
-        ["Dietary requirement", "Select", "All employees", "HR", off("No")],
-        [
-          "Next of kin (second)",
-          "Group",
-          "All employees",
-          "HR, Self",
-          off("No"),
-        ],
-        [
-          "Professional body",
-          "Text",
-          "Finance, Engineering",
-          "HR, Line manager",
-          off("No"),
-        ],
-        [
-          "Work permit number",
-          "Text",
-          "Non-Ghanaian nationals",
-          "HR only",
-          on("Yes"),
-        ],
-        [
-          "Disability accommodation",
-          "Long text",
-          "All employees",
-          { text: "HR — purpose-based", tone: "warning" },
-          off("No"),
-        ],
-      ],
-      footnote:
-        "Fields marked purpose-based follow the medical-data rule: HR must state a reason, and the access is logged.",
-    },
-  ],
+  "custom-fields": [{ kind: "managedTable", tableId: "custom-fields" }],
 
-  "employment-types": [
-    {
-      kind: "table",
-      title: "Types in use",
-      description:
-        "Each type changes how payroll, leave accrual and statutory contributions behave.",
-      columns: ["Type", "SSNIT", "Leave accrual", "Notice period", "People"],
-      rows: [
-        [
-          "Full-time",
-          on("Tier 1, 2 & 3"),
-          "15–21 days / year",
-          "30 days",
-          "20",
-        ],
-        ["Part-time", on("Tier 1 & 2"), "Pro-rata", "14 days", "0"],
-        ["Contractor", off("Not deducted"), "None", "Per contract", "1"],
-        ["Intern", off("Not deducted"), "None", "7 days", "0"],
-        [
-          "National Service",
-          off("Not deducted"),
-          "Per NSS scheme",
-          "Per posting",
-          "1",
-        ],
-      ],
-      footnote:
-        "Contractors and National Service personnel are excluded from the SSNIT remittance file automatically.",
-    },
-  ],
+  "employment-types": [{ kind: "managedTable", tableId: "employment-types" }],
 
   "employment-id-format": [
     {
@@ -216,20 +86,7 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
 
   // -------------------------------------------------------- Time & attendance
   "working-week": [
-    {
-      kind: "table",
-      title: "Standard week",
-      columns: ["Day", "Working day", "Start", "End", "Break"],
-      rows: [
-        ["Monday", on("Yes"), "08:00", "17:00", "60 min"],
-        ["Tuesday", on("Yes"), "08:00", "17:00", "60 min"],
-        ["Wednesday", on("Yes"), "08:00", "17:00", "60 min"],
-        ["Thursday", on("Yes"), "08:00", "17:00", "60 min"],
-        ["Friday", on("Yes"), "08:00", "16:00", "60 min"],
-        ["Saturday", off("No"), "—", "—", "—"],
-        ["Sunday", off("No"), "—", "—", "—"],
-      ],
-    },
+    { kind: "managedTable", tableId: "working-week" },
     {
       kind: "fields",
       title: "Totals",
@@ -242,19 +99,7 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
     },
   ],
 
-  "work-schedules": [
-    {
-      kind: "table",
-      title: "Schedules",
-      columns: ["Schedule", "Pattern", "Hours", "Branch", "Assigned"],
-      rows: [
-        ["Standard office", "Mon–Fri, 08:00–17:00", "40 / week", "All", "18"],
-        ["Warehouse early", "Mon–Sat, 06:00–14:00", "44 / week", "Kumasi", "3"],
-        ["Warehouse late", "Mon–Sat, 14:00–22:00", "44 / week", "Kumasi", "0"],
-        ["Support rota", "Rotating, 7 days", "40 / week", "Accra HQ", "2"],
-      ],
-    },
-  ],
+  "work-schedules": [{ kind: "managedTable", tableId: "work-schedules" }],
 
   "clock-in-methods": [
     {
@@ -302,168 +147,16 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
         ["Minimum day for attendance credit", "4 hours"],
       ],
     },
-    {
-      kind: "table",
-      title: "Overtime rates",
-      description: "Applied to the hourly rate derived from monthly gross.",
-      columns: ["Condition", "Multiplier", "Approval required"],
-      rows: [
-        ["Weekday beyond 17:00", "1.5×", on("Line manager")],
-        ["Saturday", "1.5×", on("Line manager")],
-        ["Sunday", "2.0×", on("Head of Department")],
-        ["Public holiday", "2.0×", on("Head of Department")],
-      ],
-      footnote:
-        "Overtime is capped at 24 hours per employee per month without written HR approval.",
-    },
+    { kind: "managedTable", tableId: "overtime-rates" },
   ],
 
   // ------------------------------------------------------------------ Leave
-  "leave-policies": [
-    {
-      kind: "table",
-      title: "Leave types",
-      description:
-        "Entitlement is the statutory minimum or better. Ghana's Labour Act sets 15 working days as the floor for annual leave.",
-      columns: [
-        "Type",
-        "Entitlement",
-        "Paid",
-        "Accrual",
-        "Carry over",
-        "Evidence",
-      ],
-      rows: [
-        [
-          "Annual",
-          "15–21 days by grade",
-          on("Paid"),
-          "Monthly",
-          "Up to 5 days",
-          off("None"),
-        ],
-        [
-          "Sick",
-          "12 days",
-          on("Paid"),
-          "Upfront",
-          "None",
-          warn("Medical note after 2 days"),
-        ],
-        [
-          "Maternity",
-          "14 weeks",
-          on("Paid"),
-          "On event",
-          "None",
-          warn("Medical certificate"),
-        ],
-        ["Paternity", "5 days", on("Paid"), "On event", "None", off("None")],
-        [
-          "Compassionate",
-          "5 days",
-          on("Paid"),
-          "On event",
-          "None",
-          off("None"),
-        ],
-        [
-          "Study",
-          "10 days",
-          on("Paid"),
-          "On approval",
-          "None",
-          warn("Proof of enrolment"),
-        ],
-        [
-          "Unpaid",
-          "No limit",
-          off("Unpaid"),
-          "On approval",
-          "None",
-          off("None"),
-        ],
-      ],
-      footnote:
-        "Carry-over expires on 31 March of the following year. Unused days beyond the cap are forfeited, not paid out.",
-    },
-  ],
+  "leave-policies": [{ kind: "managedTable", tableId: "leave-types" }],
 
-  "public-holidays": [
-    {
-      kind: "table",
-      title: "Ghana public holidays — 2026",
-      description:
-        "Leave and attendance are measured against this calendar. A holiday falling on a weekend is observed on the following Monday.",
-      columns: ["Date", "Day", "Holiday", "Type", "Observed"],
-      rows: [
-        ["1 January", "Thursday", "New Year's Day", "Statutory", on("Yes")],
-        ["7 January", "Wednesday", "Constitution Day", "Statutory", on("Yes")],
-        ["6 March", "Friday", "Independence Day", "Statutory", on("Yes")],
-        [
-          "20 March",
-          "Friday",
-          "Eid ul-Fitr",
-          "Statutory",
-          warn("Subject to moon sighting"),
-        ],
-        ["3 April", "Friday", "Good Friday", "Statutory", on("Yes")],
-        ["6 April", "Monday", "Easter Monday", "Statutory", on("Yes")],
-        ["1 May", "Friday", "May Day", "Statutory", on("Yes")],
-        [
-          "27 May",
-          "Wednesday",
-          "Eid ul-Adha",
-          "Statutory",
-          warn("Subject to moon sighting"),
-        ],
-        ["4 August", "Tuesday", "Founders' Day", "Statutory", on("Yes")],
-        [
-          "21 September",
-          "Monday",
-          "Kwame Nkrumah Memorial Day",
-          "Statutory",
-          on("Yes"),
-        ],
-        ["4 December", "Friday", "Farmers' Day", "Statutory", on("Yes")],
-        ["25 December", "Friday", "Christmas Day", "Statutory", on("Yes")],
-        [
-          "26 December",
-          "Saturday",
-          "Boxing Day",
-          "Statutory",
-          warn("Observed Mon 28 Dec"),
-        ],
-      ],
-      footnote:
-        "Islamic holiday dates are confirmed by national declaration and may shift by a day. HR confirms each one two weeks ahead.",
-    },
-  ],
+  "public-holidays": [{ kind: "managedTable", tableId: "public-holidays" }],
 
   "approval-settings": [
-    {
-      kind: "table",
-      title: "Approval routing",
-      columns: [
-        "Request",
-        "First approver",
-        "Second approver",
-        "Escalates after",
-      ],
-      rows: [
-        ["Annual leave ≤ 5 days", "Line manager", off("None"), "3 days"],
-        [
-          "Annual leave > 5 days",
-          "Line manager",
-          "Head of Department",
-          "3 days",
-        ],
-        ["Sick leave", "Line manager", off("None"), "1 day"],
-        ["Maternity / paternity", "HR Admin", off("None"), "2 days"],
-        ["Unpaid leave", "Line manager", "HR Admin", "3 days"],
-        ["Overtime claim", "Line manager", "Finance", "5 days"],
-      ],
-    },
+    { kind: "managedTable", tableId: "approval-routing" },
     {
       kind: "toggles",
       title: "Rules",
@@ -496,43 +189,8 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
 
   // ---------------------------------------------------------------- Payroll
   "statutory-settings": [
-    {
-      kind: "table",
-      title: "SSNIT contributions",
-      description: "Three-tier scheme. Tier 1 and 2 are mandatory.",
-      columns: ["Tier", "Employee", "Employer", "Total", "Remitted to"],
-      rows: [
-        ["Tier 1 — Basic National Scheme", "5.5%", "13.0%", "13.5%", "SSNIT"],
-        ["Tier 2 — Occupational Pension", "—", "5.0%", "5.0%", "Petra Trust"],
-        [
-          "Tier 3 — Provident Fund",
-          "Voluntary",
-          "Voluntary",
-          "Up to 16.5%",
-          "Employee's choice",
-        ],
-      ],
-      footnote:
-        "Of the 18.5% total Tier 1+2 contribution, 13.5% goes to SSNIT and 5% to the approved Tier 2 trustee.",
-    },
-    {
-      kind: "table",
-      title: "PAYE bands — monthly (GRA)",
-      description:
-        "Applied at disbursement on the chargeable amount after SSNIT relief.",
-      columns: ["Chargeable income", "Rate", "Tax on band", "Cumulative"],
-      rows: [
-        ["First GHS 490", "0%", "GHS 0.00", "GHS 0.00"],
-        ["Next GHS 110", "5%", "GHS 5.50", "GHS 5.50"],
-        ["Next GHS 130", "10%", "GHS 13.00", "GHS 18.50"],
-        ["Next GHS 3,166", "17.5%", "GHS 554.05", "GHS 572.55"],
-        ["Next GHS 16,000", "25%", "GHS 4,000.00", "GHS 4,572.55"],
-        ["Next GHS 30,520", "30%", "GHS 9,156.00", "GHS 13,728.55"],
-        ["Above GHS 50,416", "35%", "On the excess", "—"],
-      ],
-      footnote:
-        "Bands are configuration. When the GRA revises them, this table changes — no code is touched.",
-    },
+    { kind: "managedTable", tableId: "ssnit-tiers" },
+    { kind: "managedTable", tableId: "paye-bands" },
   ],
 
   "pay-schedule": [
@@ -560,81 +218,8 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
   ],
 
   "allowance-deduction-type": [
-    {
-      kind: "table",
-      title: "Allowances",
-      columns: ["Allowance", "Amount", "Frequency", "Taxable", "Applies to"],
-      rows: [
-        ["Transport", "GHS 600", "Monthly", warn("Taxable"), "All staff"],
-        ["Fuel", "GHS 1,200", "Monthly", warn("Taxable"), "L5 and above"],
-        ["Mobile data", "GHS 150", "Monthly", off("Non-taxable"), "All staff"],
-        [
-          "On-call",
-          "GHS 400",
-          "Per week on call",
-          warn("Taxable"),
-          "Engineering rota",
-        ],
-        [
-          "Responsibility",
-          "10% of basic",
-          "Monthly",
-          warn("Taxable"),
-          "Heads of Department",
-        ],
-        [
-          "Long service",
-          "GHS 5,000",
-          "On 5-year anniversary",
-          warn("Taxable"),
-          "All staff",
-        ],
-      ],
-    },
-    {
-      kind: "table",
-      title: "Deductions",
-      columns: ["Deduction", "Amount", "Frequency", "Statutory", "Applies to"],
-      rows: [
-        [
-          "SSNIT Tier 1",
-          "5.5% of basic",
-          "Monthly",
-          on("Statutory"),
-          "Full & part-time",
-        ],
-        [
-          "PAYE",
-          "Per GRA bands",
-          "Monthly",
-          on("Statutory"),
-          "All taxable staff",
-        ],
-        [
-          "Staff loan repayment",
-          "Per agreement",
-          "Monthly",
-          off("Voluntary"),
-          "3 employees",
-        ],
-        [
-          "Welfare fund",
-          "GHS 50",
-          "Monthly",
-          off("Voluntary"),
-          "Opt-in — 17 employees",
-        ],
-        [
-          "Tier 3 top-up",
-          "Employee-set",
-          "Monthly",
-          off("Voluntary"),
-          "Opt-in — 4 employees",
-        ],
-      ],
-      footnote:
-        "Total voluntary deductions are capped so that net pay never falls below 60% of gross.",
-    },
+    { kind: "managedTable", tableId: "allowances" },
+    { kind: "managedTable", tableId: "deductions" },
   ],
 
   "payment-methods": [
@@ -726,98 +311,11 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
   ],
 
   // ---------------------------------------------------------- Admin & access
-  users: [
-    {
-      kind: "table",
-      title: "Accounts",
-      description:
-        "Who can sign in. A person can hold several permission roles at once — see Role assignment.",
-      columns: ["Name", "Work email", "Roles", "Status", "Last active"],
-      rows: [
-        [
-          "Fiifi Boakye",
-          mono("fiifi.boakye@xanthan.com"),
-          "HR Admin, Employee",
-          on("Active"),
-          "Today, 09:12",
-        ],
-        [
-          "Esi Quainoo",
-          mono("esi.quainoo@xanthan.com"),
-          "Owner, HR Admin, Employee",
-          on("Active"),
-          "Today, 08:40",
-        ],
-        [
-          "Maame Yeboah",
-          mono("maame.yeboah@xanthan.com"),
-          "Payroll, Employee",
-          on("Active"),
-          "Yesterday, 16:55",
-        ],
-        [
-          "Adwoa Bediako",
-          mono("adwoa.bediako@xanthan.com"),
-          "Line Manager, Employee",
-          on("Active"),
-          "Today, 10:03",
-        ],
-        [
-          "Kwesi Owusu",
-          mono("kwesi.owusu@xanthan.com"),
-          "Head of Department, Employee",
-          on("Active"),
-          "Today, 07:58",
-        ],
-        [
-          "Serwa Acheampong",
-          mono("serwa.acheampong@xanthan.com"),
-          "HR Admin, Employee",
-          on("Active"),
-          "2 days ago",
-        ],
-        [
-          "Kobby Ansah",
-          mono("kobby.ansah@xanthan.com"),
-          "Employee",
-          { text: "Suspended", tone: "danger" },
-          "24 Aug 2026",
-        ],
-        [
-          "Nii Lartey",
-          mono("nii.lartey@xanthan.com"),
-          "Employee",
-          off("Deactivated"),
-          "31 Dec 2025",
-        ],
-      ],
-      footnote:
-        "Deactivating an account never deletes the person's record or their history in the audit log.",
-    },
-  ],
+  users: [{ kind: "managedTable", tableId: "user-accounts" }],
 
   // --------------------------------------------------------------- Security
   "two-factor-authentication": [
-    {
-      kind: "table",
-      title: "Requirement by role",
-      columns: ["Role", "Required", "Methods allowed", "Enrolled"],
-      rows: [
-        ["Owner", on("Required"), "Authenticator app, SMS", "1 of 1"],
-        ["HR Admin", on("Required"), "Authenticator app, SMS", "2 of 2"],
-        ["Payroll", on("Required"), "Authenticator app", "1 of 1"],
-        [
-          "Head of Department",
-          warn("Encouraged"),
-          "Authenticator app, SMS",
-          "1 of 2",
-        ],
-        ["Line Manager", off("Optional"), "Authenticator app, SMS", "0 of 4"],
-        ["Employee", off("Optional"), "Authenticator app, SMS", "3 of 25"],
-      ],
-      footnote:
-        "Roles that can see compensation or change lifecycle state must enrol before their next sign-in.",
-    },
+    { kind: "managedTable", tableId: "twofa-by-role" },
     {
       kind: "fields",
       title: "Recovery",
@@ -855,24 +353,7 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
   ],
 
   "session-timeout": [
-    {
-      kind: "table",
-      title: "Timeouts by role",
-      columns: [
-        "Role",
-        "Idle timeout",
-        "Absolute session",
-        "Concurrent sessions",
-      ],
-      rows: [
-        ["Owner", "20 minutes", "8 hours", "2"],
-        ["HR Admin", "20 minutes", "8 hours", "2"],
-        ["Payroll", "15 minutes", "8 hours", "1"],
-        ["Head of Department", "45 minutes", "12 hours", "3"],
-        ["Line Manager", "45 minutes", "12 hours", "3"],
-        ["Employee", "60 minutes", "24 hours", "3"],
-      ],
-    },
+    { kind: "managedTable", tableId: "session-timeouts" },
     {
       kind: "fields",
       title: "Behaviour",
@@ -889,220 +370,16 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
 
   // ---------------------------------------------------------- Notifications
   "email-in-app-notification": [
-    {
-      kind: "table",
-      title: "Events",
-      description: "Which events notify whom, and through which channel.",
-      columns: ["Event", "Recipients", "In-app", "Email", "Digest"],
-      rows: [
-        [
-          "Leave request submitted",
-          "Line manager, dotted-line manager",
-          on("On"),
-          on("On"),
-          off("No"),
-        ],
-        [
-          "Leave decision made",
-          "Requesting employee",
-          on("On"),
-          on("On"),
-          off("No"),
-        ],
-        [
-          "Contract expiring",
-          "HR Admin, line manager",
-          on("On"),
-          on("On"),
-          on("Weekly"),
-        ],
-        [
-          "Probation ending",
-          "HR Admin, line manager",
-          on("On"),
-          on("On"),
-          on("Weekly"),
-        ],
-        [
-          "Document expiring",
-          "HR Admin, the employee",
-          on("On"),
-          on("On"),
-          on("Weekly"),
-        ],
-        [
-          "New starter added",
-          "HR Admin, IT, line manager",
-          on("On"),
-          on("On"),
-          off("No"),
-        ],
-        [
-          "Lifecycle state changed",
-          "HR Admin, line manager",
-          on("On"),
-          off("Off"),
-          off("No"),
-        ],
-        [
-          "Disciplinary case opened",
-          "HR Admin only",
-          on("On"),
-          on("On"),
-          off("No"),
-        ],
-        [
-          "Payroll run ready for approval",
-          "Payroll, Owner",
-          on("On"),
-          on("On"),
-          off("No"),
-        ],
-        ["Review cycle opening", "All managers", on("On"), on("On"), off("No")],
-      ],
-      footnote:
-        "Salary changes never trigger a notification to anyone but the employee, HR and Payroll.",
-    },
+    { kind: "managedTable", tableId: "notification-events" },
   ],
 
   "reminder-schedules": [
-    {
-      kind: "table",
-      title: "Chase schedule",
-      columns: [
-        "Outstanding item",
-        "First reminder",
-        "Repeat",
-        "Escalates to",
-        "After",
-      ],
-      rows: [
-        [
-          "Leave request undecided",
-          "After 24 hours",
-          "Daily",
-          "Head of Department",
-          "3 days",
-        ],
-        [
-          "Onboarding task overdue",
-          "On due date",
-          "Every 2 days",
-          "HR Admin",
-          "5 days",
-        ],
-        [
-          "Missing required document",
-          "7 days before start",
-          "Every 2 days",
-          "HR Admin",
-          "On start date",
-        ],
-        [
-          "Contract expiry unacknowledged",
-          "30 days out",
-          "At 15 and 7 days",
-          "Owner",
-          "7 days",
-        ],
-        [
-          "Performance review overdue",
-          "On due date",
-          "Weekly",
-          "Head of Department",
-          "14 days",
-        ],
-        [
-          "Exit clearance incomplete",
-          "7 days before last day",
-          "Daily",
-          "HR Admin",
-          "Last working day",
-        ],
-      ],
-    },
-    {
-      kind: "fields",
-      title: "Quiet hours",
-      rows: [
-        ["No notifications between", "19:00 and 07:00 GMT"],
-        ["Weekends", "Held until Monday, except escalations"],
-        ["Public holidays", "Held until the next working day"],
-      ],
-    },
+    { kind: "managedTable", tableId: "reminder-schedules" },
   ],
 
   // ----------------------------------------------------------- Integrations
   "api-keys-webhooks": [
-    {
-      kind: "table",
-      title: "API keys",
-      columns: ["Label", "Key", "Scope", "Created", "Last used"],
-      rows: [
-        [
-          "Payroll bureau export",
-          mono("zel_live_••••••••4f2a"),
-          "Read: employees, compensation",
-          "12 Mar 2026",
-          "Yesterday",
-        ],
-        [
-          "Identity provider sync",
-          mono("zel_live_••••••••9c71"),
-          "Read/write: users",
-          "4 Jan 2026",
-          "Today, 06:00",
-        ],
-        [
-          "Attendance terminals",
-          mono("zel_live_••••••••2b58"),
-          "Write: attendance",
-          "19 Nov 2025",
-          "Today, 08:02",
-        ],
-        [
-          "BI warehouse (read-only)",
-          mono("zel_live_••••••••7e03"),
-          "Read: aggregates only",
-          "2 Jun 2026",
-          "3 days ago",
-        ],
-      ],
-      footnote:
-        "Keys are shown once at creation and never again. The BI key can only read aggregates above the 5-person floor.",
-    },
-    {
-      kind: "table",
-      title: "Webhooks",
-      columns: ["Event", "Endpoint", "Status", "Last delivery"],
-      rows: [
-        [
-          "employee.created",
-          mono("https://it.xanthan.com/hooks/zelos"),
-          on("Healthy"),
-          "Today, 09:14 — 200",
-        ],
-        [
-          "employee.lifecycle_changed",
-          mono("https://it.xanthan.com/hooks/zelos"),
-          on("Healthy"),
-          "Yesterday, 11:02 — 200",
-        ],
-        [
-          "leave.approved",
-          mono("https://ops.xanthan.com/rota"),
-          warn("Retrying"),
-          "Today, 07:31 — 503",
-        ],
-        [
-          "payroll.run_completed",
-          mono("https://finance.xanthan.com/hooks"),
-          on("Healthy"),
-          "28 Aug 2026 — 200",
-        ],
-      ],
-      footnote:
-        "Failed deliveries retry 5 times with exponential backoff, then raise an alert to HR Admin.",
-    },
+    { kind: "managedTable", tableId: "api-keys" },
+    { kind: "managedTable", tableId: "webhooks" },
   ],
 }

@@ -29,6 +29,7 @@ import {
   REQUISITIONS,
   REVIEWS,
 } from "./data/records"
+import { TABLE_ROWS, TABLE_SPECS, type TableRow } from "./data/settings-tables"
 import type {
   Alert,
   CompanyProfile,
@@ -74,6 +75,8 @@ interface State {
   alerts: Alert[]
   notifications: Notification[]
   company: CompanyProfile
+  /** Editable settings tables, keyed by table id. */
+  tables: Record<string, TableRow[]>
   activeRole: PermissionRole
 }
 
@@ -97,6 +100,7 @@ const INITIAL: State = {
   alerts: ALERTS,
   notifications: NOTIFICATIONS,
   company: COMPANY,
+  tables: TABLE_ROWS,
   activeRole: "hr_admin",
 }
 
@@ -109,6 +113,13 @@ interface StoreValue extends State {
   update: <K extends keyof State>(key: K, value: State[K]) => void
   patchEmployee: (id: string, patch: Partial<Employee>, note?: string) => void
   updateCompany: (patch: Partial<CompanyProfile>) => void
+  addTableRow: (tableId: string, row: Omit<TableRow, "id">) => void
+  updateTableRow: (
+    tableId: string,
+    rowId: string,
+    patch: Partial<TableRow>
+  ) => void
+  deleteTableRow: (tableId: string, rowId: string) => void
   addEmployee: (employee: Employee) => void
   changeLifecycle: (
     id: string,
@@ -275,6 +286,95 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             ...s,
             company: { ...s.company, ...patch },
             auditLog: [...entries, ...s.auditLog],
+          }
+        })
+      },
+
+      addTableRow: (tableId, row) => {
+        setState((s) => {
+          const spec = TABLE_SPECS[tableId]
+          const next = { id: uid("row"), ...row } as TableRow
+          return {
+            ...s,
+            tables: {
+              ...s.tables,
+              [tableId]: [...(s.tables[tableId] ?? []), next],
+            },
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: null,
+                actorId,
+                action: `Added a row to ${spec?.title ?? tableId}`,
+                field: tableId,
+                after: String(next[spec?.labelKey ?? "id"] ?? ""),
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      updateTableRow: (tableId, rowId, patch) => {
+        setState((s) => {
+          const spec = TABLE_SPECS[tableId]
+          const rows = s.tables[tableId] ?? []
+          const before = rows.find((r) => r.id === rowId)
+          if (!before) return s
+          const changed = Object.entries(patch).filter(
+            ([k, v]) => before[k] !== v
+          )
+          if (changed.length === 0) return s
+          return {
+            ...s,
+            tables: {
+              ...s.tables,
+              [tableId]: rows.map((r) =>
+                r.id === rowId ? ({ ...r, ...patch } as TableRow) : r
+              ),
+            },
+            auditLog: [
+              ...changed.map(([field, after]) => ({
+                id: uid("a"),
+                employeeId: null,
+                actorId,
+                action: `Updated ${before[spec?.labelKey ?? "id"]} in ${spec?.title ?? tableId}`,
+                field,
+                before: String(before[field] ?? ""),
+                after: String(after ?? ""),
+                at: nowIso(),
+              })),
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      deleteTableRow: (tableId, rowId) => {
+        setState((s) => {
+          const spec = TABLE_SPECS[tableId]
+          const rows = s.tables[tableId] ?? []
+          const gone = rows.find((r) => r.id === rowId)
+          if (!gone) return s
+          return {
+            ...s,
+            tables: {
+              ...s.tables,
+              [tableId]: rows.filter((r) => r.id !== rowId),
+            },
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: null,
+                actorId,
+                action: `Removed a row from ${spec?.title ?? tableId}`,
+                field: tableId,
+                before: String(gone[spec?.labelKey ?? "id"] ?? ""),
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
           }
         })
       },

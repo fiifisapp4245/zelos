@@ -5,12 +5,13 @@ import { Info, Pencil, Trash2, Users } from "lucide-react"
 import { toast } from "sonner"
 
 import { Panel, Pill, Initials, Field, SectionGrid } from "@/components/common"
+import { SettingsTable } from "./settings-table"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { useStore } from "@/lib/store"
 import { isOnStrength } from "@/lib/selectors"
 import { fullName } from "@/lib/format"
-import type { Block, Cell } from "@/lib/data/settings-content"
+import type { Block } from "@/lib/data/settings-content"
 import { cn } from "@/lib/utils"
 
 export function SettingBlocks({ blocks }: { blocks: Block[] }) {
@@ -119,72 +120,11 @@ function SettingBlock({ block }: { block: Block }) {
     return <OfficesBlock title={block.title} description={block.description} />
   }
 
-  return (
-    <Panel
-      title={block.title}
-      description={block.description}
-      bodyClassName="p-0"
-    >
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/40 text-left">
-              {block.columns.map((c, i) => (
-                <th
-                  key={c}
-                  className={cn(
-                    "px-3 py-2.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase",
-                    i === 0 && "pl-5",
-                    i === block.columns.length - 1 && "pr-5"
-                  )}
-                >
-                  {c}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {block.rows.map((row, r) => (
-              <tr key={r} className="transition-colors hover:bg-muted/30">
-                {row.map((cell, c) => (
-                  <td
-                    key={c}
-                    className={cn(
-                      "px-3 py-2.5 align-top",
-                      c === 0 && "pl-5 font-medium",
-                      c === row.length - 1 && "pr-5"
-                    )}
-                  >
-                    <CellValue cell={cell} />
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {block.footnote && (
-        <p className="border-t px-5 py-3 text-xs text-muted-foreground">
-          {block.footnote}
-        </p>
-      )}
-    </Panel>
-  )
-}
+  if (block.kind === "managedTable") {
+    return <SettingsTable tableId={block.tableId} />
+  }
 
-function CellValue({ cell }: { cell: string | Cell }) {
-  if (typeof cell === "string") return <>{cell}</>
-  if (cell.tone) return <Pill tone={cell.tone}>{cell.text}</Pill>
-  return (
-    <span
-      className={cn(
-        cell.mono && "font-mono text-xs",
-        cell.muted && "text-muted-foreground"
-      )}
-    >
-      {cell.text}
-    </span>
-  )
+  return null
 }
 
 /**
