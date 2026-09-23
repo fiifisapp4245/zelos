@@ -2,39 +2,26 @@
 
 import { useStore } from "../store"
 import { resolveAudience } from "./get-nav-for-user"
+import { approvalsFor } from "../home/home-data"
 import type { NavBadgeKey } from "./nav-config"
 
 /**
- * Stub for the counts endpoint the sidebar will eventually poll. The numbers
- * differ by audience because the queues do: an HR Admin sees everything
- * awaiting the company, a manager only what is waiting on them.
+ * The count beside Approvals. It reads the same queue Home renders, through
+ * the same selector, so the badge and the page can never disagree.
  */
 export function useNavBadges(): Record<NavBadgeKey, number> {
-  const { session, leaveRequests, employees } = useStore()
+  const { session, approvals, employees } = useStore()
   const audience = resolveAudience(session)
 
-  const pending = leaveRequests.filter((r) => r.status === "pending")
+  const scope =
+    audience === "manager"
+      ? "team"
+      : audience === "payroll"
+        ? "payDetails"
+        : "company"
 
-  if (audience === "hr_admin") {
-    return { approvals: pending.length }
+  return {
+    approvals: approvalsFor(approvals, audience, session.id, employees, scope)
+      .length,
   }
-
-  if (audience === "manager") {
-    const mine = new Set(
-      employees
-        .filter(
-          (e) =>
-            e.managerId === session.id || e.dottedLineManagerId === session.id
-        )
-        .map((e) => e.id)
-    )
-    return { approvals: pending.filter((r) => mine.has(r.employeeId)).length }
-  }
-
-  if (audience === "payroll") {
-    // Payroll approves pay runs, not leave; nothing is queued in the seed.
-    return { approvals: 0 }
-  }
-
-  return { approvals: 0 }
 }

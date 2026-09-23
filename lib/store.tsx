@@ -180,7 +180,8 @@ interface StoreValue extends State {
   reset: () => void
 }
 
-const StoreContext = React.createContext<StoreValue | null>(null)
+/** Exported so a demo view can provide a starved store to a subtree. */
+export const StoreContext = React.createContext<StoreValue | null>(null)
 
 function nowIso() {
   return new Date().toISOString()

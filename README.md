@@ -40,13 +40,38 @@ The **persona switcher** is the floating button in the bottom-right corner of th
 the signed-in persona, and it is the fastest way to see the permission model — the thing most
 worth demoing:
 
-| Role | Persona | What changes |
-|---|---|---|
-| HR Admin | Fiifi Boakye | Everything. The only role that can change lifecycle state. |
-| Line Manager | Adwoa Bediako | Own reports only. **No salary.** No audit log, payroll or structure. |
-| Head of Department | Kwesi Owusu | Whole department, plus their own reports. |
-| Payroll Officer | Maame Yeboah | Compensation and statutory IDs across the org. |
-| Employee | Kofi Mensah | Own record only — a 403 on anyone else's. |
+| Role               | Persona       | What changes                                                         |
+| ------------------ | ------------- | -------------------------------------------------------------------- |
+| HR Admin           | Fiifi Boakye  | Everything. The only role that can change lifecycle state.           |
+| Line Manager       | Adwoa Bediako | Own reports only. **No salary.** No audit log, payroll or structure. |
+| Head of Department | Kwesi Owusu   | Whole department, plus their own reports.                            |
+| Payroll Officer    | Maame Yeboah  | Compensation and statutory IDs across the org.                       |
+| Employee           | Kofi Mensah   | Own record only — a 403 on anyone else's.                            |
+
+## Home
+
+`/overview` is one skeleton for every role — a greeting, up to four quick actions, then a
+two-thirds main column and a one-third rail that stacks under it below 1024px. Which widgets
+land in which column comes from [lib/home/home-config.ts](lib/home/home-config.ts) and the pure
+`getHomeForUser(session)`; the config names widgets as string keys, and the page maps them
+through its own registry, so the selector stays free of React and is unit-tested for all four
+personas.
+
+The queue leads because that is what Home is for. `NeedsApproval` shows only requests whose
+_current_ chain step belongs to you — HR at the HR stage across the company, a manager at their
+own stage on their own team, payroll on pay details — and expanding a row gives you the facts
+needed to decide without opening the record: leave balance before and after, who else is away
+on those dates, and any public holidays in the range.
+
+### Demo states
+
+Two query parameters, deliberately not surfaced anywhere in the UI. Combine either with the
+persona switcher to see all four homes in each state.
+
+| URL                      | Shows                                                              |
+| ------------------------ | ------------------------------------------------------------------ |
+| `/overview?demo=empty`   | Every widget's empty state, by starving the store for that subtree |
+| `/overview?demo=loading` | The loading skeletons                                              |
 
 ## The three access models
 
@@ -56,7 +81,7 @@ rather than sketched.
 
 1. **Static role-based** — salary is visible to the employee, HR and Payroll. Line managers are
    excluded deliberately; comp conversations route through HR.
-2. **Purpose-based** — medical documents and statutory ID reveals require a *stated reason*,
+2. **Purpose-based** — medical documents and statutory ID reveals require a _stated reason_,
    which is written to the audit log. Seniority alone opens nothing.
 3. **Lifecycle/state-based** — who may read a disciplinary case depends on the case's state.
    A coaching note is private to its author until it is deliberately escalated.
@@ -67,18 +92,18 @@ one person routinely holds several at once. See the matrix under
 
 ## What to look at
 
-| Route | Worth noticing |
-|---|---|
-| `/overview` | Role-aware. Employees get a different landing page entirely. |
-| `/employees` | 3-character search minimum, composable filters, table/grid. |
-| `/employees/new` | 5-step wizard. Try continuing with an empty form, or reusing Kofi's Ghana Card. |
-| `/employees/kofi` | Full record. Compare the Compensation tab across roles. |
-| `/employees/nii` | Retired — an end state. "Change status" offers nothing. |
-| `/leave` | Approvals, including via a dotted line. Rejection requires a reason. |
-| `/performance` | Private notes, escalation as a one-way door, and the HR escalation signal. |
-| `/payroll` | Blocks the run on incomplete records *before* it starts. |
-| `/alerts` | Thresholds fire at 30/15/7 days and are generated from dates already in the system. |
-| `/settings` | Company Settings hub — searchable, ten categories. Try searching "holiday" or "payroll". |
+| Route             | Worth noticing                                                                           |
+| ----------------- | ---------------------------------------------------------------------------------------- |
+| `/overview`       | Role-aware. Employees get a different landing page entirely.                             |
+| `/employees`      | 3-character search minimum, composable filters, table/grid.                              |
+| `/employees/new`  | 5-step wizard. Try continuing with an empty form, or reusing Kofi's Ghana Card.          |
+| `/employees/kofi` | Full record. Compare the Compensation tab across roles.                                  |
+| `/employees/nii`  | Retired — an end state. "Change status" offers nothing.                                  |
+| `/leave`          | Approvals, including via a dotted line. Rejection requires a reason.                     |
+| `/performance`    | Private notes, escalation as a one-way door, and the HR escalation signal.               |
+| `/payroll`        | Blocks the run on incomplete records _before_ it starts.                                 |
+| `/alerts`         | Thresholds fire at 30/15/7 days and are generated from dates already in the system.      |
+| `/settings`       | Company Settings hub — searchable, ten categories. Try searching "holiday" or "payroll". |
 
 ## Design decisions worth keeping
 
@@ -120,6 +145,8 @@ lib/data/settings.ts  the Company Settings catalogue (categories → items)
 lib/rbac.ts           the permission layer
 lib/selectors.ts      role-scoped queries (visibleEmployees, completeness, …)
 lib/format.ts         labels, dates, GHS, the lifecycle state machine
+lib/home/            the Home widget config, getHomeForUser and its selectors
+lib/fixtures/        Ghana public holidays and the GRA/SSNIT filing calendar
 lib/lifecycle-actions.ts  the decisions each lifecycle state has made due
 ```
 
