@@ -66,11 +66,16 @@ function Home() {
   const demo = params.get("demo")
 
   const layout = getHomeForUser(session)
-  // Only pin the grid to the viewport when something in it can absorb the
-  // slack. The employee home is four fixed widgets — bounding it would
-  // crush My day rather than make anything line up.
-  const bounded = [...layout.main, ...layout.rail].some((w) => w.fills)
   const greeting = greetingFor(new Date().getHours())
+
+  // Walk both columns together so each main widget shares a grid row with
+  // the rail widget beside it. Grid stretches a row to its tallest cell, so
+  // the pair always ends level; the one marked `yields` takes that height
+  // rather than setting it.
+  const rows = Array.from(
+    { length: Math.max(layout.main.length, layout.rail.length) },
+    (_, i) => ({ main: layout.main[i], rail: layout.rail[i] })
+  )
 
   return (
     <PageShell width="wide" crumbs={[{ label: "Home" }]}>
@@ -87,34 +92,31 @@ function Home() {
           })}
         </p>
         <QuickActions session={session} />
+        {layout.header.map((w) => (
+          <div key={w.id} className="mt-3">
+            <Slot widget={w} />
+          </div>
+        ))}
       </header>
 
       {demo === "loading" ? (
         <HomeSkeleton />
       ) : (
         <MaybeEmpty active={demo === "empty"}>
-          {/* From lg the two columns share one height and finish level: the
-              grid is bounded to the viewport and the widgets marked `fills`
-              absorb the slack, scrolling inside themselves. The floor stops
-              a short window crushing them — below it the page scrolls a
-              little rather than the widgets becoming unreadable. Under lg
-              this is one ordinary stacked column. */}
-          <div
-            className={cn(
-              "grid gap-5 lg:grid-cols-3",
-              bounded && "lg:h-[calc(100dvh-17rem)] lg:min-h-[460px]"
-            )}
-          >
-            <div className="flex flex-col gap-5 lg:col-span-2 lg:min-h-0">
-              {layout.main.map((w) => (
-                <Slot key={w.id} widget={w} />
-              ))}
-            </div>
-            <div className="flex flex-col gap-5 lg:min-h-0">
-              {layout.rail.map((w) => (
-                <Slot key={w.id} widget={w} />
-              ))}
-            </div>
+          {/* One grid, not two columns: each row holds a main widget and the
+              rail widget beside it, so the pair finishes level. Below lg it
+              collapses to a single stacked column. */}
+          <div className="grid gap-5 lg:grid-cols-3">
+            {rows.map((row, i) => (
+              <React.Fragment key={i}>
+                {row.main ? (
+                  <Slot widget={row.main} span />
+                ) : (
+                  <span className="hidden lg:col-span-2 lg:block" />
+                )}
+                {row.rail ? <Slot widget={row.rail} /> : <span />}
+              </React.Fragment>
+            ))}
           </div>
         </MaybeEmpty>
       )}
@@ -122,9 +124,28 @@ function Home() {
   )
 }
 
-function Slot({ widget }: { widget: HomeWidgetConfig }) {
+function Slot({ widget, span }: { widget: HomeWidgetConfig; span?: boolean }) {
   const Component = widgetRegistry[widget.widget]
-  return <Component scope={widget.scope} />
+  const cell = span ? "lg:col-span-2" : undefined
+
+  if (!widget.yields) {
+    return (
+      <div className={cn(cell, "flex flex-col [&>section]:flex-1")}>
+        <Component scope={widget.scope} />
+      </div>
+    )
+  }
+
+  // Absolutely positioned content contributes no intrinsic height, which is
+  // precisely how this cell takes its size from its partner instead of from
+  // its own list. Static below lg, where rows do not exist.
+  return (
+    <div className={cn(cell, "lg:relative lg:min-h-[200px]")}>
+      <div className="lg:absolute lg:inset-0 lg:flex lg:flex-col">
+        <Component scope={widget.scope} />
+      </div>
+    </div>
+  )
 }
 
 /**

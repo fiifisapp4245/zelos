@@ -36,47 +36,59 @@ export function MeStrip() {
   return (
     <section
       aria-labelledby="me-strip-heading"
-      className="rounded-xl border bg-card/60 px-4 py-3"
+      className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border bg-card/60 px-4 py-2.5"
     >
       <h2 id="me-strip-heading" className="sr-only">
         You
       </h2>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
-            {clockedIn ? `In since ${today?.clockIn}` : "Not clocked in"}
-          </p>
-          <p className="tabular text-sm font-medium">
-            {annual} days annual leave left
-          </p>
-        </div>
-        <Button
-          size="sm"
-          variant={clockedIn ? "outline" : "default"}
-          onClick={() => {
-            if (clockedIn) {
-              store.clockOut()
-              toast.success("Clocked out")
-            } else {
-              store.clockIn()
-              toast.success("Clocked in")
-            }
-          }}
-        >
-          {clockedIn ? "Clock out" : "Clock in"}
-        </Button>
-      </div>
+
+      <span className="text-sm">
+        <span className="text-muted-foreground">
+          {clockedIn ? "In since " : "Status "}
+        </span>
+        <span className="font-medium">
+          {clockedIn ? today?.clockIn : "not clocked in"}
+        </span>
+      </span>
+
+      <span className="hidden h-4 w-px bg-border sm:block" aria-hidden />
+
+      <span className="text-sm">
+        <span className="tabular font-medium">{annual}</span>
+        <span className="text-muted-foreground"> days annual leave left</span>
+      </span>
+
       {month && (
-        <p className="mt-2 border-t pt-2 text-xs text-muted-foreground">
-          Latest payslip {month} ·{" "}
-          <Link
-            href="/me/pay"
-            className="rounded font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            View
-          </Link>
-        </p>
+        <>
+          <span className="hidden h-4 w-px bg-border sm:block" aria-hidden />
+          <span className="text-sm text-muted-foreground">
+            Latest payslip {month} ·{" "}
+            <Link
+              href="/me/pay"
+              className="rounded font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              View
+            </Link>
+          </span>
+        </>
       )}
+
+      <Button
+        size="sm"
+        variant={clockedIn ? "outline" : "default"}
+        className="ml-auto"
+        onClick={() => {
+          if (clockedIn) {
+            store.clockOut()
+            toast.success("Clocked out")
+          } else {
+            store.clockIn()
+            toast.success("Clocked in")
+          }
+        }}
+      >
+        {clockedIn ? "Clock out" : "Clock in"}
+      </Button>
     </section>
   )
 }

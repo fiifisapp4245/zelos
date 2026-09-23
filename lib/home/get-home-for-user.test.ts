@@ -33,23 +33,24 @@ const PAYROLL = session({ id: "maame", roles: ["payroll", "employee"] })
 const keys = (s: SessionContext) => {
   const l = getHomeForUser(s)
   return {
+    header: l.header.map((w) => w.widget),
     main: l.main.map((w) => w.widget),
     rail: l.rail.map((w) => w.widget),
   }
 }
-const scopes = (s: SessionContext) =>
-  Object.fromEntries(
-    [...getHomeForUser(s).main, ...getHomeForUser(s).rail].map((w) => [
-      w.widget,
-      w.scope,
-    ])
+const scopes = (s: SessionContext) => {
+  const l = getHomeForUser(s)
+  return Object.fromEntries(
+    [...l.header, ...l.main, ...l.rail].map((w) => [w.widget, w.scope])
   )
+}
 
 describe("getHomeForUser — HR Admin", () => {
   it("leads with the approval queue, then attention, then the one metric", () => {
     expect(keys(HR)).toEqual({
+      header: ["meStrip"],
       main: ["needsApproval", "needsAttention", "workforceSnapshot"],
-      rail: ["meStrip", "upcoming", "today", "celebrations"],
+      rail: ["upcoming", "today", "celebrations"],
     })
   })
 
@@ -69,8 +70,9 @@ describe("getHomeForUser — HR Admin", () => {
 describe("getHomeForUser — Line Manager", () => {
   it("orders approvals, attention, team, then own requests", () => {
     expect(keys(MANAGER)).toEqual({
+      header: ["meStrip"],
       main: ["needsApproval", "needsAttention", "teamToday", "myRequests"],
-      rail: ["meStrip", "today", "celebrations"],
+      rail: ["today", "celebrations"],
     })
   })
 
@@ -91,14 +93,15 @@ describe("getHomeForUser — Line Manager", () => {
 describe("getHomeForUser — Employee", () => {
   it("leads with the day and shows only self-service widgets", () => {
     expect(keys(EMPLOYEE)).toEqual({
+      header: [],
       main: ["myDay", "myRequests", "leaveBalances", "latestPayslip"],
       rail: ["today", "celebrations", "profileCompletion"],
     })
   })
 
-  it("has nothing to approve and no me-strip, being the whole page already", () => {
+  it("has nothing to approve, and no me-strip — the page is already theirs", () => {
     expect(keys(EMPLOYEE).main).not.toContain("needsApproval")
-    expect(keys(EMPLOYEE).rail).not.toContain("meStrip")
+    expect(keys(EMPLOYEE).header).toEqual([])
   })
 
   it("scopes to self and team", () => {
@@ -111,8 +114,9 @@ describe("getHomeForUser — Employee", () => {
 describe("getHomeForUser — Payroll Officer", () => {
   it("gets pay-shaped approvals and attention, with the statutory rail", () => {
     expect(keys(PAYROLL)).toEqual({
+      header: ["meStrip"],
       main: ["needsApproval", "needsAttention"],
-      rail: ["meStrip", "upcoming", "today", "celebrations"],
+      rail: ["upcoming", "today", "celebrations"],
     })
   })
 
@@ -171,7 +175,7 @@ describe("home config integrity", () => {
   it("never gives one audience the same widget twice in a column", () => {
     for (const s of [HR, MANAGER, EMPLOYEE, PAYROLL]) {
       const l = getHomeForUser(s)
-      for (const col of [l.main, l.rail]) {
+      for (const col of [l.header, l.main, l.rail]) {
         const w = col.map((x) => x.widget)
         expect(new Set(w).size).toBe(w.length)
       }
@@ -187,11 +191,31 @@ describe("home config integrity", () => {
     }
   })
 
+  it("never puts two yielding widgets in the same row", () => {
+    // A row needs one side to set its height. Two yielders would collapse it.
+    for (const s of [HR, MANAGER, EMPLOYEE, PAYROLL]) {
+      const l = getHomeForUser(s)
+      const rows = Math.max(l.main.length, l.rail.length)
+      for (let i = 0; i < rows; i++) {
+        expect(Boolean(l.main[i]?.yields && l.rail[i]?.yields)).toBe(false)
+      }
+    }
+  })
+
+  it("gives HR the pairing the layout was designed around", () => {
+    const l = getHomeForUser(HR)
+    expect(l.main.map((m, i) => [m.widget, l.rail[i]?.widget])).toEqual([
+      ["needsApproval", "upcoming"],
+      ["needsAttention", "today"],
+      ["workforceSnapshot", "celebrations"],
+    ])
+  })
+
   it("reaches every configured widget from some audience", () => {
     const seen = new Set(
       [HR, MANAGER, EMPLOYEE, PAYROLL].flatMap((s) => {
         const l = getHomeForUser(s)
-        return [...l.main, ...l.rail].map((w) => w.id)
+        return [...l.header, ...l.main, ...l.rail].map((w) => w.id)
       })
     )
     expect(HOME_WIDGETS.filter((w) => !seen.has(w.id))).toEqual([])

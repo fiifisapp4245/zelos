@@ -20,7 +20,11 @@ export type WidgetKey =
   | "celebrations"
   | "profileCompletion"
 
-export type HomeColumn = "main" | "rail"
+/**
+ * "header" is a full-width strip under the quick actions. It exists so the
+ * main and rail widgets can be paired row for row without an odd one out.
+ */
+export type HomeColumn = "main" | "rail" | "header"
 
 /**
  * Narrows what a widget draws on. The same queue serves four personas; the
@@ -35,8 +39,11 @@ export interface HomeWidgetConfig {
   roles: NavAudience[]
   order: number
   scope?: WidgetScope
-  /** Absorbs the leftover height in its column and scrolls inside itself. */
-  fills?: boolean | number
+  /**
+   * Takes its height from the widget beside it rather than from its own
+   * content, scrolling whatever does not fit. Exactly one of a pair yields.
+   */
+  yields?: boolean
 }
 
 export const HOME_WIDGETS: HomeWidgetConfig[] = [
@@ -44,7 +51,6 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "approvals-hr",
     widget: "needsApproval",
-    fills: 2,
     column: "main",
     roles: ["hr_admin"],
     order: 1,
@@ -53,7 +59,6 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "approvals-manager",
     widget: "needsApproval",
-    fills: 2,
     column: "main",
     roles: ["manager"],
     order: 1,
@@ -62,7 +67,6 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "approvals-payroll",
     widget: "needsApproval",
-    fills: 2,
     column: "main",
     roles: ["payroll"],
     order: 1,
@@ -71,7 +75,7 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "attention-hr",
     widget: "needsAttention",
-    fills: true,
+    yields: true,
     column: "main",
     roles: ["hr_admin"],
     order: 2,
@@ -80,7 +84,7 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "attention-manager",
     widget: "needsAttention",
-    fills: true,
+    yields: true,
     column: "main",
     roles: ["manager"],
     order: 2,
@@ -89,7 +93,7 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "attention-payroll",
     widget: "needsAttention",
-    fills: true,
+    yields: true,
     column: "main",
     roles: ["payroll"],
     order: 2,
@@ -156,7 +160,7 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "me-strip",
     widget: "meStrip",
-    column: "rail",
+    column: "header",
     roles: ["hr_admin", "manager", "payroll"],
     order: 1,
     scope: "self",
@@ -164,7 +168,7 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "upcoming-hr",
     widget: "upcoming",
-    fills: true,
+    yields: true,
     column: "rail",
     roles: ["hr_admin"],
     order: 2,
@@ -173,7 +177,7 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "upcoming-payroll",
     widget: "upcoming",
-    fills: true,
+    yields: true,
     column: "rail",
     roles: ["payroll"],
     order: 2,

@@ -95,11 +95,10 @@ export function NeedsApproval({ scope }: { scope?: WidgetScope }) {
       title="Needs your approval"
       count={queue.length}
       weight="primary"
-      fills={2}
       actions={
         queue.length > 0 && <ViewAll href="/approvals" count={queue.length} />
       }
-      bodyClassName="flex min-h-0 flex-col p-0"
+      bodyClassName="flex flex-col p-0"
     >
       {showFilters && (
         <div
@@ -138,8 +137,8 @@ export function NeedsApproval({ scope }: { scope?: WidgetScope }) {
       {shown.length === 0 ? (
         <WidgetEmpty>All caught up. Nothing is waiting on you.</WidgetEmpty>
       ) : (
-        <ul className="min-h-0 flex-1 divide-y overflow-y-auto overscroll-contain">
-          {shown.slice(0, 5).map((request) => (
+        <ul className="divide-y">
+          {shown.slice(0, 2).map((request) => (
             <ApprovalRow
               key={request.id}
               request={request}

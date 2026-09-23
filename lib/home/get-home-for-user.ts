@@ -7,6 +7,8 @@ import {
 } from "./home-config"
 
 export interface HomeLayout {
+  /** Full-width, above the paired rows. */
+  header: HomeWidgetConfig[]
   main: HomeWidgetConfig[]
   rail: HomeWidgetConfig[]
 }
@@ -25,7 +27,11 @@ export function getHomeForUser(session: SessionContext): HomeLayout {
       (w) => w.column === column && w.roles.includes(audience)
     ).sort((a, b) => a.order - b.order)
 
-  return { main: forColumn("main"), rail: forColumn("rail") }
+  return {
+    header: forColumn("header"),
+    main: forColumn("main"),
+    rail: forColumn("rail"),
+  }
 }
 
 export interface QuickAction {

@@ -43,13 +43,11 @@ export function Widget({
   className?: string
   bodyClassName?: string
   /**
-   * Lets the widget absorb the leftover height in its column and scroll
-   * inside itself. That is what keeps the left and right columns finishing
-   * level instead of one running past the other. A number is a share: the
-   * queue takes twice the slack of the list under it, because it is the one
-   * you came for.
+   * Fills the height it is given and scrolls inside itself. Paired with the
+   * `yields` wrapper on the page, this is how a widget takes its height from
+   * the one beside it instead of from its own content.
    */
-  fills?: boolean | number
+  fills?: boolean
 }) {
   const headingId = `${id ?? title.replace(/\s+/g, "-").toLowerCase()}-heading`
 
@@ -60,7 +58,7 @@ export function Widget({
       className={cn(
         WEIGHT[weight],
         "scroll-mt-20",
-        fills && "flex min-h-0 flex-col",
+        fills && "flex h-full min-h-0 flex-col",
         className
       )}
       style={
