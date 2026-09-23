@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import type { LucideIcon } from "lucide-react"
+import { LayoutGrid, Rows3, type LucideIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { initials } from "@/lib/format"
@@ -304,5 +304,72 @@ export function SectionGrid({
     >
       {children}
     </dl>
+  )
+}
+
+/** The column head used by every plain table in the app. */
+export function Th({
+  children,
+  className,
+}: {
+  children?: React.ReactNode
+  className?: string
+}) {
+  return (
+    <th
+      className={cn(
+        "px-3 py-2.5 text-left text-[11px] font-medium tracking-wide text-muted-foreground uppercase",
+        className
+      )}
+    >
+      {children}
+    </th>
+  )
+}
+
+export type ListView = "table" | "grid"
+
+/**
+ * A table reads better when you are scanning forty rows; cards read better
+ * when each one carries a sentence of context. Neither wins outright, so the
+ * choice stays with whoever is looking.
+ */
+export function ViewToggle({
+  view,
+  onChange,
+  className,
+}: {
+  view: ListView
+  onChange: (v: ListView) => void
+  className?: string
+}) {
+  const options: { id: ListView; label: string; icon: LucideIcon }[] = [
+    { id: "table", label: "Table", icon: Rows3 },
+    { id: "grid", label: "Grid", icon: LayoutGrid },
+  ]
+  return (
+    <div
+      role="group"
+      aria-label="Change layout"
+      className={cn("flex items-center rounded-lg border p-0.5", className)}
+    >
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          aria-pressed={view === o.id}
+          className={cn(
+            "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
+            view === o.id
+              ? "bg-muted font-medium"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <o.icon className="size-4" />
+          {o.label}
+        </button>
+      ))}
+    </div>
   )
 }

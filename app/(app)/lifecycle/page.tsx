@@ -2,15 +2,17 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ListChecks, RefreshCw } from "lucide-react"
+import { RefreshCw } from "lucide-react"
 
 import { PageShell } from "@/components/shell/page-shell"
 import {
   EmptyState,
   Initials,
   PageHeader,
-  Panel,
   StatCard,
+  Th,
+  ViewToggle,
+  type ListView,
 } from "@/components/common"
 import { LifecycleBadge } from "@/components/common/status"
 import { useStore } from "@/lib/store"
@@ -23,8 +25,10 @@ import {
   formatDateTime,
   fullName,
 } from "@/lib/format"
-import type { LifecycleState } from "@/lib/types"
+import type { LifecycleEvent, LifecycleState } from "@/lib/types"
 import { cn } from "@/lib/utils"
+
+type Tab = "decisions" | "history"
 
 export default function LifecycleEventsPage() {
   const store = useStore()
@@ -33,15 +37,22 @@ export default function LifecycleEventsPage() {
   const scopeIds = new Set(scope.map((e) => e.id))
 
   const [filter, setFilter] = React.useState<LifecycleState | "all">("all")
+  const [view, setView] = React.useState<ListView>("table")
 
-  // Decisions the current states have made due, newest deadline first.
+  // Decisions the current states have made due, nearest deadline first.
   const tasks = lifecycleTasks(scope, lifecycleEvents, store.leaveRequests)
   const overdue = tasks.filter((t) => t.daysLeft < 0).length
 
-  const events = lifecycleEvents
+  const allEvents = lifecycleEvents
     .filter((e) => scopeIds.has(e.employeeId))
-    .filter((e) => filter === "all" || e.to === filter)
     .sort((a, b) => b.at.localeCompare(a.at))
+  const events = allEvents.filter((e) => filter === "all" || e.to === filter)
+
+  // Work waiting on someone opens first; history is the thing you go looking
+  // for, so it never gets to push the worklist off the bottom of the page.
+  const [tab, setTab] = React.useState<Tab>(
+    tasks.length > 0 ? "decisions" : "history"
+  )
 
   const counts = (Object.keys(LIFECYCLE_LABEL) as LifecycleState[]).map(
     (s) => ({
@@ -49,6 +60,11 @@ export default function LifecycleEventsPage() {
       count: scope.filter((e) => e.lifecycleState === s).length,
     })
   )
+
+  const TABS: { id: Tab; label: string; count: number }[] = [
+    { id: "decisions", label: "Needs a decision", count: tasks.length },
+    { id: "history", label: "History", count: allEvents.length },
+  ]
 
   return (
     <PageShell
@@ -60,7 +76,7 @@ export default function LifecycleEventsPage() {
     >
       <PageHeader
         title="Lifecycle events"
-        description="Every movement through the employee journey, from pre-hire to retirement. Decisions that have fallen due sit at the top; the history below can never be edited or deleted."
+        description="Every movement through the employee journey, from pre-hire to retirement. Decisions that have fallen due come first; the history behind them can never be edited or deleted."
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -92,84 +108,203 @@ export default function LifecycleEventsPage() {
         />
       </div>
 
-      <Panel
-        title="Needs a decision"
-        description="Lifecycle states carry obligations. These are the ones that have fallen due in the next 30 days — acting here writes the same audited event as a manual status change."
-        className="mb-6"
-        bodyClassName="p-0"
-        actions={
-          tasks.length > 0 && (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <ListChecks className="size-3.5" />
-              {tasks.length} open
-            </span>
-          )
-        }
-      >
-        <LifecycleWorklist tasks={tasks} />
-      </Panel>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1 rounded-xl border bg-card p-1">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm transition-colors",
+                tab === t.id
+                  ? "bg-success-muted font-medium text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              {t.label}
+              <span
+                className={cn(
+                  "tabular rounded-full px-1.5 text-xs",
+                  tab === t.id
+                    ? "bg-primary/15 text-primary"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                {t.count}
+              </span>
+              {/* The count alone says nothing about urgency, so overdue work
+                  carries its own mark rather than recolouring the total. */}
+              {t.id === "decisions" && overdue > 0 && (
+                <span
+                  className="tabular rounded-full bg-destructive/15 px-1.5 text-xs text-destructive"
+                  title={`${overdue} overdue`}
+                >
+                  {overdue} overdue
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
 
-      <h2 className="mb-3 text-sm font-semibold">History</h2>
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
-          All events
-        </FilterChip>
-        {(Object.keys(LIFECYCLE_LABEL) as LifecycleState[]).map((s) => (
-          <FilterChip
-            key={s}
-            active={filter === s}
-            onClick={() => setFilter(s)}
-          >
-            {LIFECYCLE_LABEL[s]}
-          </FilterChip>
-        ))}
+        <ViewToggle view={view} onChange={setView} />
       </div>
 
-      <Panel bodyClassName="p-0">
-        {events.length === 0 ? (
-          <EmptyState
-            icon={RefreshCw}
-            title="No events match this filter"
-            description="Try another state, or clear the filter to see the whole history."
-          />
-        ) : (
-          <ul className="divide-y">
-            {events.map((e) => {
-              const employee = store.employeeById(e.employeeId)
-              return (
-                <li key={e.id} className="flex gap-3.5 px-5 py-4">
-                  {employee && <Initials person={employee} size="md" />}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Link
-                        href={`/employees/${e.employeeId}`}
-                        className="text-sm font-medium hover:underline"
-                      >
-                        {fullName(employee)}
-                      </Link>
-                      {e.from && (
-                        <>
-                          <LifecycleBadge state={e.from} />
-                          <span className="text-muted-foreground/50">›</span>
-                        </>
-                      )}
-                      <LifecycleBadge state={e.to} />
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      by {fullName(store.employeeById(e.actorId))} ·{" "}
-                      {formatDateTime(e.at)} · effective{" "}
-                      {formatDate(e.effectiveDate)}
-                    </p>
-                    {e.reason && <p className="mt-1.5 text-sm">{e.reason}</p>}
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </Panel>
+      {tab === "decisions" ? (
+        <section className="rounded-xl border bg-card">
+          <header className="border-b px-5 py-4">
+            <h2 className="text-sm font-semibold">Needs a decision</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Lifecycle states carry obligations. These have fallen due within
+              the next 30 days — acting here writes the same audited event as a
+              manual status change.
+              {overdue > 0 && (
+                <strong className="ml-1 font-medium text-destructive">
+                  {overdue} {overdue === 1 ? "is" : "are"} already overdue.
+                </strong>
+              )}
+            </p>
+          </header>
+          <LifecycleWorklist tasks={tasks} view={view} />
+        </section>
+      ) : (
+        <>
+          <div className="mb-4 flex flex-wrap gap-2">
+            <FilterChip
+              active={filter === "all"}
+              onClick={() => setFilter("all")}
+            >
+              All events
+            </FilterChip>
+            {(Object.keys(LIFECYCLE_LABEL) as LifecycleState[]).map((s) => (
+              <FilterChip
+                key={s}
+                active={filter === s}
+                onClick={() => setFilter(s)}
+              >
+                {LIFECYCLE_LABEL[s]}
+              </FilterChip>
+            ))}
+          </div>
+
+          <section className="rounded-xl border bg-card">
+            {events.length === 0 ? (
+              <EmptyState
+                icon={RefreshCw}
+                title="No events match this filter"
+                description="Try another state, or clear the filter to see the whole history."
+              />
+            ) : view === "table" ? (
+              <HistoryTable events={events} />
+            ) : (
+              <HistoryCards events={events} />
+            )}
+          </section>
+        </>
+      )}
     </PageShell>
+  )
+}
+
+function HistoryCards({ events }: { events: LifecycleEvent[] }) {
+  const store = useStore()
+  return (
+    <ul className="divide-y">
+      {events.map((e) => {
+        const employee = store.employeeById(e.employeeId)
+        return (
+          <li key={e.id} className="flex gap-3.5 px-5 py-4">
+            {employee && <Initials person={employee} size="md" />}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={`/employees/${e.employeeId}`}
+                  className="text-sm font-medium hover:underline"
+                >
+                  {fullName(employee)}
+                </Link>
+                {e.from && (
+                  <>
+                    <LifecycleBadge state={e.from} />
+                    <span className="text-muted-foreground/50">›</span>
+                  </>
+                )}
+                <LifecycleBadge state={e.to} />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                by {fullName(store.employeeById(e.actorId))} ·{" "}
+                {formatDateTime(e.at)} · effective {formatDate(e.effectiveDate)}
+              </p>
+              {e.reason && <p className="mt-1.5 text-sm">{e.reason}</p>}
+            </div>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+function HistoryTable({ events }: { events: LifecycleEvent[] }) {
+  const store = useStore()
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/40">
+            <Th className="pl-5">Employee</Th>
+            <Th>Change</Th>
+            <Th>Recorded by</Th>
+            <Th>Effective</Th>
+            <Th className="pr-5">Reason</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {events.map((e) => {
+            const employee = store.employeeById(e.employeeId)
+            return (
+              <tr key={e.id} className="transition-colors hover:bg-muted/30">
+                <td className="py-3 pr-3 pl-5">
+                  <Link
+                    href={`/employees/${e.employeeId}`}
+                    className="flex min-w-0 items-center gap-2.5 hover:underline"
+                  >
+                    {employee && <Initials person={employee} size="sm" />}
+                    <span className="truncate font-medium">
+                      {fullName(employee)}
+                    </span>
+                  </Link>
+                </td>
+                <td className="py-3 pr-3">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {e.from && (
+                      <>
+                        <LifecycleBadge state={e.from} />
+                        <span className="text-muted-foreground/50">›</span>
+                      </>
+                    )}
+                    <LifecycleBadge state={e.to} />
+                  </span>
+                </td>
+                <td className="py-3 pr-3">
+                  <span className="block whitespace-nowrap">
+                    {fullName(store.employeeById(e.actorId))}
+                  </span>
+                  <span className="block text-xs whitespace-nowrap text-muted-foreground">
+                    {formatDateTime(e.at)}
+                  </span>
+                </td>
+                <td className="py-3 pr-3 whitespace-nowrap">
+                  {formatDate(e.effectiveDate)}
+                </td>
+                <td className="max-w-[320px] py-3 pr-5 text-muted-foreground">
+                  {e.reason || "—"}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
   )
 }
 

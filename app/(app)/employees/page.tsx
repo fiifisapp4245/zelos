@@ -7,9 +7,7 @@ import {
   Eye,
   Pencil,
   RefreshCw,
-  LayoutGrid,
   ListFilter,
-  Rows3,
   Search,
   Upload,
   UserPlus,
@@ -18,7 +16,14 @@ import {
 } from "lucide-react"
 
 import { PageShell } from "@/components/shell/page-shell"
-import { EmptyState, Initials, PageHeader, Pill } from "@/components/common"
+import {
+  EmptyState,
+  Initials,
+  PageHeader,
+  Pill,
+  ViewToggle,
+  type ListView,
+} from "@/components/common"
 import { RowActions } from "@/components/common/row-actions"
 import { LifecycleBadge } from "@/components/common/status"
 import { Button } from "@/components/ui/button"
@@ -59,7 +64,7 @@ export default function DirectoryPage() {
   const [departments, setDepartments] = React.useState<string[]>([])
   const [types, setTypes] = React.useState<EmploymentType[]>([])
   const [contractOnly, setContractOnly] = React.useState(false)
-  const [view, setView] = React.useState<"table" | "grid">("table")
+  const [view, setView] = React.useState<ListView>("table")
   const [sort, setSort] = React.useState<SortKey>("name")
 
   const scope = React.useMemo(
@@ -177,22 +182,7 @@ export default function DirectoryPage() {
             />
           </div>
 
-          <div className="flex items-center rounded-lg border p-0.5">
-            <ViewToggle
-              active={view === "table"}
-              onClick={() => setView("table")}
-              icon={Rows3}
-            >
-              Table
-            </ViewToggle>
-            <ViewToggle
-              active={view === "grid"}
-              onClick={() => setView("grid")}
-              icon={LayoutGrid}
-            >
-              Grid
-            </ViewToggle>
-          </div>
+          <ViewToggle view={view} onChange={setView} />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -376,34 +366,6 @@ export default function DirectoryPage() {
         )}
       </div>
     </PageShell>
-  )
-}
-
-function ViewToggle({
-  active,
-  onClick,
-  icon: Icon,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  icon: typeof Rows3
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
-        active
-          ? "bg-muted font-medium"
-          : "text-muted-foreground hover:text-foreground"
-      )}
-    >
-      <Icon className="size-4" />
-      {children}
-    </button>
   )
 }
 
