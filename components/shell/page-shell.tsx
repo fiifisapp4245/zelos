@@ -33,7 +33,11 @@ export function PageShell({
   return (
     <>
       <Topbar crumbs={crumbs} />
-      <main className="flex-1 overflow-y-auto">
+      {/* `relative` is load-bearing: .sr-only is absolutely positioned, and
+          without a positioned ancestor it resolves against the document
+          instead of this scroller — which grows the page and gives you a
+          second scrollbar behind the first. */}
+      <main className="relative min-h-0 flex-1 overflow-y-auto">
         <div
           className={cn(
             // 80% of the content area, centred, so the page never runs edge to edge.
