@@ -1,3 +1,5 @@
+"use client"
+
 import { CalendarCheck } from "lucide-react"
 
 import { ModulePlaceholder } from "@/components/common/module-placeholder"

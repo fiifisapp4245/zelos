@@ -1,3 +1,5 @@
+"use client"
+
 import { Wallet } from "lucide-react"
 
 import { ModulePlaceholder } from "@/components/common/module-placeholder"

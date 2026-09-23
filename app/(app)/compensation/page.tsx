@@ -1,3 +1,5 @@
+"use client"
+
 import { CircleDollarSign } from "lucide-react"
 
 import { ModulePlaceholder } from "@/components/common/module-placeholder"

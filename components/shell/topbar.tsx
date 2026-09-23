@@ -23,7 +23,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { NAV, visibleFor } from "./nav"
+import { getNavForUser } from "@/lib/nav/get-nav-for-user"
 
 export interface Crumb {
   label: string
@@ -171,6 +171,14 @@ function NotificationBell() {
             </li>
           ))}
         </ul>
+        <div className="border-t p-2">
+          <Link
+            href="/alerts"
+            className="block rounded-lg px-2.5 py-2 text-center text-sm text-primary transition-colors hover:bg-muted"
+          >
+            View all alerts
+          </Link>
+        </div>
       </PopoverContent>
     </Popover>
   )
@@ -182,7 +190,7 @@ function SearchPalette({
   onOpenChange: (v: boolean) => void
 }) {
   const router = useRouter()
-  const { employees, viewer } = useStore()
+  const { employees, viewer, session } = useStore()
   // Mounted only while open, so the query clears itself on close.
   const [query, setQuery] = React.useState("")
 
@@ -190,11 +198,10 @@ function SearchPalette({
 
   const pages = React.useMemo(
     () =>
-      NAV.flatMap((g) => g.items)
-        .flatMap((i) => [i, ...(i.children ?? [])])
-        .filter((i) => visibleFor(i, viewer.roles))
+      getNavForUser(session)
+        .flatMap((g) => g.items)
         .filter((i) => !q || i.label.toLowerCase().includes(q)),
-    [q, viewer.roles]
+    [q, session]
   )
 
   // Directory search needs 3 characters, matching the spec for the employee list.
