@@ -54,6 +54,7 @@ import type {
   Requisition,
 } from "./types"
 import type { Viewer } from "./rbac"
+import type { SessionContext } from "./session"
 
 interface State {
   employees: Employee[]
@@ -108,6 +109,7 @@ const STORAGE_KEY = "zelos-hr-session-v1"
 
 interface StoreValue extends State {
   viewer: Viewer
+  session: SessionContext
   setActiveRole: (role: PermissionRole) => void
   employeeById: (id: string | null | undefined) => Employee | undefined
   update: <K extends keyof State>(key: K, value: State[K]) => void
@@ -228,9 +230,29 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }))
     }
 
+    const me = state.employees.find((e) => e.id === actorId)
+
+    // Shaped like the planned GET /api/me/ response, so the sidebar reads the
+    // same fields it will read against the real API. Managing people is
+    // counted off the org chart rather than stored.
+    const session: SessionContext = {
+      id: actorId,
+      first_name: me?.firstName ?? "",
+      last_name: me?.lastName ?? "",
+      email: me?.email ?? "",
+      job_title: me?.jobTitle ?? "",
+      department: me?.department ?? "",
+      roles: viewer.roles,
+      direct_report_count: state.employees.filter(
+        (e) => e.managerId === actorId
+      ).length,
+      company: { name: state.company.tradingName || state.company.legalName },
+    }
+
     return {
       ...state,
       viewer,
+      session,
       setActiveRole: (role) => setState((s) => ({ ...s, activeRole: role })),
       employeeById: (id) =>
         id ? state.employees.find((e) => e.id === id) : undefined,

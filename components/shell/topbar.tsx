@@ -85,18 +85,6 @@ export function Topbar({ crumbs }: { crumbs: Crumb[] }) {
         </ol>
       </nav>
 
-      <button
-        type="button"
-        onClick={() => setSearchOpen(true)}
-        className="hidden h-9 w-[300px] items-center gap-2 rounded-lg border bg-muted/40 px-3 text-sm text-muted-foreground transition-colors hover:border-ring/40 md:flex"
-      >
-        <Search className="size-4" />
-        <span>Search anything…</span>
-        <kbd className="ml-auto rounded border bg-background px-1.5 py-0.5 font-mono text-[10px]">
-          ⌘K
-        </kbd>
-      </button>
-
       <ThemeToggle />
       <NotificationBell />
 

@@ -3,16 +3,13 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import {
-  ChevronDown,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Search,
-} from "lucide-react"
+import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { useStore } from "@/lib/store"
-import { NAV, visibleFor, type NavItem } from "./nav"
+import { getNavForUser } from "@/lib/nav/get-nav-for-user"
+import { PINNED_SECTION, type NavItemConfig } from "@/lib/nav/nav-config"
+import { useNavBadges } from "@/lib/nav/use-nav-badges"
 import { ProfileMenu } from "./profile-menu"
 import {
   Tooltip,
@@ -60,13 +57,13 @@ export function Sidebar({
   collapsed: boolean
   onToggle: () => void
 }) {
-  const { viewer, alerts, leaveRequests } = useStore()
+  const { session } = useStore()
   const isActive = useIsActive()
+  const badges = useNavBadges()
 
-  const badgeCounts = {
-    alerts: alerts.filter((a) => !a.acknowledged).length,
-    approvals: leaveRequests.filter((r) => r.status === "pending").length,
-  }
+  const sections = getNavForUser(session)
+  const scrolling = sections.filter((s) => s.id !== PINNED_SECTION)
+  const pinned = sections.find((s) => s.id === PINNED_SECTION)
 
   return (
     <aside
@@ -86,7 +83,7 @@ export function Sidebar({
           type="button"
           onClick={onToggle}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="ml-auto grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-hover hover:text-foreground"
+          className="ml-auto grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           {collapsed ? (
             <PanelLeftOpen className="size-4" />
@@ -96,83 +93,144 @@ export function Sidebar({
         </button>
       </div>
 
-      {!collapsed && (
-        <div className="px-3 pb-2">
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-lg border bg-background px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:border-ring/40"
-            onClick={() =>
-              document.dispatchEvent(new CustomEvent("zelos:open-search"))
-            }
-          >
-            <Search className="size-4" />
-            <span>Search</span>
-            <kbd className="ml-auto rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-              ⌘K
-            </kbd>
-          </button>
+      {/* The only search in the product. The top bar no longer carries one. */}
+      <div className="px-3 pb-2">
+        <SearchTrigger collapsed={collapsed} />
+      </div>
+
+      <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 pb-4">
+        {scrolling.map((section) => (
+          <NavSectionList
+            key={section.id}
+            id={section.id}
+            label={section.label}
+            items={section.items}
+            collapsed={collapsed}
+            isActive={isActive}
+            badges={badges}
+          />
+        ))}
+      </nav>
+
+      {pinned && (
+        <div className="border-t px-3 py-2">
+          <NavSectionList
+            id={pinned.id}
+            label={pinned.label}
+            items={pinned.items}
+            collapsed={collapsed}
+            isActive={isActive}
+            badges={badges}
+          />
         </div>
       )}
-
-      <nav className="flex-1 overflow-y-auto px-3 pb-4">
-        {NAV.map((group) => {
-          const items = group.items.filter((i) => visibleFor(i, viewer.roles))
-          if (items.length === 0) return null
-          return (
-            <div key={group.label ?? "root"} className="mb-1">
-              {group.label && !collapsed && (
-                <p className="px-2.5 pt-4 pb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground">
-                  {group.label}
-                </p>
-              )}
-              {group.label && collapsed && <div className="my-3 border-t" />}
-              <ul className="space-y-0.5">
-                {items.map((item) => (
-                  <NavRow
-                    key={item.href}
-                    item={item}
-                    collapsed={collapsed}
-                    isActive={isActive}
-                    roles={viewer.roles}
-                    badgeCounts={badgeCounts}
-                  />
-                ))}
-              </ul>
-            </div>
-          )
-        })}
-      </nav>
 
       <ProfileMenu collapsed={collapsed} isActive={isActive} />
     </aside>
   )
 }
 
+function SearchTrigger({ collapsed }: { collapsed: boolean }) {
+  const open = () =>
+    document.dispatchEvent(new CustomEvent("zelos:open-search"))
+
+  if (collapsed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={open}
+            aria-label="Search (Command K)"
+            aria-keyshortcuts="Meta+K Control+K"
+            className="grid h-9 w-full place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            <Search className="size-[18px]" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right">Search · ⌘K</TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={open}
+      aria-keyshortcuts="Meta+K Control+K"
+      className="flex w-full items-center gap-2 rounded-lg border bg-background px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:border-ring/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+    >
+      <Search className="size-4" />
+      <span>Search</span>
+      <kbd className="ml-auto rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+        ⌘K
+      </kbd>
+    </button>
+  )
+}
+
+function NavSectionList({
+  id,
+  label,
+  items,
+  collapsed,
+  isActive,
+  badges,
+}: {
+  id: string
+  label: string | null
+  items: NavItemConfig[]
+  collapsed: boolean
+  isActive: (href: string) => boolean
+  badges: Record<string, number>
+}) {
+  const headingId = `nav-section-${id}`
+
+  return (
+    <div className="mb-1">
+      {label &&
+        (collapsed ? (
+          // The rule stands in for the heading when there is no room to read it.
+          <div className="my-3 border-t" role="presentation" />
+        ) : (
+          <p
+            id={headingId}
+            className="px-2.5 pt-4 pb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground"
+          >
+            {label}
+          </p>
+        ))}
+      <ul
+        className="space-y-0.5"
+        aria-labelledby={label && !collapsed ? headingId : undefined}
+        aria-label={label && collapsed ? label : undefined}
+      >
+        {items.map((item) => (
+          <NavRow
+            key={item.id}
+            item={item}
+            collapsed={collapsed}
+            active={isActive(item.href)}
+            count={item.badgeKey ? (badges[item.badgeKey] ?? 0) : 0}
+          />
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function NavRow({
   item,
   collapsed,
-  isActive,
-  roles,
-  badgeCounts,
+  active,
+  count,
 }: {
-  item: NavItem
+  item: NavItemConfig
   collapsed: boolean
-  isActive: (href: string) => boolean
-  roles: ReturnType<typeof useStore>["viewer"]["roles"]
-  badgeCounts: { alerts: number; approvals: number }
+  active: boolean
+  count: number
 }) {
-  const children = (item.children ?? []).filter((c) => visibleFor(c, roles))
-  const hasChildren = children.length > 0
-  const childActive = children.some((c) => isActive(c.href))
-  const selfActive = isActive(item.href) && !childActive
-  const [manuallyToggled, setManuallyToggled] = React.useState<boolean | null>(
-    null
-  )
-  // A group is open when it holds the current route, unless the user has said otherwise.
-  const open = manuallyToggled ?? (childActive || selfActive)
-
   const Icon = item.icon
-  const count = item.badge ? badgeCounts[item.badge] : 0
 
   if (collapsed) {
     return (
@@ -181,9 +239,13 @@ function NavRow({
           <TooltipTrigger asChild>
             <Link
               href={item.href}
+              aria-current={active ? "page" : undefined}
+              aria-label={
+                count > 0 ? `${item.label}, ${count} waiting` : item.label
+              }
               className={cn(
-                "relative grid h-9 place-items-center rounded-lg transition-colors",
-                selfActive || childActive
+                "relative grid h-9 place-items-center rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                active
                   ? "bg-success-muted text-primary"
                   : "text-muted-foreground hover:bg-sidebar-hover hover:text-foreground"
               )}
@@ -194,7 +256,10 @@ function NavRow({
               )}
             </Link>
           </TooltipTrigger>
-          <TooltipContent side="right">{item.label}</TooltipContent>
+          <TooltipContent side="right">
+            {item.label}
+            {count > 0 && ` · ${count}`}
+          </TooltipContent>
         </Tooltip>
       </li>
     )
@@ -202,64 +267,25 @@ function NavRow({
 
   return (
     <li>
-      <div className="flex items-center">
-        <Link
-          href={item.href}
-          className={cn(
-            "flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
-            selfActive
-              ? "bg-success-muted font-medium text-primary"
-              : childActive
-                ? "font-medium text-foreground"
-                : "text-muted-foreground hover:bg-sidebar-hover hover:text-foreground"
-          )}
-        >
-          <Icon className="size-[18px] shrink-0" />
-          <span className="truncate">{item.label}</span>
-          {count > 0 && (
-            <span className="tabular ml-auto rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
-              {count}
-            </span>
-          )}
-        </Link>
-        {hasChildren && (
-          <button
-            type="button"
-            onClick={() => setManuallyToggled(!open)}
-            aria-label={
-              open ? `Collapse ${item.label}` : `Expand ${item.label}`
-            }
-            className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-hover hover:text-foreground"
-          >
-            <ChevronDown
-              className={cn(
-                "size-4 transition-transform",
-                open && "rotate-180"
-              )}
-            />
-          </button>
+      <Link
+        href={item.href}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "flex min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+          active
+            ? "bg-success-muted font-medium text-primary"
+            : "text-muted-foreground hover:bg-sidebar-hover hover:text-foreground"
         )}
-      </div>
-
-      {hasChildren && open && (
-        <ul className="mt-0.5 ml-[18px] space-y-0.5 border-l pl-2.5">
-          {children.map((child) => (
-            <li key={child.href}>
-              <Link
-                href={child.href}
-                className={cn(
-                  "block truncate rounded-lg px-2.5 py-1.5 text-sm transition-colors",
-                  isActive(child.href)
-                    ? "bg-success-muted font-medium text-primary"
-                    : "text-muted-foreground hover:bg-sidebar-hover hover:text-foreground"
-                )}
-              >
-                {child.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      >
+        <Icon className="size-[18px] shrink-0" />
+        <span className="truncate">{item.label}</span>
+        {count > 0 && (
+          <span className="tabular ml-auto rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+            {count}
+            <span className="sr-only"> waiting</span>
+          </span>
+        )}
+      </Link>
     </li>
   )
 }

@@ -27,7 +27,7 @@ export function ProfileMenu({
   collapsed: boolean
   isActive: (href: string) => boolean
 }) {
-  const { viewer, activeRole, employeeById } = useStore()
+  const { viewer, session, activeRole, employeeById } = useStore()
   const me = employeeById(viewer.employeeId)
   const items = SETTINGS_NAV.filter((i) => visibleFor(i, viewer.roles))
 
@@ -113,7 +113,7 @@ export function ProfileMenu({
             </button>
           </TooltipTrigger>
           <TooltipContent side="right">
-            {fullName(me)} · {ROLE_LABEL[activeRole]}
+            {fullName(me)} · {ROLE_LABEL[activeRole]} · {session.company.name}
           </TooltipContent>
         </Tooltip>
       </div>
@@ -174,6 +174,9 @@ export function ProfileMenu({
           </span>
           <span className="block truncate text-xs text-muted-foreground">
             {ROLE_LABEL[activeRole]}
+          </span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {session.company.name}
           </span>
         </span>
         <ChevronDown
