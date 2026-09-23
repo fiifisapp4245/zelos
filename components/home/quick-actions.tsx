@@ -64,7 +64,9 @@ export function QuickActions({ session }: { session: SessionContext }) {
         const Icon = ICONS[a.icon] ?? Check
         const inner = (
           <>
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg border bg-card text-foreground shadow-sm">
+            {/* White, bordered, flat — the border does the separating, so
+                no shadow. */}
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg border bg-card text-foreground">
               <Icon className="size-4" />
             </span>
             <span className="min-w-0 truncate">{a.label}</span>
