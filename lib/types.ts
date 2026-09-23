@@ -253,6 +253,8 @@ export interface PerformanceReview {
   managerId: string
   dueOn: string
   sharedOn: string | null
+  /** What the reviewer wrote, shown when the review is signed off. */
+  reviewerComments: string | null
 }
 
 /** Private to the authoring manager until deliberately escalated (system map §3). */
@@ -289,6 +291,14 @@ export type OffboardingReason =
   | "contract_end"
   | "mutual"
 
+/** One item of company property, tracked individually so exit is auditable. */
+export interface AssetReturn {
+  item: string
+  /** Asset tag or serial, where the item carries one. */
+  tag?: string
+  returned: boolean
+}
+
 export interface OffboardingCase {
   id: string
   employeeId: string
@@ -297,7 +307,8 @@ export interface OffboardingCase {
   lastWorkingDay: string
   exitInterviewDone: boolean
   clearance: {
-    assets: boolean
+    /** Itemised, not a single tick: "assets returned" is several things. */
+    assets: AssetReturn[]
     access: boolean
     finance: boolean
     handover: boolean

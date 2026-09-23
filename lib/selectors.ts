@@ -1,4 +1,4 @@
-import type { Alert, Employee, LeaveRequest } from "./types"
+import type { Alert, Employee, LeaveRequest, OffboardingCase } from "./types"
 import { canApproveLeave, canViewRecord, isInChain, type Viewer } from "./rbac"
 import { daysUntil, RETIREMENT_AGE, TODAY, age } from "./format"
 
@@ -17,10 +17,16 @@ export function dottedReports(viewer: Viewer, all: Employee[]) {
 
 /** Direct reports plus everyone beneath them. */
 export function wholeTeam(viewer: Viewer, all: Employee[]) {
-  return all.filter((e) => e.id !== viewer.employeeId && isInChain(viewer, e, all))
+  return all.filter(
+    (e) => e.id !== viewer.employeeId && isInChain(viewer, e, all)
+  )
 }
 
-export function pendingApprovalsFor(viewer: Viewer, all: Employee[], requests: LeaveRequest[]) {
+export function pendingApprovalsFor(
+  viewer: Viewer,
+  all: Employee[],
+  requests: LeaveRequest[]
+) {
   return requests.filter((r) => {
     if (r.status !== "pending") return false
     const emp = all.find((e) => e.id === r.employeeId)
@@ -28,14 +34,24 @@ export function pendingApprovalsFor(viewer: Viewer, all: Employee[], requests: L
   })
 }
 
-export const ACTIVE_STATES = ["active", "probation", "on_leave", "notice", "suspended"] as const
+export const ACTIVE_STATES = [
+  "active",
+  "probation",
+  "on_leave",
+  "notice",
+  "suspended",
+] as const
 
 export function isOnStrength(e: Employee) {
   return (ACTIVE_STATES as readonly string[]).includes(e.lifecycleState)
 }
 
 /** Alerts the viewer should act on, newest-deadline first. */
-export function openAlertsFor(viewer: Viewer, all: Employee[], alerts: Alert[]) {
+export function openAlertsFor(
+  viewer: Viewer,
+  all: Employee[],
+  alerts: Alert[]
+) {
   return alerts
     .filter((a) => !a.acknowledged)
     .filter((a) => {
@@ -50,7 +66,9 @@ export function headcountByDepartment(employees: Employee[]) {
   employees.filter(isOnStrength).forEach((e) => {
     map.set(e.department, (map.get(e.department) ?? 0) + 1)
   })
-  return [...map.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
+  return [...map.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
 }
 
 /**
@@ -69,14 +87,20 @@ const REQUIRED_FOR_PAYROLL: (keyof Employee | string)[] = [
 
 export function completeness(e: Employee) {
   const read = (path: string): unknown =>
-    path.split(".").reduce<unknown>((acc, k) => (acc as Record<string, unknown>)?.[k], e)
+    path
+      .split(".")
+      .reduce<unknown>((acc, k) => (acc as Record<string, unknown>)?.[k], e)
   const missing = REQUIRED_FOR_PAYROLL.filter((f) => {
     const v = read(String(f))
     return v === null || v === undefined || v === "" || v === 0
   })
   return {
     missing: missing.map(String),
-    percent: Math.round(((REQUIRED_FOR_PAYROLL.length - missing.length) / REQUIRED_FOR_PAYROLL.length) * 100),
+    percent: Math.round(
+      ((REQUIRED_FOR_PAYROLL.length - missing.length) /
+        REQUIRED_FOR_PAYROLL.length) *
+        100
+    ),
   }
 }
 
@@ -88,11 +112,33 @@ export function approachingRetirement(employees: Employee[], withinDays = 365) {
       const years = age(e.dateOfBirth)
       const retireOn = new Date(e.dateOfBirth)
       retireOn.setFullYear(retireOn.getFullYear() + RETIREMENT_AGE)
-      return { employee: e, age: years, retireOn: retireOn.toISOString().slice(0, 10) }
+      return {
+        employee: e,
+        age: years,
+        retireOn: retireOn.toISOString().slice(0, 10),
+      }
     })
     .filter((r) => {
       const d = daysUntil(r.retireOn, TODAY)
       return d !== null && d <= withinDays
     })
     .sort((a, b) => (daysUntil(a.retireOn) ?? 0) - (daysUntil(b.retireOn) ?? 0))
+}
+
+/**
+ * Clearance as four booleans, which is how the checklist reads it. Assets are
+ * itemised underneath, so "returned" means every item is back.
+ */
+export function clearanceFlags(c: OffboardingCase) {
+  return {
+    assets: c.clearance.assets.every((a) => a.returned),
+    access: c.clearance.access,
+    finance: c.clearance.finance,
+    handover: c.clearance.handover,
+  }
+}
+
+/** Items still out, for the offboarding context panel. */
+export function assetsOutstanding(c: OffboardingCase) {
+  return c.clearance.assets.filter((a) => !a.returned)
 }

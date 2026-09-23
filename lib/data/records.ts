@@ -483,7 +483,12 @@ export const LEAVE_BALANCES: LeaveBalance[] = EMPLOYEES.map((e, i) => {
       },
       { type: "sick", entitlement: 12, taken: sickTaken, pending: 0 },
       parental,
-      { type: "compassionate", entitlement: 5, taken: i % 3 === 0 ? 2 : 0, pending: 0 },
+      {
+        type: "compassionate",
+        entitlement: 5,
+        taken: i % 3 === 0 ? 2 : 0,
+        pending: 0,
+      },
       { type: "study", entitlement: 5, taken: 0, pending: i === 19 ? 5 : 0 },
     ],
   }
@@ -970,6 +975,8 @@ export const REVIEWS: PerformanceReview[] = [
     managerId: "adwoa",
     dueOn: "2026-10-15",
     sharedOn: null,
+    reviewerComments:
+      "Strong delivery on the payments migration. Needs to hand over more before taking leave.",
   },
   {
     id: "pr-2",
@@ -980,6 +987,8 @@ export const REVIEWS: PerformanceReview[] = [
     managerId: "kwesi",
     dueOn: "2026-10-15",
     sharedOn: null,
+    reviewerComments:
+      "Consistent and dependable. Ready for more scope next cycle.",
   },
   {
     id: "pr-3",
@@ -990,6 +999,8 @@ export const REVIEWS: PerformanceReview[] = [
     managerId: "adwoa",
     dueOn: "2026-10-15",
     sharedOn: "2026-09-12",
+    reviewerComments:
+      "Good quarter. Documentation is still the weak spot — agreed as a goal.",
   },
   {
     id: "pr-4",
@@ -1000,6 +1011,8 @@ export const REVIEWS: PerformanceReview[] = [
     managerId: "adwoa",
     dueOn: "2026-04-20",
     sharedOn: null,
+    reviewerComments:
+      "Took on the Takoradi rollout unprompted. Exceeds expectations on ownership.",
   },
   {
     id: "pr-5",
@@ -1010,6 +1023,8 @@ export const REVIEWS: PerformanceReview[] = [
     managerId: "yaw",
     dueOn: "2026-10-15",
     sharedOn: null,
+    reviewerComments:
+      "Steady. We agreed two specific goals for H2 rather than a broad one.",
   },
   {
     id: "pr-6",
@@ -1020,6 +1035,8 @@ export const REVIEWS: PerformanceReview[] = [
     managerId: "yaw",
     dueOn: "2026-04-15",
     sharedOn: "2026-04-11",
+    reviewerComments:
+      "Handled a difficult client well. Wants to move towards team lead.",
   },
   {
     id: "pr-7",
@@ -1030,6 +1047,8 @@ export const REVIEWS: PerformanceReview[] = [
     managerId: "abena",
     dueOn: "2026-10-15",
     sharedOn: null,
+    reviewerComments:
+      "Strong delivery on the payments migration. Needs to hand over more before taking leave.",
   },
   {
     id: "pr-8",
@@ -1040,6 +1059,8 @@ export const REVIEWS: PerformanceReview[] = [
     managerId: "akwasi",
     dueOn: "2026-10-15",
     sharedOn: "2026-09-14",
+    reviewerComments:
+      "Consistent and dependable. Ready for more scope next cycle.",
   },
 ]
 
@@ -1126,7 +1147,16 @@ export const OFFBOARDING: OffboardingCase[] = [
     noticeGivenOn: "2026-09-01",
     lastWorkingDay: "2026-09-30",
     exitInterviewDone: false,
-    clearance: { assets: true, access: false, finance: false, handover: true },
+    clearance: {
+      assets: [
+        { item: "Laptop — Dell Latitude", tag: "ZEL-LT-0182", returned: true },
+        { item: "Access card", tag: "AC-4471", returned: true },
+        { item: "MTN SIM (work line)", returned: false },
+      ],
+      access: false,
+      finance: false,
+      handover: true,
+    },
     finalSettlement: null,
     state: "clearing",
   },
@@ -1137,7 +1167,16 @@ export const OFFBOARDING: OffboardingCase[] = [
     noticeGivenOn: "2025-09-30",
     lastWorkingDay: "2025-12-31",
     exitInterviewDone: true,
-    clearance: { assets: true, access: true, finance: true, handover: true },
+    clearance: {
+      assets: [
+        { item: "Laptop — HP ProBook", tag: "ZEL-LT-0090", returned: true },
+        { item: "Access card", tag: "AC-2210", returned: true },
+        { item: "Toolkit", returned: true },
+      ],
+      access: true,
+      finance: true,
+      handover: true,
+    },
     finalSettlement: 41300,
     state: "closed",
   },

@@ -17,7 +17,11 @@ import {
 import { LifecycleBadge } from "@/components/common/status"
 import { Button } from "@/components/ui/button"
 import { useStore } from "@/lib/store"
-import { approachingRetirement, visibleEmployees } from "@/lib/selectors"
+import {
+  approachingRetirement,
+  clearanceFlags,
+  visibleEmployees,
+} from "@/lib/selectors"
 import {
   OFFBOARD_REASON_LABEL,
   RETIREMENT_AGE,
@@ -48,7 +52,7 @@ export default function OffboardingPage() {
   const retiring = approachingRetirement(scope, 400)
 
   const outstanding = active.reduce(
-    (sum, c) => sum + Object.values(c.clearance).filter((v) => !v).length,
+    (sum, c) => sum + Object.values(clearanceFlags(c)).filter((v) => !v).length,
     0
   )
 
@@ -165,7 +169,7 @@ function CaseCard({ offboarding: c }: { offboarding: OffboardingCase }) {
   const employee = store.employeeById(c.employeeId)
   if (!employee) return null
 
-  const items = Object.entries(c.clearance) as [
+  const items = Object.entries(clearanceFlags(c)) as [
     keyof OffboardingCase["clearance"],
     boolean,
   ][]
