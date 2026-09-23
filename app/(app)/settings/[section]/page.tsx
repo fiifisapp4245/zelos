@@ -14,6 +14,7 @@ import {
 
 import { PageShell } from "@/components/shell/page-shell"
 import { SettingsNav } from "@/components/shell/settings-nav"
+import { SETTINGS_NAV_GROUPS } from "@/lib/nav/settings-nav"
 import { EmptyState, Panel, Pill } from "@/components/common"
 import { useStore } from "@/lib/store"
 import { MIN_AGGREGATION_GROUP, ROLE_LABEL, has } from "@/lib/rbac"
@@ -31,6 +32,11 @@ export default function SettingDetailPage() {
 
   if (!found) notFound()
   const { category, item } = found
+  // The crumb names the group the settings navigation files this under, so
+  // the trail and the rail agree.
+  const group = SETTINGS_NAV_GROUPS.find((g) =>
+    g.items.some((i) => i.href === `/settings/${section}`)
+  )
   const blocks = SETTINGS_CONTENT[section]
 
   if (!has(viewer, "hr_admin")) {
@@ -54,7 +60,7 @@ export default function SettingDetailPage() {
       width="wide"
       crumbs={[
         { label: "Company settings", href: "/settings" },
-        { label: category.label, href: "/settings" },
+        { label: group?.label ?? category.label, href: "/settings" },
         { label: item.label },
       ]}
     >
