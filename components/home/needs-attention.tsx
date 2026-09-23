@@ -45,7 +45,12 @@ export function NeedsAttention({ scope }: { scope?: WidgetScope }) {
   })).filter((g) => g.rows.length > 0)
 
   return (
-    <Widget title="Needs attention" count={items.length} bodyClassName="p-0">
+    <Widget
+      title="Needs attention"
+      count={items.length}
+      fills
+      bodyClassName="min-h-0 p-0"
+    >
       {items.length === 0 ? (
         <WidgetEmpty>No records need attention.</WidgetEmpty>
       ) : (

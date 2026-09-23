@@ -95,16 +95,17 @@ export function NeedsApproval({ scope }: { scope?: WidgetScope }) {
       title="Needs your approval"
       count={queue.length}
       weight="primary"
+      fills={2}
       actions={
         queue.length > 0 && <ViewAll href="/approvals" count={queue.length} />
       }
-      bodyClassName="p-0"
+      bodyClassName="flex min-h-0 flex-col p-0"
     >
       {showFilters && (
         <div
           role="group"
           aria-label="Filter by module"
-          className="flex flex-wrap gap-1.5 border-b px-5 py-3"
+          className="flex shrink-0 flex-wrap gap-1.5 border-b px-5 py-3"
         >
           {FILTERS.map((f) => {
             const n =
@@ -137,7 +138,7 @@ export function NeedsApproval({ scope }: { scope?: WidgetScope }) {
       {shown.length === 0 ? (
         <WidgetEmpty>All caught up. Nothing is waiting on you.</WidgetEmpty>
       ) : (
-        <ul className="divide-y">
+        <ul className="min-h-0 flex-1 divide-y overflow-y-auto overscroll-contain">
           {shown.slice(0, 5).map((request) => (
             <ApprovalRow
               key={request.id}

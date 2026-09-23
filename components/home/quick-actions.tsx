@@ -32,9 +32,21 @@ const ICONS: Record<string, LucideIcon> = {
   receipt: Receipt,
 }
 
-const CHIP = cn(
-  "flex items-center gap-2 rounded-full border bg-card px-3.5 py-2 text-sm",
-  "transition-colors hover:bg-muted",
+/**
+ * One gradient family, built from the primary green and stepped in strength
+ * across the row. It reads as a set rather than four unrelated tiles, and
+ * introduces no colour the theme does not already have.
+ */
+const GRADIENTS = [
+  "from-primary/14 via-primary/5 to-card",
+  "from-primary/11 via-primary/4 to-card",
+  "from-primary/8 via-primary/3 to-card",
+  "from-primary/5 via-primary/2 to-card",
+]
+
+const CARD = cn(
+  "group flex items-center gap-3 rounded-xl border bg-gradient-to-br px-4 py-3.5 text-left text-sm font-medium",
+  "transition-colors hover:border-primary/40",
   "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 )
 
@@ -46,23 +58,36 @@ export function QuickActions({ session }: { session: SessionContext }) {
     <div
       role="group"
       aria-label="Quick actions"
-      className="flex flex-wrap items-center gap-2"
+      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
     >
-      {actions.map((a) => {
+      {actions.map((a, i) => {
         const Icon = ICONS[a.icon] ?? Check
+        const inner = (
+          <>
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-card/80 text-primary shadow-sm">
+              <Icon className="size-4" />
+            </span>
+            <span className="min-w-0 truncate">{a.label}</span>
+          </>
+        )
+
         if (a.href) {
           return (
-            <Link key={a.label} href={a.href} className={CHIP}>
-              <Icon className="size-4 text-muted-foreground" />
-              {a.label}
+            <Link
+              key={a.label}
+              href={a.href}
+              className={cn(CARD, GRADIENTS[i % GRADIENTS.length])}
+            >
+              {inner}
             </Link>
           )
         }
+
         return (
           <button
             key={a.label}
             type="button"
-            className={CHIP}
+            className={cn(CARD, GRADIENTS[i % GRADIENTS.length])}
             onClick={() => {
               const target = document.getElementById(a.scrollTo!)
               target?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -70,8 +95,7 @@ export function QuickActions({ session }: { session: SessionContext }) {
               target?.querySelector<HTMLElement>("button, a")?.focus()
             }}
           >
-            <Icon className="size-4 text-muted-foreground" />
-            {a.label}
+            {inner}
           </button>
         )
       })}

@@ -35,6 +35,8 @@ export interface HomeWidgetConfig {
   roles: NavAudience[]
   order: number
   scope?: WidgetScope
+  /** Absorbs the leftover height in its column and scrolls inside itself. */
+  fills?: boolean | number
 }
 
 export const HOME_WIDGETS: HomeWidgetConfig[] = [
@@ -42,6 +44,7 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "approvals-hr",
     widget: "needsApproval",
+    fills: 2,
     column: "main",
     roles: ["hr_admin"],
     order: 1,
@@ -50,6 +53,7 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "approvals-manager",
     widget: "needsApproval",
+    fills: 2,
     column: "main",
     roles: ["manager"],
     order: 1,
@@ -58,6 +62,7 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "approvals-payroll",
     widget: "needsApproval",
+    fills: 2,
     column: "main",
     roles: ["payroll"],
     order: 1,
@@ -66,6 +71,7 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "attention-hr",
     widget: "needsAttention",
+    fills: true,
     column: "main",
     roles: ["hr_admin"],
     order: 2,
@@ -74,6 +80,7 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "attention-manager",
     widget: "needsAttention",
+    fills: true,
     column: "main",
     roles: ["manager"],
     order: 2,
@@ -82,6 +89,7 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "attention-payroll",
     widget: "needsAttention",
+    fills: true,
     column: "main",
     roles: ["payroll"],
     order: 2,
@@ -156,6 +164,7 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "upcoming-hr",
     widget: "upcoming",
+    fills: true,
     column: "rail",
     roles: ["hr_admin"],
     order: 2,
@@ -164,6 +173,7 @@ export const HOME_WIDGETS: HomeWidgetConfig[] = [
   {
     id: "upcoming-payroll",
     widget: "upcoming",
+    fills: true,
     column: "rail",
     roles: ["payroll"],
     order: 2,

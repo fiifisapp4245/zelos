@@ -33,7 +33,7 @@ export function Upcoming() {
   )
 
   return (
-    <Widget title="Upcoming" weight="quiet">
+    <Widget title="Upcoming" weight="quiet" fills>
       <div className="space-y-4">
         {run && (
           <div className="rounded-lg border bg-success-muted/50 px-3 py-2.5">

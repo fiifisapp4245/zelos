@@ -29,6 +29,7 @@ export function Widget({
   children,
   className,
   bodyClassName,
+  fills,
 }: {
   id?: string
   title: string
@@ -41,6 +42,14 @@ export function Widget({
   children: React.ReactNode
   className?: string
   bodyClassName?: string
+  /**
+   * Lets the widget absorb the leftover height in its column and scroll
+   * inside itself. That is what keeps the left and right columns finishing
+   * level instead of one running past the other. A number is a share: the
+   * queue takes twice the slack of the list under it, because it is the one
+   * you came for.
+   */
+  fills?: boolean | number
 }) {
   const headingId = `${id ?? title.replace(/\s+/g, "-").toLowerCase()}-heading`
 
@@ -48,11 +57,21 @@ export function Widget({
     <section
       id={id}
       aria-labelledby={headingId}
-      className={cn(WEIGHT[weight], "scroll-mt-20", className)}
+      className={cn(
+        WEIGHT[weight],
+        "scroll-mt-20",
+        fills && "flex min-h-0 flex-col",
+        className
+      )}
+      style={
+        fills
+          ? { flexGrow: typeof fills === "number" ? fills : 1, flexBasis: 0 }
+          : undefined
+      }
     >
       <header
         className={cn(
-          "flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b px-5",
+          "flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b px-5",
           weight === "quiet" ? "py-3" : "py-4"
         )}
       >
@@ -78,11 +97,18 @@ export function Widget({
         )}
       </header>
 
-      <div className={bodyClassName ?? (weight === "quiet" ? "p-4" : "p-5")}>
+      <div
+        className={cn(
+          bodyClassName ?? (weight === "quiet" ? "p-4" : "p-5"),
+          fills && "min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        )}
+      >
         {children}
       </div>
 
-      {footer && <div className="border-t px-5 py-3 text-sm">{footer}</div>}
+      {footer && (
+        <div className="shrink-0 border-t px-5 py-3 text-sm">{footer}</div>
+      )}
     </section>
   )
 }
