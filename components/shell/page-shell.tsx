@@ -13,8 +13,23 @@ export function PageShell({
 }: {
   crumbs: Crumb[]
   children: React.ReactNode
-  width?: "default" | "wide"
+  /**
+   * "canvas" hands the whole content area to the page and does not scroll it,
+   * for screens that are a surface rather than a document.
+   */
+  width?: "default" | "wide" | "canvas"
 }) {
+  if (width === "canvas") {
+    return (
+      <>
+        <Topbar crumbs={crumbs} />
+        <main className="relative min-h-0 flex-1 overflow-hidden">
+          {children}
+        </main>
+      </>
+    )
+  }
+
   return (
     <>
       <Topbar crumbs={crumbs} />
