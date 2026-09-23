@@ -6,15 +6,15 @@ import { notFound, useParams } from "next/navigation"
 import {
   ArrowLeft,
   Check,
-  Construction,
   Globe,
   Lock,
   ShieldCheck,
+  SlidersHorizontal,
 } from "lucide-react"
 
 import { PageShell } from "@/components/shell/page-shell"
+import { SettingsNav } from "@/components/shell/settings-nav"
 import { EmptyState, Panel, Pill } from "@/components/common"
-import { Button } from "@/components/ui/button"
 import { useStore } from "@/lib/store"
 import { MIN_AGGREGATION_GROUP, ROLE_LABEL, has } from "@/lib/rbac"
 import { RETIREMENT_AGE } from "@/lib/format"
@@ -51,6 +51,7 @@ export default function SettingDetailPage() {
 
   return (
     <PageShell
+      width="wide"
       crumbs={[
         { label: "Company settings", href: "/settings" },
         { label: category.label, href: "/settings" },
@@ -74,29 +75,28 @@ export default function SettingDetailPage() {
         </p>
       </div>
 
-      <div className="py-6">
-        {section === "company-information" ? (
-          <CompanyInformation />
-        ) : section === "localization" ? (
-          <LocalizationPanel />
-        ) : section === "role-assignment" ? (
-          <RoleAssignmentPanel />
-        ) : blocks ? (
-          <SettingBlocks blocks={blocks} />
-        ) : (
-          <Panel>
-            <EmptyState
-              icon={Construction}
-              title="Not built in this round"
-              description="The hub, its structure and the areas already wired up are in. This screen is scheduled for a later round."
-              action={
-                <Button variant="outline" asChild>
-                  <Link href="/settings">Back to Company Settings</Link>
-                </Button>
-              }
-            />
-          </Panel>
-        )}
+      <div className="flex flex-col gap-6 py-6 lg:flex-row lg:items-start">
+        <SettingsNav className="w-full shrink-0 lg:sticky lg:top-6 lg:w-[232px]" />
+
+        <div className="min-w-0 flex-1">
+          {section === "company-information" ? (
+            <CompanyInformation />
+          ) : section === "localization" ? (
+            <LocalizationPanel />
+          ) : section === "role-assignment" ? (
+            <RoleAssignmentPanel />
+          ) : blocks ? (
+            <SettingBlocks blocks={blocks} />
+          ) : (
+            <Panel>
+              <EmptyState
+                icon={SlidersHorizontal}
+                title={`No ${item.label.toLowerCase()} configured`}
+                description="Nothing has been set here yet. Whatever is configured will apply across the company."
+              />
+            </Panel>
+          )}
+        </div>
       </div>
     </PageShell>
   )

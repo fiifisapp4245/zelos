@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Lock, Search, SlidersHorizontal } from "lucide-react"
 
 import { PageShell } from "@/components/shell/page-shell"
+import { SettingsNav } from "@/components/shell/settings-nav"
 import { EmptyState, Panel } from "@/components/common"
 import { Button } from "@/components/ui/button"
 import { useStore } from "@/lib/store"
@@ -84,26 +85,32 @@ export default function CompanySettingsPage() {
         )}
       </div>
 
-      {results.length === 0 ? (
-        <Panel>
-          <EmptyState
-            icon={SlidersHorizontal}
-            title={`No settings match “${query}”`}
-            description="Try a broader term — for example “leave”, “payroll” or “security”."
-            action={
-              <Button variant="outline" onClick={() => setQuery("")}>
-                Clear search
-              </Button>
-            }
-          />
-        </Panel>
-      ) : (
-        <div className="grid items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-4">
-          {results.map((category) => (
-            <CategoryCard key={category.slug} category={category} />
-          ))}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <SettingsNav className="w-full shrink-0 lg:sticky lg:top-6 lg:w-[232px]" />
+
+        <div className="min-w-0 flex-1">
+          {results.length === 0 ? (
+            <Panel>
+              <EmptyState
+                icon={SlidersHorizontal}
+                title={`No settings match “${query}”`}
+                description="Try a broader term — for example “leave”, “payroll” or “security”."
+                action={
+                  <Button variant="outline" onClick={() => setQuery("")}>
+                    Clear search
+                  </Button>
+                }
+              />
+            </Panel>
+          ) : (
+            <div className="grid items-stretch gap-5 sm:grid-cols-2 2xl:grid-cols-3">
+              {results.map((category) => (
+                <CategoryCard key={category.slug} category={category} />
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </PageShell>
   )
 }

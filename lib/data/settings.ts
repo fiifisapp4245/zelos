@@ -57,7 +57,7 @@ export const SETTINGS: SettingCategory[] = [
       },
       {
         slug: "job-catalog",
-        label: "Job catalog",
+        label: "Grade structure",
         blurb:
           "The list of job titles, families and pay grades that employee records can be assigned to.",
       },
@@ -95,6 +95,12 @@ export const SETTINGS: SettingCategory[] = [
     icon: UserRoundPlus,
     items: [
       {
+        slug: "lifecycle-event-types",
+        label: "Lifecycle event types",
+        blurb:
+          "The transitions the state machine permits, and which of them require a reason or an approval.",
+      },
+      {
         slug: "custom-fields",
         label: "Custom fields",
         blurb:
@@ -108,9 +114,21 @@ export const SETTINGS: SettingCategory[] = [
       },
       {
         slug: "employment-id-format",
-        label: "Employment ID format",
+        label: "ID format",
         blurb:
           "The pattern new employee IDs are generated from — currently ZEL-0000.",
+      },
+      {
+        slug: "subdomain",
+        label: "Subdomain",
+        blurb:
+          "The address staff sign in at, and whether the company is reachable on a custom domain.",
+      },
+      {
+        slug: "archiving",
+        label: "Archiving",
+        blurb:
+          "How long ended records, documents and audit history are kept before they are archived.",
       },
       {
         slug: "expiry-alerts",
@@ -128,7 +146,7 @@ export const SETTINGS: SettingCategory[] = [
     items: [
       {
         slug: "working-week",
-        label: "Working week definition",
+        label: "Working week",
         blurb:
           "Which days count as working days, and the standard hours per week.",
       },
@@ -139,13 +157,13 @@ export const SETTINGS: SettingCategory[] = [
       },
       {
         slug: "clock-in-methods",
-        label: "Clock-in methods",
+        label: "Devices & capture",
         blurb:
           "How attendance is captured — web, mobile, biometric or manual entry by a supervisor.",
       },
       {
         slug: "overtime-grace",
-        label: "Overtime & grace periods",
+        label: "Attendance rules",
         blurb:
           "How many minutes late still counts as on time, and how overtime is accrued and paid.",
       },
@@ -170,7 +188,7 @@ export const SETTINGS: SettingCategory[] = [
       },
       {
         slug: "approval-settings",
-        label: "Approval settings",
+        label: "Approval routing",
         blurb:
           "Who approves what, and whether a dotted-line manager can approve alongside the line manager.",
       },
@@ -183,7 +201,7 @@ export const SETTINGS: SettingCategory[] = [
     items: [
       {
         slug: "statutory-settings",
-        label: "Statutory settings",
+        label: "Country rules",
         blurb:
           "SSNIT Tier 1 and 2 rates, Tier 3 handling and the PAYE bands applied at disbursement.",
       },
@@ -194,7 +212,7 @@ export const SETTINGS: SettingCategory[] = [
       },
       {
         slug: "allowance-deduction-type",
-        label: "Allowance & deduction type",
+        label: "Pay components",
         blurb:
           "Recurring allowances and deductions, and whether each is taxable.",
       },
@@ -231,7 +249,7 @@ export const SETTINGS: SettingCategory[] = [
       },
       {
         slug: "role-assignment",
-        label: "Role assignment",
+        label: "Roles & permissions",
         blurb:
           "Which permission roles each person holds. Roles compose — one person can hold several at once.",
       },
@@ -289,6 +307,12 @@ export const SETTINGS: SettingCategory[] = [
     label: "Integrations",
     icon: Plug,
     items: [
+      {
+        slug: "billing",
+        label: "Billing",
+        blurb:
+          "The plan, the seats it covers, the invoices raised against it and the card they are charged to.",
+      },
       {
         slug: "api-keys-webhooks",
         label: "API keys & webhooks",
