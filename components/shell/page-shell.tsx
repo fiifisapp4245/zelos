@@ -40,9 +40,9 @@ export function PageShell({
       <main className="relative min-h-0 flex-1 overflow-y-auto">
         <div
           className={cn(
-            // 85% of the content area, centred, so the page never runs edge
-            // to edge but is not squeezed into the middle either.
-            "mx-auto w-[85%] py-6",
+            // 95% of the content area, centred: a thin gutter either side so
+            // the page does not run flush to the edges.
+            "mx-auto w-[95%] py-6",
             width === "wide" ? "max-w-[1600px]" : "max-w-[1280px]"
           )}
         >
