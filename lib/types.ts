@@ -154,6 +154,13 @@ export interface LeaveRequest {
   decisionNote?: string
 }
 
+export interface LeaveTypeBalance {
+  type: LeaveType
+  entitlement: number
+  taken: number
+  pending: number
+}
+
 export interface LeaveBalance {
   employeeId: string
   annualEntitlement: number
@@ -162,6 +169,8 @@ export interface LeaveBalance {
   sickEntitlement: number
   sickTaken: number
   carriedOver: number
+  /** Every type the person is entitled to, for the balances tiles. */
+  byType: LeaveTypeBalance[]
 }
 
 export type AttendanceStatus =
@@ -351,4 +360,101 @@ export interface CompanyProfile {
   website: string
   mainLine: string
   postalAddress: string
+}
+
+/* ── Approvals ───────────────────────────────────────────────────────────── */
+
+/**
+ * Approval is a chain, not a flag: a request moves through named stages and
+ * each one is owned by a role, so "waiting on you" is answerable.
+ */
+export type ApprovalStage =
+  "line_manager" | "head_of_department" | "hr" | "payroll"
+
+export interface ApprovalStep {
+  stage: ApprovalStage
+  /** The person expected to decide, when it is one named person. */
+  approverId: string | null
+  decision: "pending" | "approved" | "declined"
+  decidedAt: string | null
+  note?: string
+}
+
+export type ApprovalKind = "leave" | "pay_details" | "lifecycle" | "document"
+
+interface ApprovalBase {
+  id: string
+  employeeId: string
+  submittedAt: string
+  /** When a decision is expected. Past this, the request is overdue. */
+  dueOn: string
+  chain: ApprovalStep[]
+  status: RequestStatus
+  decisionNote?: string
+}
+
+export interface LeaveApproval extends ApprovalBase {
+  kind: "leave"
+  leaveType: LeaveType
+  startDate: string
+  endDate: string
+  days: number
+  reason: string
+}
+
+/** Masked on both sides — the point is that the details changed, not what they are. */
+export interface PayDetailsApproval extends ApprovalBase {
+  kind: "pay_details"
+  method: "bank" | "mobile_money"
+  before: { provider: string; account: string }
+  after: { provider: string; account: string }
+  requestedBy: string
+}
+
+export interface LifecycleApproval extends ApprovalBase {
+  kind: "lifecycle"
+  change: "promotion" | "transfer" | "acting" | "probation_confirmation"
+  before: { jobTitle: string; payGrade: string; department: string }
+  after: { jobTitle: string; payGrade: string; department: string }
+  effectiveDate: string
+  reason: string
+}
+
+export interface DocumentApproval extends ApprovalBase {
+  kind: "document"
+  documentId: string
+  documentName: string
+  category: EmployeeDocument["category"]
+  /** "employee" means it is the employee who still owes something. */
+  waitingOn: "hr" | "employee"
+}
+
+export type ApprovalRequest =
+  LeaveApproval | PayDetailsApproval | LifecycleApproval | DocumentApproval
+
+/* ── Pay ─────────────────────────────────────────────────────────────────── */
+
+export interface Payslip {
+  id: string
+  employeeId: string
+  /** yyyy-mm, the period it covers. */
+  period: string
+  grossGhs: number
+  netGhs: number
+  ssnitEmployee: number
+  paye: number
+  otherDeductions: number
+  paidOn: string
+}
+
+/* ── Acting assignments ──────────────────────────────────────────────────── */
+
+export interface ActingAssignment {
+  id: string
+  employeeId: string
+  /** The role being covered. */
+  jobTitle: string
+  coveringForId: string | null
+  startDate: string
+  endDate: string
 }

@@ -10,6 +10,7 @@ import type {
   DisciplinaryCase,
   EmployeeDocument,
   LeaveBalance,
+  LeaveTypeBalance,
   LeaveRequest,
   LifecycleEvent,
   Notification,
@@ -453,15 +454,40 @@ export const DOCUMENTS: EmployeeDocument[] = [
   ),
 ]
 
-export const LEAVE_BALANCES: LeaveBalance[] = EMPLOYEES.map((e, i) => ({
-  employeeId: e.id,
-  annualEntitlement: 15 + (i % 3) * 3,
-  annualTaken: (i * 2) % 11,
-  annualPending: i % 4 === 0 ? 3 : 0,
-  sickEntitlement: 12,
-  sickTaken: i % 5,
-  carriedOver: i % 3,
-}))
+export const LEAVE_BALANCES: LeaveBalance[] = EMPLOYEES.map((e, i) => {
+  const annualEntitlement = 15 + (i % 3) * 3
+  const annualTaken = (i * 2) % 11
+  const annualPending = i % 4 === 0 ? 3 : 0
+  const sickTaken = i % 5
+  // Parental entitlement follows the Labour Act: 12 weeks maternity for
+  // women, a discretionary week of paternity leave for men.
+  const parental: LeaveTypeBalance =
+    e.gender === "female"
+      ? { type: "maternity", entitlement: 84, taken: 0, pending: 0 }
+      : { type: "paternity", entitlement: 7, taken: 0, pending: 0 }
+
+  return {
+    employeeId: e.id,
+    annualEntitlement,
+    annualTaken,
+    annualPending,
+    sickEntitlement: 12,
+    sickTaken,
+    carriedOver: i % 3,
+    byType: [
+      {
+        type: "annual",
+        entitlement: annualEntitlement,
+        taken: annualTaken,
+        pending: annualPending,
+      },
+      { type: "sick", entitlement: 12, taken: sickTaken, pending: 0 },
+      parental,
+      { type: "compassionate", entitlement: 5, taken: i % 3 === 0 ? 2 : 0, pending: 0 },
+      { type: "study", entitlement: 5, taken: 0, pending: i === 19 ? 5 : 0 },
+    ],
+  }
+})
 
 export const LEAVE_REQUESTS: LeaveRequest[] = [
   {

@@ -30,6 +30,7 @@ import {
   REVIEWS,
 } from "./data/records"
 import { TABLE_ROWS, TABLE_SPECS, type TableRow } from "./data/settings-tables"
+import { ACTING_ASSIGNMENTS, APPROVALS, PAYSLIPS } from "./data/approvals"
 import type {
   Alert,
   CompanyProfile,
@@ -50,9 +51,14 @@ import type {
   OffboardingCase,
   OnboardingTask,
   PerformanceReview,
+  ActingAssignment,
+  ApprovalRequest,
+  Payslip,
   PermissionRole,
+  RequestStatus,
   Requisition,
 } from "./types"
+import { TODAY_ISO } from "./format"
 import type { Viewer } from "./rbac"
 import type { SessionContext } from "./session"
 
@@ -75,6 +81,9 @@ interface State {
   branches: Branch[]
   alerts: Alert[]
   notifications: Notification[]
+  approvals: ApprovalRequest[]
+  payslips: Payslip[]
+  actingAssignments: ActingAssignment[]
   company: CompanyProfile
   /** Editable settings tables, keyed by table id. */
   tables: Record<string, TableRow[]>
@@ -100,6 +109,9 @@ const INITIAL: State = {
   branches: BRANCHES,
   alerts: ALERTS,
   notifications: NOTIFICATIONS,
+  approvals: APPROVALS,
+  payslips: PAYSLIPS,
+  actingAssignments: ACTING_ASSIGNMENTS,
   company: COMPANY,
   tables: TABLE_ROWS,
   activeRole: "hr_admin",
@@ -135,6 +147,17 @@ interface StoreValue extends State {
     note: string
   ) => void
   submitLeave: (request: LeaveRequest) => void
+  /**
+   * Decides the current step of an approval chain. The request only reaches a
+   * final status once every step has passed; a decline ends it immediately.
+   */
+  decideApproval: (
+    id: string,
+    decision: "approved" | "declined",
+    note?: string
+  ) => void
+  clockIn: () => void
+  clockOut: () => void
   cancelLeave: (id: string) => void
   addOnboardingTask: (task: OnboardingTask) => void
   deleteOnboardingTask: (id: string) => void
@@ -508,6 +531,101 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             ...s.auditLog,
           ],
         }))
+      },
+
+      decideApproval: (id, decision, note) => {
+        setState((s) => {
+          const request = s.approvals.find((r) => r.id === id)
+          if (!request) return s
+
+          const at = nowIso()
+          let handled = false
+          const chain = request.chain.map((step) => {
+            if (handled || step.decision !== "pending") return step
+            handled = true
+            return { ...step, decision, decidedAt: at, note }
+          })
+
+          // A decline stops the chain; an approval only finishes the request
+          // once no step is still waiting.
+          const status: RequestStatus =
+            decision === "declined"
+              ? "rejected"
+              : chain.every((c) => c.decision === "approved")
+                ? "approved"
+                : "pending"
+
+          return {
+            ...s,
+            approvals: s.approvals.map((r) =>
+              r.id === id ? { ...r, chain, status, decisionNote: note } : r
+            ),
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: request.employeeId,
+                actorId,
+                action: `${decision === "approved" ? "Approved" : "Declined"} ${request.kind.replace("_", " ")} request`,
+                field: id,
+                after: decision,
+                at,
+                ...(note ? { reason: note } : {}),
+              } as AuditEntry,
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      clockIn: () => {
+        setState((s) => {
+          const date = TODAY_ISO
+          const time = new Date().toTimeString().slice(0, 5)
+          const existing = s.attendance.find(
+            (a) => a.employeeId === actorId && a.date === date
+          )
+          if (existing?.clockIn) return s
+          const record = {
+            id: existing?.id ?? uid("at"),
+            employeeId: actorId,
+            date,
+            status: "present" as const,
+            clockIn: time,
+            clockOut: null,
+            hours: 0,
+          }
+          return {
+            ...s,
+            attendance: existing
+              ? s.attendance.map((a) => (a.id === existing.id ? record : a))
+              : [record, ...s.attendance],
+          }
+        })
+      },
+
+      clockOut: () => {
+        setState((s) => {
+          const date = TODAY_ISO
+          const existing = s.attendance.find(
+            (a) => a.employeeId === actorId && a.date === date
+          )
+          if (!existing?.clockIn || existing.clockOut) return s
+          const out = new Date().toTimeString().slice(0, 5)
+          const toMinutes = (t: string) =>
+            Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
+          const hours =
+            Math.round(
+              ((toMinutes(out) - toMinutes(existing.clockIn)) / 60) * 10
+            ) / 10
+          return {
+            ...s,
+            attendance: s.attendance.map((a) =>
+              a.id === existing.id
+                ? { ...a, clockOut: out, hours: Math.max(hours, 0) }
+                : a
+            ),
+          }
+        })
       },
 
       submitLeave: (request) => {

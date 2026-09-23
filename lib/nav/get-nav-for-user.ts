@@ -19,6 +19,10 @@ export function resolveAudience(session: SessionContext): NavAudience {
   if (session.roles.includes("hr_admin")) return "hr_admin"
   if (session.roles.includes("payroll")) return "payroll"
   if (session.direct_report_count > 0) return "manager"
+
+  // Default branch. Anyone the rules above do not claim — including a session
+  // carrying no roles at all, or a role this build does not know — gets the
+  // employee product. Nobody is ever left without a home.
   return "employee"
 }
 
