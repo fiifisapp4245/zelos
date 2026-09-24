@@ -22,6 +22,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { SegmentedTabs } from "@/components/common/segmented-tabs"
+import { Tabs } from "@/components/ui/tabs"
 import { DayCodeBadge } from "./day-code"
 import {
   exceptionsFrom,
@@ -194,44 +196,24 @@ export function TimesheetManager({
         </div>
       </Panel>
 
-      <div
-        role="group"
-        aria-label="Filter by timesheet status"
-        className="mb-4 flex flex-wrap items-center gap-1 rounded-xl border bg-card p-1"
+      {/* The same tab component the rest of the product uses, so it hugs
+          its labels instead of stretching across the page. */}
+      <Tabs
+        value={tab}
+        onValueChange={(v) => {
+          setTab(v as TimesheetStatus)
+          setSelected([])
+        }}
+        className="mb-4 gap-0"
       >
-        {TABS.map((t) => {
-          const n = summaries.filter((s) => s.status === t.id).length
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => {
-                setTab(t.id)
-                setSelected([])
-              }}
-              aria-pressed={tab === t.id}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                tab === t.id
-                  ? "bg-success-muted font-medium text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              {t.label}
-              <span
-                className={cn(
-                  "tabular rounded-full px-1.5 text-xs",
-                  tab === t.id
-                    ? "bg-primary/15 text-primary"
-                    : "bg-muted text-muted-foreground"
-                )}
-              >
-                {n}
-              </span>
-            </button>
-          )
-        })}
-      </div>
+        <SegmentedTabs
+          tabs={TABS.map((t) => ({
+            value: t.id,
+            label: t.label,
+            count: summaries.filter((s) => s.status === t.id).length,
+          }))}
+        />
+      </Tabs>
 
       {shown.length === 0 ? (
         <Panel bodyClassName="p-0">

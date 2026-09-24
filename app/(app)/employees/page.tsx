@@ -25,16 +25,15 @@ import {
   type ListView,
 } from "@/components/common"
 import { RowActions } from "@/components/common/row-actions"
+import { FilterMenu } from "@/components/common/filter-bar"
 import { LifecycleBadge } from "@/components/common/status"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useStore } from "@/lib/store"
@@ -221,7 +220,6 @@ export default function DirectoryPage() {
 
           <FilterMenu
             label="Status"
-            count={states.length}
             options={(Object.keys(LIFECYCLE_LABEL) as LifecycleState[]).map(
               (s) => ({
                 value: s,
@@ -239,7 +237,6 @@ export default function DirectoryPage() {
           />
           <FilterMenu
             label="Department"
-            count={departments.length}
             options={allDepartments.map((d) => ({ value: d, label: d }))}
             selected={departments}
             onToggle={(v) =>
@@ -250,7 +247,6 @@ export default function DirectoryPage() {
           />
           <FilterMenu
             label="Employment type"
-            count={types.length}
             options={(
               Object.keys(EMPLOYMENT_TYPE_LABEL) as EmploymentType[]
             ).map((t) => ({
@@ -366,60 +362,6 @@ export default function DirectoryPage() {
         )}
       </div>
     </PageShell>
-  )
-}
-
-function FilterMenu({
-  label,
-  count,
-  options,
-  selected,
-  onToggle,
-}: {
-  label: string
-  count: number
-  options: { value: string; label: string }[]
-  selected: string[]
-  onToggle: (v: string) => void
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "flex items-center gap-1.5 rounded-full border border-dashed px-3 py-1.5 text-xs transition-colors",
-            count > 0
-              ? "border-primary bg-success-muted font-medium text-primary"
-              : "text-muted-foreground hover:border-ring/50 hover:text-foreground"
-          )}
-        >
-          + {label}
-          {count > 0 && (
-            <span className="tabular rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">
-              {count}
-            </span>
-          )}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        className="max-h-[320px] overflow-y-auto"
-      >
-        <DropdownMenuLabel>{label}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {options.map((o) => (
-          <DropdownMenuCheckboxItem
-            key={o.value}
-            checked={selected.includes(o.value)}
-            onCheckedChange={() => onToggle(o.value)}
-            onSelect={(e) => e.preventDefault()}
-          >
-            {o.label}
-          </DropdownMenuCheckboxItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
   )
 }
 

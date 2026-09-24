@@ -46,8 +46,9 @@ export function rangeFor(
 }
 
 export interface ScopeFilters {
-  department?: string
-  branch?: string
+  /** Empty means no narrowing, which is how the chips read when unset. */
+  departments?: string[]
+  branches?: string[]
   search?: string
 }
 
@@ -90,8 +91,14 @@ export function useAttendance({
     )
     const q = (filters.search ?? "").trim().toLowerCase()
     return base
-      .filter((e) => !filters.department || e.department === filters.department)
-      .filter((e) => !filters.branch || e.branch === filters.branch)
+      .filter(
+        (e) =>
+          !filters.departments?.length ||
+          filters.departments.includes(e.department)
+      )
+      .filter(
+        (e) => !filters.branches?.length || filters.branches.includes(e.branch)
+      )
       .filter(
         (e) =>
           !q ||
@@ -105,8 +112,8 @@ export function useAttendance({
     store.session.id,
     audience,
     employeeId,
-    filters.department,
-    filters.branch,
+    filters.departments,
+    filters.branches,
     filters.search,
   ])
 

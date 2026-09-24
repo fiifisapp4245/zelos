@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Search, Users } from "lucide-react"
+import { Users } from "lucide-react"
 
 import { AttendanceShell } from "@/components/attendance/attendance-shell"
 import { DayCodeLegend } from "@/components/attendance/day-code"
@@ -18,12 +18,11 @@ import { EmptyState, Panel, StatCard } from "@/components/common"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  FilterChipRow,
+  FilterChoice,
+  FilterMenu,
+  FilterSearchRow,
+} from "@/components/common/filter-bar"
 import { formatHours, metricsFor } from "@/lib/attendance/derive"
 import type { DayRecord } from "@/lib/attendance/types"
 import { useStore } from "@/lib/store"
@@ -33,8 +32,8 @@ export default function RegisterPage() {
   const store = useStore()
   const [period, setPeriod] = React.useState<PeriodKey>("twoWeeks")
   const [custom, setCustom] = React.useState({ from: "", to: "" })
-  const [department, setDepartment] = React.useState("all")
-  const [branch, setBranch] = React.useState("all")
+  const [departments, setDepartments] = React.useState<string[]>([])
+  const [branches, setBranches] = React.useState<string[]>([])
   const [search, setSearch] = React.useState("")
   const [openDay, setOpenDay] = React.useState<DayRecord | null>(null)
 
@@ -42,18 +41,14 @@ export default function RegisterPage() {
   const { scope, dates, records } = useAttendance({
     from,
     to,
-    filters: {
-      department: department === "all" ? undefined : department,
-      branch: branch === "all" ? undefined : branch,
-      search,
-    },
+    filters: { departments, branches, search },
   })
 
   const metrics = metricsFor(records)
-  const departments = [
+  const allDepartments = [
     ...new Set(store.employees.map((e) => e.department)),
   ].sort()
-  const branches = store.branches.filter((b) => !b.archived)
+  const allBranches = store.branches.filter((b) => !b.archived)
 
   return (
     <AttendanceShell
@@ -64,28 +59,63 @@ export default function RegisterPage() {
         { label: "Attendance" },
       ]}
     >
-      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border bg-card px-4 py-3">
-        <div>
-          <Label className="mb-1.5 block text-xs font-medium">Period</Label>
-          <Select
+      {/* The directory's filter pattern: search on top, dashed chips
+          beneath that fill in once they are doing something. */}
+      <div className="mb-4 rounded-xl border bg-card">
+        <FilterSearchRow
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by name or job title"
+        >
+          <FilterChoice
+            label="Period"
             value={period}
-            onValueChange={(v) => setPeriod(v as PeriodKey)}
-          >
-            <SelectTrigger className="h-9 w-[160px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.keys(PERIOD_LABEL) as PeriodKey[]).map((k) => (
-                <SelectItem key={k} value={k}>
-                  {PERIOD_LABEL[k]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+            onChange={(v) => setPeriod(v as PeriodKey)}
+            options={(Object.keys(PERIOD_LABEL) as PeriodKey[]).map((k) => ({
+              value: k,
+              label: PERIOD_LABEL[k],
+            }))}
+            allLabel="This week"
+          />
+        </FilterSearchRow>
+
+        <FilterChipRow
+          showClear={
+            departments.length > 0 || branches.length > 0 || search !== ""
+          }
+          onClear={() => {
+            setDepartments([])
+            setBranches([])
+            setSearch("")
+          }}
+        >
+          <FilterMenu
+            label="Department"
+            options={allDepartments.map((d) => ({ value: d, label: d }))}
+            selected={departments}
+            onToggle={(v) =>
+              setDepartments((list) =>
+                list.includes(v) ? list.filter((x) => x !== v) : [...list, v]
+              )
+            }
+          />
+          <FilterMenu
+            label="Branch"
+            options={allBranches.map((b) => ({ value: b.name, label: b.name }))}
+            selected={branches}
+            onToggle={(v) =>
+              setBranches((list) =>
+                list.includes(v) ? list.filter((x) => x !== v) : [...list, v]
+              )
+            }
+          />
+          <span className="ml-auto text-xs text-muted-foreground">
+            {formatDate(from)} – {formatDate(to)}
+          </span>
+        </FilterChipRow>
 
         {period === "custom" && (
-          <>
+          <div className="flex flex-wrap items-end gap-3 border-b px-3 py-2.5">
             <div>
               <Label
                 htmlFor="from"
@@ -117,59 +147,8 @@ export default function RegisterPage() {
                 }
               />
             </div>
-          </>
+          </div>
         )}
-
-        <div>
-          <Label className="mb-1.5 block text-xs font-medium">Department</Label>
-          <Select value={department} onValueChange={setDepartment}>
-            <SelectTrigger className="h-9 w-[170px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All departments</SelectItem>
-              {departments.map((d) => (
-                <SelectItem key={d} value={d}>
-                  {d}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label className="mb-1.5 block text-xs font-medium">Branch</Label>
-          <Select value={branch} onValueChange={setBranch}>
-            <SelectTrigger className="h-9 w-[150px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All branches</SelectItem>
-              {branches.map((b) => (
-                <SelectItem key={b.id} value={b.name}>
-                  {b.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="relative min-w-[200px] flex-1">
-          <Label htmlFor="q" className="mb-1.5 block text-xs font-medium">
-            Search
-          </Label>
-          <Search
-            className="pointer-events-none absolute bottom-2.5 left-3 size-4 text-muted-foreground"
-            aria-hidden
-          />
-          <Input
-            id="q"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name or job title"
-            className="h-9 pl-9"
-          />
-        </div>
       </div>
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

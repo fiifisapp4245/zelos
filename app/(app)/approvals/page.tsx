@@ -97,6 +97,7 @@ function Approvals() {
     router.replace(`/approvals${q.size ? `?${q}` : ""}`, { scroll: false })
   }
 
+  const search = params.get("q") ?? ""
   const [selected, setSelected] = React.useState<string[]>([])
   const [open, setOpen] = React.useState<ApprovalItem | null>(null)
   // State, not a ref: the drawer reads it while rendering to know where to
@@ -112,11 +113,19 @@ function Approvals() {
     employees,
     now: TODAY,
   })
+  const q = search.trim().toLowerCase()
   const items = getApprovalsForUser(session, pool, {
     tab,
     filters,
     employees,
     now: TODAY,
+  }).filter((i) => {
+    if (!q) return true
+    const who = employees.find((e) => e.id === i.requester)
+    return (
+      i.summary.toLowerCase().includes(q) ||
+      `${who?.firstName} ${who?.lastName}`.toLowerCase().includes(q)
+    )
   })
 
   const waitingCount = getApprovalsForUser(session, pool, {
@@ -192,10 +201,16 @@ function Approvals() {
               }).length,
             }))}
           />
+        </div>
 
+        {/* The filter bar carries its own card, so it sits under the tabs
+            rather than squeezed beside them. */}
+        <div className="mb-4">
           <ApprovalFiltersBar
             items={unfiltered}
             filters={filters}
+            search={search}
+            onSearch={(v) => pushQuery({ q: v || undefined })}
             onChange={(f) =>
               pushQuery({
                 module: f.module,
