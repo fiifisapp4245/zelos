@@ -111,14 +111,23 @@ export function Widget({
   )
 }
 
-/** The "View all (n)" link every queue ends with. */
-export function ViewAll({ href, count }: { href: string; count: number }) {
+/** The link through to the full list. The count is dropped when it is nil. */
+export function ViewAll({
+  href,
+  count,
+  label = "View more",
+}: {
+  href: string
+  count?: number
+  label?: string
+}) {
   return (
     <Link
       href={href}
       className="rounded text-sm font-medium text-primary transition-colors hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
     >
-      View all ({count})
+      {label}
+      {count ? ` (${count})` : ""}
     </Link>
   )
 }

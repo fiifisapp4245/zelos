@@ -5,7 +5,8 @@ import type { Employee } from "../types"
  * (Ghana Card, SSNIT, TIN, GhanaPost GPS, MoMo, GHS) to match the launch jurisdiction.
  */
 
-type Seed = Partial<Employee> & Pick<Employee, "id" | "firstName" | "lastName" | "jobTitle" | "department">
+type Seed = Partial<Employee> &
+  Pick<Employee, "id" | "firstName" | "lastName" | "jobTitle" | "department">
 
 const TONES = [
   "bg-emerald-600",
@@ -19,6 +20,18 @@ const TONES = [
   "bg-orange-700",
   "bg-cyan-700",
 ]
+
+/**
+ * A spread of birth dates rather than one shared default. Everyone having
+ * the same birthday is not just unrealistic — it left Celebrations
+ * permanently empty, since no date ever fell inside its seven-day window.
+ */
+function birthdayFor(index: number) {
+  const year = 1978 + ((index * 7) % 22)
+  const month = ((index * 5) % 12) + 1
+  const day = ((index * 11) % 27) + 1
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+}
 
 function defaults(seed: Seed, index: number): Employee {
   const first = seed.firstName
@@ -35,7 +48,7 @@ function defaults(seed: Seed, index: number): Employee {
     email: `${first.toLowerCase()}.${last.toLowerCase()}@xanthan.com`,
     personalEmail: `${first.toLowerCase()}${last.toLowerCase()}@gmail.com`,
     phone: `+233 2${index % 10} ${300 + index} ${1000 + index * 7}`,
-    dateOfBirth: "1992-08-14",
+    dateOfBirth: birthdayFor(index),
     gender: "female",
     nationality: "Ghanaian",
     ghanaCard: `GHA-${550000000 + index * 137}-${index % 10}`,
@@ -129,6 +142,7 @@ const SEEDS: Seed[] = [
     id: "kofi",
     firstName: "Kofi",
     lastName: "Mensah",
+    dateOfBirth: "1995-09-23",
     jobTitle: "Software Engineer",
     department: "Engineering",
     managerId: "adwoa",
@@ -155,6 +169,7 @@ const SEEDS: Seed[] = [
     id: "abena",
     firstName: "Abena",
     lastName: "Owusu",
+    dateOfBirth: "1990-09-20",
     jobTitle: "Marketing Lead",
     department: "Marketing",
     managerId: "yaw",
@@ -326,7 +341,7 @@ const SEEDS: Seed[] = [
     managerId: "yaw",
     gender: "male",
     branch: "Takoradi",
-    startDate: "2019-10-21",
+    startDate: "2019-09-22",
     compensation: { grossMonthly: 12400, payGrade: "L5" } as never,
   },
   {

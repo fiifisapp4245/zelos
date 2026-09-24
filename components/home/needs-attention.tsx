@@ -3,7 +3,7 @@
 import Link from "next/link"
 
 import { Initials } from "@/components/common"
-import { Widget, WidgetEmpty } from "./widget"
+import { ViewAll, Widget, WidgetEmpty } from "./widget"
 import { useStore } from "@/lib/store"
 import {
   attentionItemsFor,
@@ -44,11 +44,24 @@ export function NeedsAttention({ scope }: { scope?: WidgetScope }) {
     rows: items.filter((i) => bucketFor(i) === b),
   })).filter((g) => g.rows.length > 0)
 
+  /**
+   * These are not approvals, so "View more" cannot point at /approvals. It
+   * goes wherever the items in that scope are actually worked: compliance
+   * alerts for HR, the pay run for payroll, the team for a manager.
+   */
+  const more =
+    scope === "payroll"
+      ? { href: "/payroll", label: "Open payroll" }
+      : scope === "team"
+        ? { href: "/team", label: "View team" }
+        : { href: "/alerts", label: "View more" }
+
   return (
     <Widget
       title="Needs attention"
       count={items.length}
       fills
+      actions={<ViewAll href={more.href} label={more.label} />}
       bodyClassName="min-h-0 p-0"
     >
       {items.length === 0 ? (

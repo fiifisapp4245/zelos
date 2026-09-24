@@ -71,9 +71,9 @@ export function NeedsApproval({ scope }: { scope?: WidgetScope }) {
         title="Needs your approval"
         count={queue.length}
         weight="primary"
-        actions={
-          queue.length > 0 && <ViewAll href="/approvals" count={queue.length} />
-        }
+        // Always offered, empty or not: it is the way through to the full
+        // queue, the other tabs and the filters.
+        actions={<ViewAll href="/approvals" count={queue.length} />}
         bodyClassName="flex flex-col p-0"
       >
         {showFilters && (

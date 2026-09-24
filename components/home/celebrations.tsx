@@ -56,9 +56,25 @@ export function Celebrations({ scope }: { scope?: WidgetScope }) {
               </div>
               <button
                 type="button"
-                onClick={() =>
-                  toast.success(`Wishes sent to ${c.employee.firstName}`)
-                }
+                onClick={() => {
+                  // The wish becomes a real notification rather than a toast
+                  // that vanishes — it lands in the bell alongside the rest.
+                  store.addNotification({
+                    kind: "mention",
+                    title:
+                      c.kind === "birthday"
+                        ? `Birthday wishes sent to ${fullName(c.employee)}`
+                        : `Anniversary wishes sent to ${fullName(c.employee)}`,
+                    body:
+                      c.kind === "birthday"
+                        ? `${c.employee.firstName} is celebrating ${c.daysAway === 0 ? "today" : `on ${formatDate(c.on)}`}.`
+                        : `${c.years} ${c.years === 1 ? "year" : "years"} with the company.`,
+                    href: `/employees/${c.employee.id}`,
+                  })
+                  toast.success(
+                    `Wishes sent to ${c.employee.firstName} — added to your notifications`
+                  )
+                }}
                 className="shrink-0 rounded-lg border px-2.5 py-1 text-xs transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               >
                 Send wishes

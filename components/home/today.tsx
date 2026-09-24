@@ -3,7 +3,7 @@
 import Link from "next/link"
 
 import { Initials } from "@/components/common"
-import { Widget } from "./widget"
+import { ViewAll, Widget } from "./widget"
 import { useStore } from "@/lib/store"
 import { outToday, teamOf } from "@/lib/home/home-data"
 import { holidaysBetween } from "@/lib/fixtures/ghanaHolidays"
@@ -42,6 +42,7 @@ export function Today({ scope }: { scope?: WidgetScope }) {
     <Widget
       title="Today"
       weight="quiet"
+      actions={<ViewAll href="/leave" label="Open leave" />}
       description={new Date(TODAY_ISO).toLocaleDateString("en-GB", {
         weekday: "long",
         day: "numeric",

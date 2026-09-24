@@ -59,7 +59,7 @@ import type {
   PermissionRole,
   Requisition,
 } from "./types"
-import { TODAY_ISO } from "./format"
+import { TODAY, TODAY_ISO } from "./format"
 import type { Viewer } from "./rbac"
 import type { SessionContext } from "./session"
 
@@ -183,6 +183,8 @@ interface StoreValue extends State {
   moveCandidate: (id: string, stage: Candidate["stage"]) => void
   acknowledgeAlert: (id: string) => void
   markNotificationsRead: () => void
+  /** Puts a notification in the bell, where the rest of them live. */
+  addNotification: (n: Omit<Notification, "id" | "at" | "read">) => void
   addCoachingNote: (note: CoachingNote) => void
   escalateNote: (id: string) => void
   log: (
@@ -194,8 +196,17 @@ interface StoreValue extends State {
 /** Exported so a demo view can provide a starved store to a subtree. */
 export const StoreContext = React.createContext<StoreValue | null>(null)
 
+/**
+ * Writes are timestamped against the fixture's fixed TODAY, not the wall
+ * clock. Using the real date put anything you did during a demo six days in
+ * the future — "in 6 days" on a notification you just created. The counter
+ * keeps successive writes distinct so ordering stays stable.
+ */
+let writeSeq = 0
 function nowIso() {
-  return new Date().toISOString()
+  const t = new Date(TODAY)
+  t.setSeconds(t.getSeconds() + writeSeq++)
+  return t.toISOString()
 }
 
 /**
@@ -790,6 +801,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           alerts: s.alerts.map((a) =>
             a.id === id ? { ...a, acknowledged: true } : a
           ),
+        }))
+      },
+
+      addNotification: (n) => {
+        setState((s) => ({
+          ...s,
+          notifications: [
+            { ...n, id: uid("n"), at: nowIso(), read: false },
+            ...s.notifications,
+          ],
         }))
       },
 
