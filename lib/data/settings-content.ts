@@ -6,6 +6,16 @@
  * empty shell. Rendered generically by the settings detail route.
  */
 
+import { ATTENDANCE_POLICY } from "./attendance-log"
+import { SCHEDULE_POLICY } from "./schedules"
+
+/** Which one the company mostly is, which decides where Schedules opens. */
+const WORK_MODEL_LABEL = {
+  office: "Office hours",
+  mixed: "Mixed — office hours and rostered branches",
+  shift: "Shift-based",
+}
+
 export type Block =
   | {
       kind: "fields"
@@ -140,11 +150,37 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
     {
       kind: "fields",
       title: "Grace periods",
+      description:
+        "Lateness is measured against each person's own scheduled start — from their work pattern or their published shift — plus this grace. A pattern may set a shorter grace of its own.",
       rows: [
-        ["Late arrival grace", "15 minutes"],
-        ["Marked late after", "08:15"],
+        ["Company grace period", `${ATTENDANCE_POLICY.graceMinutes} minutes`],
+        ["Unfinished days closed at", ATTENDANCE_POLICY.autoCloseAt],
         ["Early departure grace", "10 minutes"],
         ["Minimum day for attendance credit", "4 hours"],
+      ],
+    },
+    {
+      kind: "fields",
+      title: "Roster thresholds",
+      description:
+        "What the roster warns about before a schedule is published. None of them blocks publishing.",
+      rows: [
+        [
+          "Weekly hours before overtime is flagged",
+          `${SCHEDULE_POLICY.overtimeWeeklyHours} hours`,
+        ],
+        [
+          "Minimum rest between shifts",
+          `${SCHEDULE_POLICY.shortRestHours} hours`,
+        ],
+        [
+          "Coverage warning",
+          `${SCHEDULE_POLICY.coverageWarnPercent}% of a department away on one day`,
+        ],
+        [
+          "Primary work model",
+          WORK_MODEL_LABEL[SCHEDULE_POLICY.primaryWorkModel],
+        ],
       ],
     },
     { kind: "managedTable", tableId: "overtime-rates" },
