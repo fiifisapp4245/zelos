@@ -1,100 +1,19 @@
 import type {
   ActingAssignment,
-  ApprovalRequest,
-  ApprovalStage,
   Employee,
   EmployeeDocument,
   LeaveRequest,
   PerformanceReview,
 } from "../types"
-import type { NavAudience } from "../nav/nav-config"
+import type { ApprovalItem, RoleChangePayload } from "../approvals/types"
 import type { WidgetScope } from "./home-config"
 import { TODAY, TODAY_ISO, daysUntil } from "../format"
 import { completeness } from "../selectors"
 
-/** The step a request is sitting on right now, if any. */
-export function currentStep(request: ApprovalRequest) {
-  return request.chain.find((s) => s.decision === "pending") ?? null
-}
-
-export function stepPosition(request: ApprovalRequest) {
-  const index = request.chain.findIndex((s) => s.decision === "pending")
-  return {
-    step: index === -1 ? request.chain.length : index + 1,
-    of: request.chain.length,
-  }
-}
-
-export const STAGE_LABEL: Record<ApprovalStage, string> = {
-  line_manager: "Line manager",
-  head_of_department: "HoD",
-  hr: "HR",
-  payroll: "Payroll",
-}
-
-/** Which stages a persona is allowed to act on. */
-const STAGES_BY_AUDIENCE: Record<NavAudience, ApprovalStage[]> = {
-  hr_admin: ["hr"],
-  manager: ["line_manager", "head_of_department"],
-  payroll: ["payroll"],
-  employee: [],
-}
-
-/**
- * The queue for one persona: only requests whose *current* step belongs to
- * them. An HR Admin sees the HR stage across the company; a manager sees only
- * their own people, and only while it is their turn.
- *
- * Sort is overdue first, then due today, then oldest — the order you would
- * work them in.
- */
-export function approvalsFor(
-  approvals: ApprovalRequest[],
-  audience: NavAudience,
-  viewerId: string,
-  employees: Employee[],
-  scope: WidgetScope | undefined
-): ApprovalRequest[] {
-  const stages = STAGES_BY_AUDIENCE[audience]
-  if (stages.length === 0) return []
-
-  const teamIds = new Set(
-    employees
-      .filter(
-        (e) => e.managerId === viewerId || e.dottedLineManagerId === viewerId
-      )
-      .map((e) => e.id)
-  )
-
-  return approvals
-    .filter((r) => r.status === "pending")
-    .filter((r) => {
-      const step = currentStep(r)
-      if (!step || !stages.includes(step.stage)) return false
-
-      // A document still waiting on the employee is their homework, not a
-      // queue item — it shows up on their own requests list instead.
-      if (r.kind === "document" && r.waitingOn === "employee") return false
-
-      if (scope === "payDetails" && r.kind !== "pay_details") return false
-      if (scope === "team" && !teamIds.has(r.employeeId)) return false
-      return true
-    })
-    .sort((a, b) => {
-      const da = daysUntil(a.dueOn) ?? 0
-      const db = daysUntil(b.dueOn) ?? 0
-      if (da !== db) return da - db
-      return a.submittedAt.localeCompare(b.submittedAt)
-    })
-}
-
 /** Requests belonging to one person, whatever stage they are at. */
-export function myRequests(
-  approvals: ApprovalRequest[],
-  employeeId: string
-): ApprovalRequest[] {
+export function myRequests(approvals: ApprovalItem[], employeeId: string) {
   return approvals
-    .filter((r) => r.employeeId === employeeId)
+    .filter((r) => r.requester === employeeId || r.subject === employeeId)
     .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
 }
 
@@ -147,7 +66,7 @@ export function attentionItemsFor({
   documents: EmployeeDocument[]
   acting: ActingAssignment[]
   reviews: PerformanceReview[]
-  approvals: ApprovalRequest[]
+  approvals: ApprovalItem[]
 }): AttentionItem[] {
   const inScope = (id: string) => {
     if (scope !== "team") return true
@@ -194,17 +113,18 @@ export function attentionItemsFor({
       }
     }
     for (const r of approvals) {
-      if (r.kind !== "lifecycle" || r.status !== "pending") continue
-      const e = byId(r.employeeId)
-      const d = daysUntil(r.effectiveDate)
+      if (r.module !== "lifecycle" || r.status !== "pending") continue
+      const p = r.payload as RoleChangePayload
+      const e = byId(r.subject)
+      const d = daysUntil(p.effectiveDate)
       // Anything landing inside this pay period changes what payroll owes.
       if (!e || d === null || d > 30) continue
       push({
         id: `lc-${r.id}`,
         kind: "lifecycleThisPeriod",
         employee: e,
-        issue: `${r.after.jobTitle} on ${r.after.payGrade} — effective this pay period`,
-        dueOn: r.effectiveDate,
+        issue: `${p.after.jobTitle} on ${p.after.payGrade} — effective this pay period`,
+        dueOn: p.effectiveDate,
         actionLabel: "Review",
         href: "/approvals",
       })

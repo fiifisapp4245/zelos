@@ -30,7 +30,10 @@ import {
   REVIEWS,
 } from "./data/records"
 import { TABLE_ROWS, TABLE_SPECS, type TableRow } from "./data/settings-tables"
-import { ACTING_ASSIGNMENTS, APPROVALS, PAYSLIPS } from "./data/approvals"
+import { ACTING_ASSIGNMENTS, PAYSLIPS } from "./data/approvals"
+import { APPROVAL_ITEMS } from "./data/approval-items"
+import { applyDecision } from "./approvals/selectors"
+import type { ApprovalItem, DecisionAction } from "./approvals/types"
 import type {
   Alert,
   CompanyProfile,
@@ -52,10 +55,8 @@ import type {
   OnboardingTask,
   PerformanceReview,
   ActingAssignment,
-  ApprovalRequest,
   Payslip,
   PermissionRole,
-  RequestStatus,
   Requisition,
 } from "./types"
 import { TODAY_ISO } from "./format"
@@ -81,7 +82,7 @@ interface State {
   branches: Branch[]
   alerts: Alert[]
   notifications: Notification[]
-  approvals: ApprovalRequest[]
+  approvals: ApprovalItem[]
   payslips: Payslip[]
   actingAssignments: ActingAssignment[]
   company: CompanyProfile
@@ -109,7 +110,7 @@ const INITIAL: State = {
   branches: BRANCHES,
   alerts: ALERTS,
   notifications: NOTIFICATIONS,
-  approvals: APPROVALS,
+  approvals: APPROVAL_ITEMS,
   payslips: PAYSLIPS,
   actingAssignments: ACTING_ASSIGNMENTS,
   company: COMPANY,
@@ -148,12 +149,14 @@ interface StoreValue extends State {
   ) => void
   submitLeave: (request: LeaveRequest) => void
   /**
-   * Decides the current step of an approval chain. The request only reaches a
-   * final status once every step has passed; a decline ends it immediately.
+   * Records a decision on the step an approval is sitting on. The pure
+   * applyDecision does the moving; this wires it to state and the audit log.
    */
-  decideApproval: (
-    id: string,
-    decision: "approved" | "declined",
+  decideApproval: (id: string, action: DecisionAction, note?: string) => void
+  /** Same decision across several items, for the bulk bar. */
+  decideApprovals: (
+    ids: string[],
+    action: DecisionAction,
     note?: string
   ) => void
   clockIn: () => void
@@ -185,6 +188,45 @@ export const StoreContext = React.createContext<StoreValue | null>(null)
 
 function nowIso() {
   return new Date().toISOString()
+}
+
+/**
+ * Applies one decision to several approvals and writes an audit entry for
+ * each. Bulk and single go through the same path so they cannot diverge.
+ */
+function decideIn(
+  s: State,
+  ids: string[],
+  action: DecisionAction,
+  note: string | undefined,
+  actorId: string
+): State {
+  const at = new Date().toISOString()
+  const entries: AuditEntry[] = []
+
+  const approvals = s.approvals.map((item) => {
+    if (!ids.includes(item.id) || item.status !== "pending") return item
+    const next = applyDecision(item, {
+      stepIndex: item.currentStepIndex,
+      actorId,
+      action,
+      note,
+      at,
+    })
+    entries.push({
+      id: uid("a"),
+      employeeId: item.subject,
+      actorId,
+      action: `${action[0].toUpperCase()}${action.slice(1)}d ${item.type}`,
+      field: item.id,
+      after: next.status,
+      at,
+      ...(note ? { purpose: note } : {}),
+    })
+    return next
+  })
+
+  return { ...s, approvals, auditLog: [...entries, ...s.auditLog] }
 }
 
 function uid(prefix: string) {
@@ -534,48 +576,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         }))
       },
 
-      decideApproval: (id, decision, note) => {
-        setState((s) => {
-          const request = s.approvals.find((r) => r.id === id)
-          if (!request) return s
+      decideApproval: (id, action, note) => {
+        setState((s) => decideIn(s, [id], action, note, actorId))
+      },
 
-          const at = nowIso()
-          let handled = false
-          const chain = request.chain.map((step) => {
-            if (handled || step.decision !== "pending") return step
-            handled = true
-            return { ...step, decision, decidedAt: at, note }
-          })
-
-          // A decline stops the chain; an approval only finishes the request
-          // once no step is still waiting.
-          const status: RequestStatus =
-            decision === "declined"
-              ? "rejected"
-              : chain.every((c) => c.decision === "approved")
-                ? "approved"
-                : "pending"
-
-          return {
-            ...s,
-            approvals: s.approvals.map((r) =>
-              r.id === id ? { ...r, chain, status, decisionNote: note } : r
-            ),
-            auditLog: [
-              {
-                id: uid("a"),
-                employeeId: request.employeeId,
-                actorId,
-                action: `${decision === "approved" ? "Approved" : "Declined"} ${request.kind.replace("_", " ")} request`,
-                field: id,
-                after: decision,
-                at,
-                ...(note ? { reason: note } : {}),
-              } as AuditEntry,
-              ...s.auditLog,
-            ],
-          }
-        })
+      decideApprovals: (ids, action, note) => {
+        setState((s) => decideIn(s, ids, action, note, actorId))
       },
 
       clockIn: () => {

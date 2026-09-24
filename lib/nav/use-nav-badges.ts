@@ -1,27 +1,22 @@
 "use client"
 
 import { useStore } from "../store"
-import { resolveAudience } from "./get-nav-for-user"
-import { approvalsFor } from "../home/home-data"
+import { getApprovalsForUser } from "../approvals/selectors"
+import { TODAY } from "../format"
 import type { NavBadgeKey } from "./nav-config"
 
 /**
- * The count beside Approvals. It reads the same queue Home renders, through
- * the same selector, so the badge and the page can never disagree.
+ * The count beside Approvals. It runs the same selector the Approvals page
+ * and the Home widget run, so the three can never disagree.
  */
 export function useNavBadges(): Record<NavBadgeKey, number> {
   const { session, approvals, employees } = useStore()
-  const audience = resolveAudience(session)
-
-  const scope =
-    audience === "manager"
-      ? "team"
-      : audience === "payroll"
-        ? "payDetails"
-        : "company"
 
   return {
-    approvals: approvalsFor(approvals, audience, session.id, employees, scope)
-      .length,
+    approvals: getApprovalsForUser(session, approvals, {
+      tab: "waiting",
+      employees,
+      now: TODAY,
+    }).length,
   }
 }

@@ -7,21 +7,25 @@ import { Pill } from "@/components/common"
 import { Widget, WidgetEmpty } from "./widget"
 import { Button } from "@/components/ui/button"
 import { useStore } from "@/lib/store"
-import {
-  STAGE_LABEL,
-  currentStep,
-  myRequests,
-  stepPosition,
-} from "@/lib/home/home-data"
-import { LEAVE_TYPE_LABEL, formatDate, relativeTime } from "@/lib/format"
-import type { ApprovalRequest } from "@/lib/types"
+import { myRequests } from "@/lib/home/home-data"
+import { currentStep, stepPosition } from "@/lib/approvals/selectors"
+import { TYPE_LABEL } from "@/lib/approvals/approval-chains"
+import { relativeTime } from "@/lib/format"
+import type { ApprovalItem } from "@/lib/approvals/types"
 import { cn } from "@/lib/utils"
 
 const STATUS_TONE = {
   pending: "warning",
   approved: "success",
-  rejected: "danger",
+  declined: "danger",
   cancelled: "neutral",
+} as const
+
+const STATUS_LABEL = {
+  pending: "Pending",
+  approved: "Approved",
+  declined: "Declined",
+  cancelled: "Cancelled",
 } as const
 
 /** What I have asked for, and who it is sitting with. */
@@ -44,25 +48,32 @@ export function MyRequests() {
   )
 }
 
-function Row({ request }: { request: ApprovalRequest }) {
+/** Which way a step went, if it has been decided at all. */
+function decided(item: ApprovalItem, stepIndex: number) {
+  const d = item.history.find((h) => h.stepIndex === stepIndex)
+  if (!d) return null
+  return d.action === "approve" || d.action === "verify" ? "approve" : "decline"
+}
+
+function Row({ request }: { request: ApprovalItem }) {
   const store = useStore()
   const { step, of } = stepPosition(request)
   const stage = currentStep(request)
-  const waiting =
-    request.kind === "document" && request.waitingOn === "employee"
 
   return (
     <li className="flex flex-wrap items-start gap-3 px-5 py-3.5">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium">{title(request)}</span>
+          <span className="text-sm font-medium">
+            {TYPE_LABEL[request.type]}
+          </span>
           <Pill tone={STATUS_TONE[request.status]}>
-            {request.status === "rejected"
-              ? "Declined"
-              : capitalise(request.status)}
+            {STATUS_LABEL[request.status]}
           </Pill>
-          {waiting && <Pill tone="warning">Waiting on you</Pill>}
         </div>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          {request.summary}
+        </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
           Raised {relativeTime(request.submittedAt)}
           {request.status === "pending" && stage && (
@@ -72,14 +83,14 @@ function Row({ request }: { request: ApprovalRequest }) {
                 Step {step} of {of}
               </span>
               {" · with "}
-              {STAGE_LABEL[stage.stage]}
+              {stage.label}
             </>
           )}
         </p>
 
         <ol className="mt-1.5 flex flex-wrap items-center gap-1">
           {request.chain.map((s, i) => (
-            <li key={`${s.stage}-${i}`} className="flex items-center gap-1">
+            <li key={`${s.role}-${i}`} className="flex items-center gap-1">
               {i > 0 && (
                 <span className="text-muted-foreground/40" aria-hidden>
                   ›
@@ -88,14 +99,15 @@ function Row({ request }: { request: ApprovalRequest }) {
               <span
                 className={cn(
                   "rounded px-1.5 py-0.5 text-[11px]",
-                  s.decision === "approved" && "bg-success-muted text-primary",
-                  s.decision === "declined" &&
+                  decided(request, i) === "approve" &&
+                    "bg-success-muted text-primary",
+                  decided(request, i) === "decline" &&
                     "bg-danger-muted text-destructive",
-                  s.decision === "pending" && "bg-muted text-muted-foreground"
+                  !decided(request, i) && "bg-muted text-muted-foreground"
                 )}
               >
-                {STAGE_LABEL[s.stage]}
-                {s.decision === "approved" && " ✓"}
+                {s.label}
+                {decided(request, i) === "approve" && " ✓"}
               </span>
             </li>
           ))}
@@ -110,7 +122,7 @@ function Row({ request }: { request: ApprovalRequest }) {
             onClick={() => {
               store.decideApproval(
                 request.id,
-                "declined",
+                "decline",
                 "Cancelled by the requester"
               )
               toast.success("Request cancelled")
@@ -125,21 +137,4 @@ function Row({ request }: { request: ApprovalRequest }) {
       </div>
     </li>
   )
-}
-
-function title(r: ApprovalRequest) {
-  switch (r.kind) {
-    case "leave":
-      return `${LEAVE_TYPE_LABEL[r.leaveType]} leave · ${formatDate(r.startDate)} – ${formatDate(r.endDate)}`
-    case "pay_details":
-      return `${r.method === "bank" ? "Bank account" : "Mobile money"} change`
-    case "lifecycle":
-      return `${r.after.jobTitle} from ${formatDate(r.effectiveDate)}`
-    case "document":
-      return r.documentName
-  }
-}
-
-function capitalise(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1)
 }
