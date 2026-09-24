@@ -213,7 +213,9 @@ export const PAY_PERIODS: PayPeriod[] = [
     label: "September 2026",
     start: "2026-09-01",
     end: "2026-09-30",
-    status: "inReview",
+    // Timesheets are settled, which is what lets the September payroll
+    // run be calculated at all.
+    status: "readyForPayroll",
   },
   {
     id: "pp-2026-08",

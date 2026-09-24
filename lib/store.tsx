@@ -47,6 +47,13 @@ import {
 } from "./data/schedules"
 import { RECONCILIATIONS } from "./data/reconciliations"
 import {
+  EXTERNAL_RESULTS,
+  LINE_ADJUSTMENTS,
+  ONE_OFF_PAYMENTS,
+  PAYROLL_RUNS,
+  READINESS_ACKNOWLEDGEMENTS,
+} from "./data/payroll"
+import {
   APPROVAL_SETTINGS,
   ASSIGNMENTS_ABROAD,
   CHANGE_REQUESTS,
@@ -73,6 +80,12 @@ import type { Reconciliation } from "./leave/reconcile"
 import type {
   ApprovalSettings,
   AssignmentAbroad,
+  ExternalResult,
+  LineAdjustment,
+  OneOffPayment,
+  PayrollRun,
+  ReadinessAcknowledgement,
+  RunStatus,
   CompensationChangeRequest,
   CompensationVersion,
   CountryRulePack,
@@ -147,6 +160,11 @@ interface State {
   changeRequests: CompensationChangeRequest[]
   assignmentsAbroad: AssignmentAbroad[]
   approvalSettings: ApprovalSettings
+  payrollRuns: PayrollRun[]
+  lineAdjustments: LineAdjustment[]
+  oneOffPayments: OneOffPayment[]
+  externalResults: ExternalResult[]
+  readinessAcknowledgements: ReadinessAcknowledgement[]
   clockEvents: ClockEvent[]
   timeAdjustments: TimeAdjustment[]
   exceptionResolutions: ExceptionResolution[]
@@ -193,6 +211,11 @@ const INITIAL: State = {
   changeRequests: CHANGE_REQUESTS,
   assignmentsAbroad: ASSIGNMENTS_ABROAD,
   approvalSettings: APPROVAL_SETTINGS,
+  payrollRuns: PAYROLL_RUNS,
+  lineAdjustments: LINE_ADJUSTMENTS,
+  oneOffPayments: ONE_OFF_PAYMENTS,
+  externalResults: EXTERNAL_RESULTS,
+  readinessAcknowledgements: READINESS_ACKNOWLEDGEMENTS,
   clockEvents: CLOCK_EVENTS,
   timeAdjustments: TIME_ADJUSTMENTS,
   exceptionResolutions: EXCEPTION_RESOLUTIONS,
@@ -212,7 +235,7 @@ const STORAGE_KEY = "zelos-hr-session"
  * this week's types is how you get a crash three screens away from the
  * change that caused it.
  */
-const STORAGE_VERSION = 4
+const STORAGE_VERSION = 5
 
 interface StoreValue extends State {
   viewer: Viewer
@@ -311,6 +334,31 @@ interface StoreValue extends State {
   savePayGroup: (group: PayGroup) => void
   savePayComponent: (component: PayComponent) => void
   saveApprovalSettings: (patch: Partial<ApprovalSettings>) => void
+
+  /**
+   * A run moves forward a step at a time and records who moved it.
+   * Nothing here edits an approved run: a correction is a new off-cycle
+   * run, not a rewrite of one that has been signed off.
+   */
+  advanceRun: (id: string, to: RunStatus, note?: string) => void
+  decideRun: (
+    id: string,
+    outcome: "approved" | "rejected",
+    reason: string
+  ) => void
+  addLineAdjustment: (draft: Omit<LineAdjustment, "id" | "by" | "at">) => void
+  acknowledgeReadiness: (runId: string, checkId: string, reason: string) => void
+  importExternalResults: (runId: string, rows: ExternalResult[]) => void
+  startOffCycleRun: (draft: {
+    payGroupId: string
+    employeeIds: string[]
+    reason: string
+    payDate: string
+  }) => PayrollRun
+  addOneOffPayment: (
+    draft: Omit<OneOffPayment, "id" | "status" | "includedInRunId" | "events">
+  ) => void
+  cancelOneOffPayment: (id: string, reason: string) => void
   decideTimesheet: (
     periodId: string,
     employeeIds: string[],
@@ -341,6 +389,31 @@ interface StoreValue extends State {
     entry: Omit<AuditEntry, "id" | "at" | "actorId"> & { actorId?: string }
   ) => void
   reset: () => void
+}
+
+/** What each step of a run is called in its own history. */
+const RUN_STEP_LABEL: Record<RunStatus, string> = {
+  upcoming: "Reopened",
+  inputs_open: "Inputs opened",
+  inputs_locked: "Inputs locked",
+  calculated: "Calculated",
+  pending_approval: "Submitted for approval",
+  approved: "Approved",
+  paying: "Payments started",
+  paid: "Paid",
+}
+
+/**
+ * The rate used to state a foreign-currency run in the reporting
+ * currency, fixed at the moment of approval so a later market move
+ * cannot restate a run that has already been signed off.
+ */
+function FX_AT_APPROVAL(payGroupId: string, at: string) {
+  if (payGroupId === "pg-contractors")
+    return [{ from: "USD", to: "GHS", rate: 12.42, capturedAt: at }]
+  if (payGroupId === "pg-ng-monthly")
+    return [{ from: "NGN", to: "GHS", rate: 0.0079, capturedAt: at }]
+  return []
 }
 
 /** Exported so a demo view can provide a starved store to a subtree. */
@@ -1277,6 +1350,214 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setState((s) => ({
           ...s,
           approvalSettings: { ...s.approvalSettings, ...patch },
+        }))
+      },
+
+      /* ── Payroll runs ──────────────────────────────────────────── */
+
+      advanceRun: (id, to, note) => {
+        setState((s) => ({
+          ...s,
+          payrollRuns: s.payrollRuns.map((r) =>
+            r.id === id
+              ? {
+                  ...r,
+                  status: to,
+                  submittedAt:
+                    to === "pending_approval" ? nowIso() : r.submittedAt,
+                  events: [
+                    ...r.events,
+                    {
+                      at: nowIso(),
+                      by: actorId,
+                      action: RUN_STEP_LABEL[to],
+                      ...(note ? { note } : {}),
+                    },
+                  ],
+                }
+              : r
+          ),
+        }))
+      },
+
+      decideRun: (id, outcome, reason) => {
+        setState((s) => {
+          const run = s.payrollRuns.find((r) => r.id === id)
+          if (!run) return s
+          const at = nowIso()
+          return {
+            ...s,
+            payrollRuns: s.payrollRuns.map((r) =>
+              r.id === id
+                ? {
+                    ...r,
+                    // A rejection sends it back to the preparer with the
+                    // reason attached; it does not discard the work.
+                    status: outcome === "approved" ? "approved" : "calculated",
+                    decision: { by: actorId, at, outcome, reason },
+                    fxRates:
+                      outcome === "approved" && r.fxRates.length === 0
+                        ? FX_AT_APPROVAL(r.payGroupId, at)
+                        : r.fxRates,
+                    events: [
+                      ...r.events,
+                      {
+                        at,
+                        by: actorId,
+                        action:
+                          outcome === "approved" ? "Approved" : "Rejected",
+                        note: reason,
+                      },
+                    ],
+                  }
+                : r
+            ),
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: null,
+                actorId,
+                action: `${outcome === "approved" ? "Approved" : "Rejected"} payroll run ${id}`,
+                field: id,
+                after: reason,
+                at,
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      addLineAdjustment: (draft) => {
+        setState((s) => ({
+          ...s,
+          lineAdjustments: [
+            ...s.lineAdjustments,
+            { ...draft, id: uid("adj"), by: actorId, at: nowIso() },
+          ],
+          payrollRuns: s.payrollRuns.map((r) =>
+            r.id === draft.runId
+              ? {
+                  ...r,
+                  events: [
+                    ...r.events,
+                    {
+                      at: nowIso(),
+                      by: actorId,
+                      action: "Adjustment added",
+                      note: draft.note,
+                    },
+                  ],
+                }
+              : r
+          ),
+        }))
+      },
+
+      acknowledgeReadiness: (runId, checkId, reason) => {
+        setState((s) => ({
+          ...s,
+          // Append-only: an acknowledgement is a decision somebody made,
+          // and it stays on the run whatever happens next.
+          readinessAcknowledgements: [
+            ...s.readinessAcknowledgements,
+            { runId, checkId, by: actorId, reason, at: nowIso() },
+          ],
+        }))
+      },
+
+      importExternalResults: (runId, rows) => {
+        setState((s) => ({
+          ...s,
+          externalResults: [
+            ...s.externalResults.filter((r) => r.runId !== runId),
+            ...rows.map((r) => ({ ...r, runId })),
+          ],
+          payrollRuns: s.payrollRuns.map((r) =>
+            r.id === runId
+              ? {
+                  ...r,
+                  status: "calculated" as const,
+                  events: [
+                    ...r.events,
+                    {
+                      at: nowIso(),
+                      by: actorId,
+                      action: "Results uploaded",
+                      note: `${rows.length} lines from the provider's file.`,
+                    },
+                  ],
+                }
+              : r
+          ),
+        }))
+      },
+
+      startOffCycleRun: (draft) => {
+        const run: PayrollRun = {
+          id: uid("run"),
+          payGroupId: draft.payGroupId,
+          kind: "off_cycle",
+          periodStart: TODAY_ISO,
+          periodEnd: TODAY_ISO,
+          payDate: draft.payDate,
+          status: "inputs_open",
+          preparedBy: actorId,
+          submittedAt: null,
+          decision: null,
+          fxRates: [],
+          employeeIds: draft.employeeIds,
+          reason: draft.reason,
+          events: [
+            {
+              at: nowIso(),
+              by: actorId,
+              action: "Off-cycle run started",
+              note: draft.reason,
+            },
+          ],
+        }
+        setState((s) => ({ ...s, payrollRuns: [run, ...s.payrollRuns] }))
+        return run
+      },
+
+      addOneOffPayment: (draft) => {
+        setState((s) => ({
+          ...s,
+          oneOffPayments: [
+            {
+              ...draft,
+              id: uid("oo"),
+              status: "upcoming",
+              includedInRunId: null,
+              events: [{ at: nowIso(), by: actorId, action: "Added" }],
+            },
+            ...s.oneOffPayments,
+          ],
+        }))
+      },
+
+      cancelOneOffPayment: (id, reason) => {
+        setState((s) => ({
+          ...s,
+          // Cancelling writes an event. There is no delete in Pay.
+          oneOffPayments: s.oneOffPayments.map((o) =>
+            o.id === id
+              ? {
+                  ...o,
+                  status: "cancelled" as const,
+                  events: [
+                    ...o.events,
+                    {
+                      at: nowIso(),
+                      by: actorId,
+                      action: "Cancelled",
+                      note: reason,
+                    },
+                  ],
+                }
+              : o
+          ),
         }))
       },
 

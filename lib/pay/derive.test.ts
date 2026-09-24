@@ -80,6 +80,18 @@ const RULE_PACK: CountryRulePack = {
   employerContributionRules: [
     { id: "ssnit", name: "SSNIT employer", percentOfBase: 13, note: "" },
   ],
+  employeeContributionRules: [
+    {
+      id: "ssnit-employee",
+      name: "SSNIT employee",
+      percentOfBase: 5.5,
+      note: "",
+    },
+  ],
+  taxBands: [
+    { upTo: 490, ratePercent: 0 },
+    { upTo: null, ratePercent: 25 },
+  ],
   statutoryReports: [],
   filingDeadlines: [],
   updates: [],
@@ -441,11 +453,11 @@ describe("who may see pay", () => {
   const employee = { employeeId: "kofi", roles: ["employee" as const] }
 
   it("gives a manager their own reports and nobody else", () => {
-    expect(payScope(manager, people).map((e) => e.id).sort()).toEqual([
-      "adwoa",
-      "afia",
-      "kofi",
-    ])
+    expect(
+      payScope(manager, people)
+        .map((e) => e.id)
+        .sort()
+    ).toEqual(["adwoa", "afia", "kofi"])
   })
 
   it("gives payroll everyone, and lets them change nothing", () => {

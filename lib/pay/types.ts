@@ -66,6 +66,21 @@ export interface ComponentTreatment {
   cap?: number
 }
 
+/** What the employee pays out of their own gross, by the country's rules. */
+export interface EmployeeContributionRule {
+  id: string
+  name: string
+  percentOfBase: number
+  note: string
+}
+
+/** A slice of taxable pay and the rate that applies to it. */
+export interface TaxBand {
+  /** Width of the band per period. The last band is open-ended. */
+  upTo: number | null
+  ratePercent: number
+}
+
 export interface EmployerContributionRule {
   id: string
   name: string
@@ -87,6 +102,9 @@ export interface CountryRulePack {
   /** componentId → how that component is treated in this country. */
   componentTreatments: Record<string, ComponentTreatment>
   employerContributionRules: EmployerContributionRule[]
+  employeeContributionRules: EmployeeContributionRule[]
+  /** Applied in order to taxable pay, per pay period. */
+  taxBands: TaxBand[]
   statutoryReports: string[]
   filingDeadlines: { name: string; due: string }[]
   updates: RulePackUpdate[]
@@ -218,3 +236,161 @@ export interface AssignmentAbroad {
 
 /** The point at which residency usually moves. */
 export const RESIDENCY_THRESHOLD_DAYS = 183
+
+/* ── Payroll runs ────────────────────────────────────────────────────── */
+
+export type RunKind = "regular" | "off_cycle"
+
+/**
+ * Where a run has got to. The order is the stepper, and every state has
+ * a word — a run is too consequential to be told apart by colour.
+ */
+export type RunStatus =
+  | "upcoming"
+  | "inputs_open"
+  | "inputs_locked"
+  | "calculated"
+  | "pending_approval"
+  | "approved"
+  | "paying"
+  | "paid"
+
+/** Append-only. A run's history is part of the run. */
+export interface PayrollEvent {
+  at: string
+  by: string
+  action: string
+  note?: string
+}
+
+/** The rate used to state one currency in another, fixed when approved. */
+export interface FxRate {
+  from: Currency
+  to: Currency
+  rate: number
+  capturedAt: string
+}
+
+export interface PayrollRun {
+  id: string
+  payGroupId: string
+  kind: RunKind
+  periodStart: string
+  periodEnd: string
+  payDate: string
+  status: RunStatus
+  preparedBy: string
+  submittedAt: string | null
+  decision: {
+    by: string
+    at: string
+    outcome: "approved" | "rejected"
+    reason: string
+  } | null
+  /** Captured at approval, so a later market move cannot restate a run. */
+  fxRates: FxRate[]
+  events: PayrollEvent[]
+  /** Off-cycle runs name who they are for and why they exist. */
+  employeeIds?: string[]
+  reason?: string
+}
+
+export interface LineItem {
+  componentId: string
+  label: string
+  amount: number
+}
+
+/** A hand-made change to one line, with the person who made it attached. */
+export interface LineAdjustment {
+  id: string
+  runId: string
+  employeeId: string
+  componentId: string
+  amount: number
+  direction: "add" | "deduct"
+  note: string
+  by: string
+  at: string
+}
+
+/**
+ * Why a line is worth a second look. Never colour alone: each one has a
+ * sentence attached wherever it is shown.
+ */
+export type LineFlag =
+  | "netChange"
+  | "newPayee"
+  | "changedPaymentDetails"
+  | "missingPaymentDetails"
+  | "zeroOrNegativeNet"
+
+export interface PayrollLine {
+  runId: string
+  employeeId: string
+  earnings: LineItem[]
+  deductions: LineItem[]
+  employerContributions: LineItem[]
+  adjustments: LineAdjustment[]
+  gross: number
+  net: number
+  /** Null where this is the first run the person has appeared in. */
+  previousNet: number | null
+  /** Carried on the line so no total has to look up which run it came from. */
+  currency: Currency
+  paymentChannel: PaymentChannel | null
+  paymentDestinationMasked: string | null
+  flags: LineFlag[]
+}
+
+/* ── One-off payments ────────────────────────────────────────────────── */
+
+export type OneOffStatus = "upcoming" | "included" | "paid" | "cancelled"
+
+export interface OneOffPayment {
+  id: string
+  employeeId: string
+  componentId: string
+  amount: number
+  /** Gross is what it costs; net is what the person receives. */
+  basis: "gross" | "net"
+  payFromDate: string
+  recurrence: "once" | "monthly_for_n"
+  /** How many months, where the recurrence repeats. */
+  months?: number
+  status: OneOffStatus
+  includedInRunId: string | null
+  note?: string
+  events: PayrollEvent[]
+}
+
+/* ── Readiness ───────────────────────────────────────────────────────── */
+
+export interface ReadinessCheck {
+  id: string
+  label: string
+  severity: "blocker" | "warning"
+  status: "pass" | "fail" | "acknowledged"
+  detail: string
+  /** Where the thing is actually fixed. */
+  link: string
+  acknowledgement?: { by: string; reason: string; at: string }
+}
+
+/** Somebody deciding to proceed with a warning, on the record. */
+export interface ReadinessAcknowledgement {
+  runId: string
+  checkId: string
+  by: string
+  reason: string
+  at: string
+}
+
+/** A gross-to-net result uploaded from a provider, for external groups. */
+export interface ExternalResult {
+  runId: string
+  employeeId: string
+  gross: number
+  deductions: number
+  net: number
+}

@@ -27,7 +27,8 @@ export function payRoleOf(viewer: Viewer): PayRole {
 export function payScope(viewer: Viewer, employees: Employee[]): Employee[] {
   const role = payRoleOf(viewer)
   if (role === "approver" || role === "reader") return employees
-  if (role === "self") return employees.filter((e) => e.id === viewer.employeeId)
+  if (role === "self")
+    return employees.filter((e) => e.id === viewer.employeeId)
   return employees.filter(
     (e) =>
       e.managerId === viewer.employeeId ||

@@ -309,7 +309,13 @@ const SEEDS: Seed[] = [
     contractType: "fixed_term",
     contractEndDate: "2026-11-30",
     startDate: "2025-09-01",
-    compensation: { grossMonthly: 1800, payGrade: "L1" } as never,
+    // No payment details on file yet, which the payroll run flags rather
+    // than quietly paying nobody.
+    compensation: {
+      grossMonthly: 1800,
+      payGrade: "L1",
+      momoNumber: "",
+    } as never,
   },
   {
     id: "mensa",

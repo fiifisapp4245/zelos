@@ -57,6 +57,25 @@ const GHANA_RULES: CountryRulePack = {
     "pc-ssnit-employer": { taxable: false, socialSecurity: true },
     "pc-tier2": { taxable: false, socialSecurity: true },
   },
+  employeeContributionRules: [
+    {
+      id: "ssnit-employee",
+      name: "SSNIT Tier 1 & 2 (employee)",
+      percentOfBase: 5.5,
+      note: "Deducted from gross before PAYE is worked out.",
+    },
+  ],
+  // Monthly bands, applied in order to taxable pay after the social
+  // security deduction. Placeholder figures, as above.
+  taxBands: [
+    { upTo: 490, ratePercent: 0 },
+    { upTo: 110, ratePercent: 5 },
+    { upTo: 130, ratePercent: 10 },
+    { upTo: 3166.67, ratePercent: 17.5 },
+    { upTo: 16000, ratePercent: 25 },
+    { upTo: 30520, ratePercent: 30 },
+    { upTo: null, ratePercent: 35 },
+  ],
   employerContributionRules: [
     {
       id: "ssnit-tier1",
@@ -234,9 +253,14 @@ export const ASSIGNMENTS_ABROAD: AssignmentAbroad[] = [
 /* ── Versions ────────────────────────────────────────────────────────── */
 
 const NIGERIA_STAFF = ["abena", "kwesi", "akos"]
-const CONTRACTORS: Record<string, { country: string; monthly: number }> = {
+const CONTRACTORS: Record<
+  string,
+  { country: string; monthly: number; from?: string }
+> = {
   kwame: { country: "Kenya", monthly: 4200 },
-  harriet: { country: "United Kingdom", monthly: 5800 },
+  // Engaged from September, which is why the contractor run flags her
+  // as somebody who was not paid last month.
+  harriet: { country: "United Kingdom", monthly: 5800, from: "2026-09-01" },
 }
 
 /** Nigeria salaries in naira, which are not Ghana salaries converted. */
@@ -483,9 +507,9 @@ export const COMPENSATION_VERSIONS: CompensationVersion[] = ON_STRENGTH.flatMap(
 
     return chain(e.id, [
       {
-        effectiveFrom: "2026-01-01",
+        effectiveFrom: contractor?.from ?? "2026-01-01",
         base,
-        reason: OPENING,
+        reason: contractor ? "Contract start" : OPENING,
         proposedBy: "fiifi",
         approvedBy: "esi",
       },
