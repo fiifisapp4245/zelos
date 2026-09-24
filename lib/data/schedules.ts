@@ -460,7 +460,12 @@ export const SHIFT_CHANGES: ShiftChange[] = [
 
 /** Positions the roster offers, taken from what is already rostered. */
 export const SHIFT_POSITIONS = [
-  ...new Set([...SHIFTS.map((s) => s.position), "Goods in", "Counter cover"]),
+  ...new Set([
+    ...SHIFTS.map((s) => s.position),
+    "Cover",
+    "Goods in",
+    "Counter cover",
+  ]),
 ].sort()
 
 export const ROSTER_BRANCHES = [...new Set(SHIFTS.map((s) => s.branch))].sort()

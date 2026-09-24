@@ -158,6 +158,22 @@ describe("dayRecordFor", () => {
     expect(r.lateByMinutes).toBe(20)
   })
 
+  it("measures a rostered day against the shift, not the pattern", () => {
+    // The office pattern would have had him starting at 08:00; the
+    // published shift says 14:00, so arriving at 14:05 is not late.
+    const r = dayRecordFor(
+      "kofi",
+      "2026-09-16",
+      input({
+        shifts: [shift()],
+        events: [event({ clockIn: "14:05", clockOut: "22:00" })],
+      })
+    )
+    expect(r.scheduled?.from).toBe("shift")
+    expect(r.code).toBe("P")
+    expect(r.hours).toBe(6.92)
+  })
+
   it("calls a captured web day from home remote", () => {
     const r = dayRecordFor(
       "kofi",
