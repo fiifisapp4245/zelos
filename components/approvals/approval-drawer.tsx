@@ -32,9 +32,12 @@ export function ApprovalDrawer({
   item,
   onClose,
   onDecide,
+  returnFocusTo,
 }: {
   item: ApprovalItem | null
   onClose: () => void
+  /** The row that opened it, so focus goes back where it came from. */
+  returnFocusTo?: HTMLElement | null
   onDecide: (
     item: ApprovalItem,
     action: "approve" | "decline" | "verify" | "reject",
@@ -53,7 +56,15 @@ export function ApprovalDrawer({
     <Sheet open onOpenChange={(v) => !v && onClose()}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[560px]"
+        // The sheet defaults to w-3/4 and max-w-sm at the same specificity,
+        // so both need naming to reach full screen on a phone and 560 above.
+        className="flex flex-col gap-0 overflow-hidden p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[560px]"
+        // Radix restores focus after the close handler runs, so returning it
+        // to the row has to happen here or it lands on the body.
+        onCloseAutoFocus={(e) => {
+          e.preventDefault()
+          returnFocusTo?.focus()
+        }}
       >
         <SheetHeader className="space-y-0 border-b px-5 py-4 text-left">
           <SheetTitle className="text-base">{TYPE_LABEL[item.type]}</SheetTitle>

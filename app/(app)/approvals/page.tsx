@@ -98,7 +98,9 @@ function Approvals() {
 
   const [selected, setSelected] = React.useState<string[]>([])
   const [open, setOpen] = React.useState<ApprovalItem | null>(null)
-  const openedFrom = React.useRef<HTMLElement | null>(null)
+  // State, not a ref: the drawer reads it while rendering to know where to
+  // put focus back.
+  const [openedFrom, setOpenedFrom] = React.useState<HTMLElement | null>(null)
 
   // Nothing is fetched for an employee, so nothing flashes before the
   // redirect lands.
@@ -128,7 +130,6 @@ function Approvals() {
 
   function closeDrawer() {
     setOpen(null)
-    openedFrom.current?.focus()
   }
 
   function decide(item: ApprovalItem, action: DecisionAction, note?: string) {
@@ -311,7 +312,7 @@ function Approvals() {
                         : undefined
                     }
                     onOpen={(el) => {
-                      openedFrom.current = el
+                      setOpenedFrom(el)
                       setOpen(item)
                     }}
                   />
@@ -330,7 +331,12 @@ function Approvals() {
         />
       )}
 
-      <ApprovalDrawer item={open} onClose={closeDrawer} onDecide={decide} />
+      <ApprovalDrawer
+        item={open}
+        onClose={closeDrawer}
+        onDecide={decide}
+        returnFocusTo={openedFrom}
+      />
     </PageShell>
   )
 }
