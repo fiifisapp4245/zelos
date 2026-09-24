@@ -32,6 +32,24 @@ import {
 import { TABLE_ROWS, TABLE_SPECS, type TableRow } from "./data/settings-tables"
 import { ACTING_ASSIGNMENTS, PAYSLIPS } from "./data/approvals"
 import { APPROVAL_ITEMS } from "./data/approval-items"
+import {
+  CLOCK_EVENTS,
+  EMPLOYEE_SCHEDULES,
+  EXCEPTION_RESOLUTIONS,
+  PAY_PERIODS,
+  TIMESHEETS as PERIOD_TIMESHEETS,
+  TIME_ADJUSTMENTS,
+  WORK_PATTERNS,
+} from "./data/attendance-log"
+import type {
+  ClockEvent,
+  EmployeeSchedule,
+  ExceptionResolution,
+  PayPeriod,
+  TimeAdjustment,
+  Timesheet,
+  WorkPattern,
+} from "./attendance/types"
 import { applyDecision } from "./approvals/selectors"
 import type { ApprovalItem, DecisionAction } from "./approvals/types"
 import type {
@@ -84,6 +102,13 @@ interface State {
   notifications: Notification[]
   approvals: ApprovalItem[]
   payslips: Payslip[]
+  workPatterns: WorkPattern[]
+  employeeSchedules: EmployeeSchedule[]
+  clockEvents: ClockEvent[]
+  timeAdjustments: TimeAdjustment[]
+  exceptionResolutions: ExceptionResolution[]
+  payPeriods: PayPeriod[]
+  timesheets: Timesheet[]
   actingAssignments: ActingAssignment[]
   company: CompanyProfile
   /** Editable settings tables, keyed by table id. */
@@ -112,6 +137,13 @@ const INITIAL: State = {
   notifications: NOTIFICATIONS,
   approvals: APPROVAL_ITEMS,
   payslips: PAYSLIPS,
+  workPatterns: WORK_PATTERNS,
+  employeeSchedules: EMPLOYEE_SCHEDULES,
+  clockEvents: CLOCK_EVENTS,
+  timeAdjustments: TIME_ADJUSTMENTS,
+  exceptionResolutions: EXCEPTION_RESOLUTIONS,
+  payPeriods: PAY_PERIODS,
+  timesheets: PERIOD_TIMESHEETS,
   actingAssignments: ACTING_ASSIGNMENTS,
   company: COMPANY,
   tables: TABLE_ROWS,
@@ -169,6 +201,30 @@ interface StoreValue extends State {
   ) => void
   clockIn: () => void
   clockOut: () => void
+
+  /**
+   * Corrections never touch the reading they supersede. This files a new
+   * adjustment against the original event, pending a decision.
+   */
+  requestCorrection: (
+    input: Omit<TimeAdjustment, "id" | "requestedBy" | "requestedAt" | "status">
+  ) => void
+  decideCorrection: (id: string, status: "approved" | "declined") => void
+  /** Marks an exception dealt with. The record underneath is untouched. */
+  resolveException: (
+    key: string,
+    action: ExceptionResolution["action"],
+    note?: string
+  ) => void
+  reopenException: (key: string) => void
+  decideTimesheet: (
+    periodId: string,
+    employeeIds: string[],
+    status: Timesheet["status"],
+    comment?: string
+  ) => void
+  submitTimesheet: (periodId: string, employeeId: string) => void
+  closePayPeriod: (periodId: string) => void
   cancelLeave: (id: string) => void
   addOnboardingTask: (task: OnboardingTask) => void
   deleteOnboardingTask: (id: string) => void
@@ -662,6 +718,102 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             ),
           }
         })
+      },
+
+      requestCorrection: (draft) => {
+        setState((s) => ({
+          ...s,
+          timeAdjustments: [
+            {
+              ...draft,
+              id: uid("adj"),
+              requestedBy: actorId,
+              requestedAt: nowIso(),
+              status: "pending",
+            },
+            ...s.timeAdjustments,
+          ],
+          auditLog: [
+            {
+              id: uid("a"),
+              employeeId: draft.employeeId,
+              actorId,
+              action: `Requested a time correction for ${draft.date}`,
+              field: draft.eventId,
+              before: `${draft.originalIn ?? "—"} – ${draft.originalOut ?? "—"}`,
+              after: `${draft.correctedIn ?? "—"} – ${draft.correctedOut ?? "—"}`,
+              at: nowIso(),
+            },
+            ...s.auditLog,
+          ],
+        }))
+      },
+
+      decideCorrection: (id, status) => {
+        setState((s) => ({
+          ...s,
+          timeAdjustments: s.timeAdjustments.map((a) =>
+            a.id === id
+              ? { ...a, status, decidedBy: actorId, decidedAt: nowIso() }
+              : a
+          ),
+        }))
+      },
+
+      resolveException: (key, action, note) => {
+        setState((s) => ({
+          ...s,
+          exceptionResolutions: [
+            ...s.exceptionResolutions.filter((r) => r.key !== key),
+            { key, action, note, resolvedBy: actorId, resolvedAt: nowIso() },
+          ],
+        }))
+      },
+
+      reopenException: (key) => {
+        setState((s) => ({
+          ...s,
+          exceptionResolutions: s.exceptionResolutions.filter(
+            (r) => r.key !== key
+          ),
+        }))
+      },
+
+      decideTimesheet: (periodId, employeeIds, status, comment) => {
+        setState((s) => ({
+          ...s,
+          timesheets: s.timesheets.map((t) =>
+            t.periodId === periodId && employeeIds.includes(t.employeeId)
+              ? {
+                  ...t,
+                  status,
+                  decidedBy: actorId,
+                  decidedAt: nowIso(),
+                  ...(comment ? { comment } : {}),
+                }
+              : t
+          ),
+        }))
+      },
+
+      submitTimesheet: (periodId, employeeId) => {
+        setState((s) => ({
+          ...s,
+          timesheets: s.timesheets.map((t) =>
+            t.periodId === periodId && t.employeeId === employeeId
+              ? { ...t, status: "pendingReview", submittedAt: nowIso() }
+              : t
+          ),
+        }))
+      },
+
+      closePayPeriod: (periodId) => {
+        setState((s) => ({
+          ...s,
+          payPeriods: s.payPeriods.map((p) =>
+            p.id === periodId ? { ...p, status: "closed" } : p
+          ),
+        }))
       },
 
       submitLeave: (request) => {
