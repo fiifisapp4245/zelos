@@ -16,6 +16,8 @@ import { ChangesTable } from "@/components/pay/changes-table"
 import { ApprovalSheet } from "@/components/pay/approval-sheet"
 import { RevealProvider, RevealToggle } from "@/components/pay/money"
 import { usePay } from "@/components/pay/use-pay"
+import { useSearchParams } from "next/navigation"
+
 import { useStore } from "@/lib/store"
 import { PAY_ROLE_NOTE } from "@/lib/pay/access"
 import type { CompensationChangeRequest } from "@/lib/pay/types"
@@ -31,9 +33,16 @@ export default function CompensationPage() {
 
 function Compensation() {
   const store = useStore()
-  const { role, rows, groups, requests } = usePay()
+  const params = useSearchParams()
+  const demo = params.get("demo")
+  const { role, rows: allRows, groups, requests: allRequests } = usePay()
 
-  const [tab, setTab] = React.useState("people")
+  // ?demo=empty is the first week of the product, before anything has
+  // been agreed; ?demo=loading is the moment before the data lands.
+  const rows = demo === "empty" ? [] : allRows
+  const requests = demo === "empty" ? [] : allRequests
+
+  const [tab, setTab] = React.useState(params.get("tab") ?? "people")
   const [revealed, setRevealed] = React.useState(false)
   const [selected, setSelected] = React.useState<string[]>([])
   const [open, setOpen] = React.useState<CompensationChangeRequest | null>(null)
@@ -240,8 +249,14 @@ function Compensation() {
 
         <TabsContent value="people">
           <Panel bodyClassName="p-0">
-            {rows.length === 0 ? (
-              <WidgetSkeleton rows={4} />
+            {demo === "loading" ? (
+              <WidgetSkeleton rows={5} />
+            ) : rows.length === 0 ? (
+              <EmptyState
+                icon={CircleDollarSign}
+                title="No compensation on file yet"
+                description="A first version is written for each person when their pay is agreed. Nothing here is typed over afterwards."
+              />
             ) : people.length === 0 ? (
               <EmptyState
                 icon={CircleDollarSign}
@@ -268,7 +283,9 @@ function Compensation() {
 
         <TabsContent value="changes">
           <Panel bodyClassName="p-0">
-            {changes.length === 0 ? (
+            {demo === "loading" ? (
+              <WidgetSkeleton rows={4} />
+            ) : changes.length === 0 ? (
               <EmptyState
                 icon={CircleDollarSign}
                 title="No pay changes to show"

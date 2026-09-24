@@ -19,9 +19,9 @@ const ROLES: PermissionRole[] = [
 
 const ROLE_HINT: Record<PermissionRole, string> = {
   hr_admin: "Sees everything; the only role that can change lifecycle state",
-  line_manager: "Own direct reports — no salary visibility",
+  line_manager: "Own direct reports; can propose pay, cannot approve it",
   head_of_department: "Whole department, plus their own reports",
-  payroll: "Compensation and statutory IDs across the org",
+  payroll: "Compensation and statutory IDs across the org, read-only",
   employee: "Own record only",
 }
 
