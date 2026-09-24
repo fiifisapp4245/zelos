@@ -16,13 +16,14 @@ import {
 } from "@/components/attendance/use-attendance"
 import { EmptyState, Panel, StatCard } from "@/components/common"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
-  FilterChipRow,
-  FilterChoice,
-  FilterMenu,
-  FilterSearchRow,
-} from "@/components/common/filter-bar"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { FilterSearch, FilterToolbar } from "@/components/common/filter-bar"
 import { formatHours, metricsFor } from "@/lib/attendance/derive"
 import type { DayRecord } from "@/lib/attendance/types"
 import { useStore } from "@/lib/store"
@@ -59,97 +60,77 @@ export default function RegisterPage() {
         { label: "Attendance" },
       ]}
     >
-      {/* The directory's filter pattern: search on top, dashed chips
-          beneath that fill in once they are doing something. */}
-      <div className="mb-4 rounded-xl border bg-card">
-        <FilterSearchRow
+      {/* The platform filter bar. Period sits on the bar rather than in
+          the popover: it is the range being looked at, never off. */}
+      <FilterToolbar
+        className="mb-4"
+        fields={[
+          {
+            kind: "multi",
+            key: "departments",
+            label: "Department",
+            values: departments,
+            options: allDepartments.map((d) => ({ value: d, label: d })),
+          },
+          {
+            kind: "multi",
+            key: "branches",
+            label: "Branch",
+            values: branches,
+            options: allBranches.map((b) => ({
+              value: b.name,
+              label: b.name,
+            })),
+          },
+        ]}
+        onChange={(patch) => {
+          if (patch.departments) setDepartments(patch.departments as string[])
+          if (patch.branches) setBranches(patch.branches as string[])
+        }}
+        onClear={() => {
+          setDepartments([])
+          setBranches([])
+          setSearch("")
+        }}
+      >
+        <FilterSearch
           value={search}
           onChange={setSearch}
           placeholder="Search by name or job title"
-        >
-          <FilterChoice
-            label="Period"
-            value={period}
-            onChange={(v) => setPeriod(v as PeriodKey)}
-            options={(Object.keys(PERIOD_LABEL) as PeriodKey[]).map((k) => ({
-              value: k,
-              label: PERIOD_LABEL[k],
-            }))}
-            allLabel="This week"
-          />
-        </FilterSearchRow>
-
-        <FilterChipRow
-          showClear={
-            departments.length > 0 || branches.length > 0 || search !== ""
-          }
-          onClear={() => {
-            setDepartments([])
-            setBranches([])
-            setSearch("")
-          }}
-        >
-          <FilterMenu
-            label="Department"
-            options={allDepartments.map((d) => ({ value: d, label: d }))}
-            selected={departments}
-            onToggle={(v) =>
-              setDepartments((list) =>
-                list.includes(v) ? list.filter((x) => x !== v) : [...list, v]
-              )
-            }
-          />
-          <FilterMenu
-            label="Branch"
-            options={allBranches.map((b) => ({ value: b.name, label: b.name }))}
-            selected={branches}
-            onToggle={(v) =>
-              setBranches((list) =>
-                list.includes(v) ? list.filter((x) => x !== v) : [...list, v]
-              )
-            }
-          />
-          <span className="ml-auto text-xs text-muted-foreground">
-            {formatDate(from)} – {formatDate(to)}
-          </span>
-        </FilterChipRow>
-
+        />
+        <Select value={period} onValueChange={(v) => setPeriod(v as PeriodKey)}>
+          <SelectTrigger className="h-9 w-[160px]" aria-label="Period">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(PERIOD_LABEL) as PeriodKey[]).map((k) => (
+              <SelectItem key={k} value={k}>
+                {PERIOD_LABEL[k]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {period === "custom" && (
-          <div className="flex flex-wrap items-end gap-3 border-b px-3 py-2.5">
-            <div>
-              <Label
-                htmlFor="from"
-                className="mb-1.5 block text-xs font-medium"
-              >
-                From
-              </Label>
-              <Input
-                id="from"
-                type="date"
-                className="h-9 w-[150px]"
-                value={custom.from}
-                onChange={(e) =>
-                  setCustom((c) => ({ ...c, from: e.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="to" className="mb-1.5 block text-xs font-medium">
-                To
-              </Label>
-              <Input
-                id="to"
-                type="date"
-                className="h-9 w-[150px]"
-                value={custom.to}
-                onChange={(e) =>
-                  setCustom((c) => ({ ...c, to: e.target.value }))
-                }
-              />
-            </div>
-          </div>
+          <>
+            <Input
+              type="date"
+              aria-label="From"
+              className="h-9 w-[150px]"
+              value={custom.from}
+              onChange={(e) =>
+                setCustom((c) => ({ ...c, from: e.target.value }))
+              }
+            />
+            <Input
+              type="date"
+              aria-label="To"
+              className="h-9 w-[150px]"
+              value={custom.to}
+              onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))}
+            />
+          </>
         )}
-      </div>
+      </FilterToolbar>
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard

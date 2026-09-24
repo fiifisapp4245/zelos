@@ -201,11 +201,6 @@ function Approvals() {
               }).length,
             }))}
           />
-        </div>
-
-        {/* The filter bar carries its own card, so it sits under the tabs
-            rather than squeezed beside them. */}
-        <div className="mb-4">
           <ApprovalFiltersBar
             items={unfiltered}
             filters={filters}

@@ -8,11 +8,9 @@ import {
   Pencil,
   RefreshCw,
   ListFilter,
-  Search,
   Upload,
   UserPlus,
   Users,
-  X,
 } from "lucide-react"
 
 import { PageShell } from "@/components/shell/page-shell"
@@ -25,7 +23,7 @@ import {
   type ListView,
 } from "@/components/common"
 import { RowActions } from "@/components/common/row-actions"
-import { FilterMenu } from "@/components/common/filter-bar"
+import { FilterSearch, FilterToolbar } from "@/components/common/filter-bar"
 import { LifecycleBadge } from "@/components/common/status"
 import { Button } from "@/components/ui/button"
 import {
@@ -103,9 +101,6 @@ export default function DirectoryPage() {
     })
   }, [scope, q, searchActive, states, departments, types, contractOnly, sort])
 
-  const activeFilterCount =
-    states.length + departments.length + types.length + (contractOnly ? 1 : 0)
-
   function clearFilters() {
     setStates([])
     setDepartments([])
@@ -170,156 +165,96 @@ export default function DirectoryPage() {
       />
 
       <div className="rounded-xl border bg-card">
-        <div className="flex flex-wrap items-center gap-3 border-b p-3">
-          <div className="relative min-w-[260px] flex-1">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, ID, job title… (min. 3 chars)"
-              className="h-10 w-full rounded-lg border bg-background pr-3 pl-9 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
-            />
-          </div>
-
-          <ViewToggle view={view} onChange={setView} />
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="lg">
-                <ListFilter className="size-4" />
-                Sort
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Sort by</DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={sort}
-                onValueChange={(v) => setSort(v as SortKey)}
-              >
-                <DropdownMenuRadioItem value="name">
-                  Name · A→Z
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="department">
-                  Department
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="startDate">
-                  Start date
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="status">
-                  Status
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2.5">
-          <span className="mr-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            Filters
-          </span>
-
-          <FilterMenu
-            label="Status"
-            options={(Object.keys(LIFECYCLE_LABEL) as LifecycleState[]).map(
-              (s) => ({
-                value: s,
-                label: LIFECYCLE_LABEL[s],
-              })
-            )}
-            selected={states}
-            onToggle={(v) =>
-              setStates((s) =>
-                s.includes(v as LifecycleState)
-                  ? s.filter((x) => x !== v)
-                  : [...s, v as LifecycleState]
-              )
-            }
-          />
-          <FilterMenu
-            label="Department"
-            options={allDepartments.map((d) => ({ value: d, label: d }))}
-            selected={departments}
-            onToggle={(v) =>
-              setDepartments((s) =>
-                s.includes(v) ? s.filter((x) => x !== v) : [...s, v]
-              )
-            }
-          />
-          <FilterMenu
-            label="Employment type"
-            options={(
-              Object.keys(EMPLOYMENT_TYPE_LABEL) as EmploymentType[]
-            ).map((t) => ({
-              value: t,
-              label: EMPLOYMENT_TYPE_LABEL[t],
-            }))}
-            selected={types}
-            onToggle={(v) =>
-              setTypes((s) =>
-                s.includes(v as EmploymentType)
-                  ? s.filter((x) => x !== v)
-                  : [...s, v as EmploymentType]
-              )
-            }
-          />
-          <button
-            type="button"
-            onClick={() => setContractOnly((v) => !v)}
-            className={cn(
-              "rounded-full border border-dashed px-3 py-1.5 text-xs transition-colors",
-              contractOnly
-                ? "border-primary bg-success-muted font-medium text-primary"
-                : "text-muted-foreground hover:border-ring/50 hover:text-foreground"
-            )}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b p-3">
+          <FilterToolbar
+            className="flex-1"
+            fields={[
+              {
+                kind: "multi",
+                key: "states",
+                label: "Status",
+                values: states,
+                options: (Object.keys(LIFECYCLE_LABEL) as LifecycleState[]).map(
+                  (s) => ({ value: s, label: LIFECYCLE_LABEL[s] })
+                ),
+              },
+              {
+                kind: "multi",
+                key: "departments",
+                label: "Department",
+                values: departments,
+                options: allDepartments.map((d) => ({ value: d, label: d })),
+              },
+              {
+                kind: "multi",
+                key: "types",
+                label: "Employment type",
+                values: types,
+                options: (
+                  Object.keys(EMPLOYMENT_TYPE_LABEL) as EmploymentType[]
+                ).map((t) => ({ value: t, label: EMPLOYMENT_TYPE_LABEL[t] })),
+              },
+              {
+                kind: "toggle",
+                key: "contractOnly",
+                label: "Fixed-term only",
+                value: contractOnly,
+                inline: true,
+              },
+            ]}
+            onChange={(patch) => {
+              if (patch.states) setStates(patch.states as LifecycleState[])
+              if (patch.departments)
+                setDepartments(patch.departments as string[])
+              if (patch.types) setTypes(patch.types as EmploymentType[])
+              if ("contractOnly" in patch)
+                setContractOnly(Boolean(patch.contractOnly))
+            }}
+            onClear={() => {
+              setQuery("")
+              clearFilters()
+            }}
           >
-            + Fixed-term only
-          </button>
+            <FilterSearch
+              value={query}
+              onChange={setQuery}
+              placeholder="Search by name, ID or job title (min. 3 characters)"
+            />
+          </FilterToolbar>
 
-          {activeFilterCount > 0 && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <X className="size-3.5" />
-              Clear filters
-            </button>
-          )}
-        </div>
+          <div className="flex items-center gap-2">
+            <ViewToggle view={view} onChange={setView} />
 
-        {activeFilterCount > 0 && (
-          <div className="flex flex-wrap gap-2 border-b px-3 py-2.5">
-            {states.map((s) => (
-              <Chip
-                key={s}
-                onRemove={() => setStates((x) => x.filter((v) => v !== s))}
-              >
-                Status: {LIFECYCLE_LABEL[s]}
-              </Chip>
-            ))}
-            {departments.map((d) => (
-              <Chip
-                key={d}
-                onRemove={() => setDepartments((x) => x.filter((v) => v !== d))}
-              >
-                Department: {d}
-              </Chip>
-            ))}
-            {types.map((t) => (
-              <Chip
-                key={t}
-                onRemove={() => setTypes((x) => x.filter((v) => v !== t))}
-              >
-                Type: {EMPLOYMENT_TYPE_LABEL[t]}
-              </Chip>
-            ))}
-            {contractOnly && (
-              <Chip onRemove={() => setContractOnly(false)}>
-                Contract: Fixed-term
-              </Chip>
-            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9">
+                  <ListFilter className="size-4" />
+                  Sort
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={sort}
+                  onValueChange={(v) => setSort(v as SortKey)}
+                >
+                  <DropdownMenuRadioItem value="name">
+                    Name · A→Z
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="department">
+                    Department
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="startDate">
+                    Start date
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="status">
+                    Status
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        )}
+        </div>
 
         <div className="flex items-center justify-between px-5 py-3 text-sm">
           <p className="text-muted-foreground">
@@ -362,23 +297,6 @@ export default function DirectoryPage() {
         )}
       </div>
     </PageShell>
-  )
-}
-
-function Chip({
-  children,
-  onRemove,
-}: {
-  children: React.ReactNode
-  onRemove: () => void
-}) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-success-muted px-2.5 py-1 text-xs font-medium text-primary">
-      {children}
-      <button type="button" onClick={onRemove} aria-label="Remove filter">
-        <X className="size-3" />
-      </button>
-    </span>
   )
 }
 

@@ -2,14 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import {
-  BadgeCheck,
-  Download,
-  FileText,
-  Search,
-  Trash2,
-  Upload,
-} from "lucide-react"
+import { BadgeCheck, Download, FileText, Trash2, Upload } from "lucide-react"
 import { toast } from "sonner"
 
 import { PageShell } from "@/components/shell/page-shell"
@@ -22,6 +15,7 @@ import {
 } from "@/components/common"
 import { DocumentBadge } from "@/components/common/status"
 import { RowActions } from "@/components/common/row-actions"
+import { FilterSearch, FilterToolbar } from "@/components/common/filter-bar"
 import { Button } from "@/components/ui/button"
 import { useStore } from "@/lib/store"
 import { has, isSelf } from "@/lib/rbac"
@@ -30,14 +24,16 @@ import { DOC_STATUS_LABEL, daysUntil, formatDate, fullName } from "@/lib/format"
 import type { DocumentStatus, EmployeeDocument } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-const CATEGORIES: EmployeeDocument["category"][] = [
-  "contract",
-  "identity",
-  "certificate",
-  "statutory",
-  "medical",
-  "other",
-]
+const CATEGORY_LABEL: Record<EmployeeDocument["category"], string> = {
+  contract: "Contract",
+  identity: "Identity",
+  certificate: "Certificate",
+  statutory: "Statutory",
+  medical: "Medical",
+  other: "Other",
+}
+
+const CATEGORIES = Object.keys(CATEGORY_LABEL) as EmployeeDocument["category"][]
 
 export default function DocumentsPage() {
   const store = useStore()
@@ -124,46 +120,51 @@ export default function DocumentsPage() {
       </div>
 
       <Panel bodyClassName="p-0">
-        <div className="flex flex-wrap items-center gap-3 border-b p-3">
-          <div className="relative min-w-[240px] flex-1">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
+        <div className="border-b p-3">
+          <FilterToolbar
+            fields={[
+              {
+                kind: "select",
+                key: "status",
+                label: "Status",
+                value: status,
+                allLabel: "All statuses",
+                options: (
+                  Object.keys(DOC_STATUS_LABEL) as DocumentStatus[]
+                ).map((s) => ({ value: s, label: DOC_STATUS_LABEL[s] })),
+              },
+              {
+                kind: "select",
+                key: "category",
+                label: "Category",
+                value: category,
+                allLabel: "All categories",
+                options: CATEGORIES.map((c) => ({
+                  value: c,
+                  label: CATEGORY_LABEL[c],
+                })),
+              },
+            ]}
+            onChange={(patch) => {
+              if (patch.status)
+                setStatus(patch.status as DocumentStatus | "all")
+              if (patch.category)
+                setCategory(
+                  patch.category as EmployeeDocument["category"] | "all"
+                )
+            }}
+            onClear={() => {
+              setQuery("")
+              setStatus("all")
+              setCategory("all")
+            }}
+          >
+            <FilterSearch
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by document or person…"
-              className="h-10 w-full rounded-lg border bg-background pr-3 pl-9 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+              onChange={setQuery}
+              placeholder="Search by document or person"
             />
-          </div>
-          <select
-            value={status}
-            onChange={(e) =>
-              setStatus(e.target.value as DocumentStatus | "all")
-            }
-            className="h-10 rounded-lg border bg-background px-3 text-sm outline-none"
-          >
-            <option value="all">All statuses</option>
-            {(Object.keys(DOC_STATUS_LABEL) as DocumentStatus[]).map((s) => (
-              <option key={s} value={s}>
-                {DOC_STATUS_LABEL[s]}
-              </option>
-            ))}
-          </select>
-          <select
-            value={category}
-            onChange={(e) =>
-              setCategory(
-                e.target.value as EmployeeDocument["category"] | "all"
-              )
-            }
-            className="h-10 rounded-lg border bg-background px-3 text-sm capitalize outline-none"
-          >
-            <option value="all">All categories</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c} className="capitalize">
-                {c}
-              </option>
-            ))}
-          </select>
+          </FilterToolbar>
         </div>
 
         {filtered.length === 0 ? (

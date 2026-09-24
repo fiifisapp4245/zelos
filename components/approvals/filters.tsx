@@ -1,12 +1,11 @@
 "use client"
 
 import {
-  FilterChipRow,
-  FilterChoice,
-  FilterSearchRow,
+  FilterSearch,
+  FilterToolbar,
+  type FilterField,
+  type FilterPatch,
 } from "@/components/common/filter-bar"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   APPROVAL_CHAINS,
   APPROVAL_MODULE,
@@ -21,7 +20,6 @@ import type {
 } from "@/lib/approvals/types"
 import { fullName } from "@/lib/format"
 import { useStore } from "@/lib/store"
-import { cn } from "@/lib/utils"
 
 const MODULES = Object.keys(MODULE_LABEL) as ApprovalModule[]
 const ALL_TYPES = Object.keys(APPROVAL_CHAINS) as ApprovalType[]
@@ -42,10 +40,6 @@ function activeCount(f: ApprovalFilters) {
   ].filter(Boolean).length
 }
 
-/**
- * The same filter bar the employee directory uses: search on top, a dashed
- * chip per facet beneath that fills in and names its value once set.
- */
 export function ApprovalFiltersBar({
   filters,
   onChange,
@@ -57,14 +51,12 @@ export function ApprovalFiltersBar({
   filters: ApprovalFilters
   onChange: (next: ApprovalFilters) => void
   onClear: () => void
-  /** The unfiltered pool, so the chips only offer what is actually there. */
+  /** The unfiltered pool, so the menus only offer what is actually there. */
   items: ApprovalItem[]
   search: string
   onSearch: (v: string) => void
 }) {
   const store = useStore()
-  const set = (patch: Partial<ApprovalFilters>) =>
-    onChange({ ...filters, ...patch })
 
   const requesters = [...new Set(items.map((i) => i.requester))]
   const units = [
@@ -82,92 +74,75 @@ export function ApprovalFiltersBar({
       ? ALL_TYPES.filter((t) => APPROVAL_MODULE[t] === filters.module)
       : ALL_TYPES
 
+  const fields: FilterField[] = [
+    {
+      kind: "select",
+      key: "module",
+      label: "Module",
+      value: filters.module ?? "all",
+      allLabel: "All modules",
+      options: MODULES.map((m) => ({ value: m, label: MODULE_LABEL[m] })),
+    },
+    {
+      kind: "select",
+      key: "type",
+      label: "Request type",
+      value: filters.type ?? "all",
+      allLabel: "All types",
+      options: types.map((t) => ({ value: t, label: TYPE_LABEL[t] })),
+    },
+    {
+      kind: "select",
+      key: "requester",
+      label: "Requester",
+      value: filters.requester ?? "all",
+      allLabel: "Anyone",
+      options: requesters.map((r) => ({
+        value: r,
+        label: fullName(store.employeeById(r)),
+      })),
+    },
+    {
+      kind: "select",
+      key: "unit",
+      label: "Department",
+      value: filters.unit ?? "all",
+      allLabel: "All departments",
+      options: units.map((u) => ({ value: u, label: u })),
+    },
+    { kind: "date", key: "from", label: "From", value: filters.from },
+    { kind: "date", key: "to", label: "To", value: filters.to },
+    {
+      kind: "toggle",
+      key: "overdueOnly",
+      label: "Overdue only",
+      value: Boolean(filters.overdueOnly),
+      inline: true,
+      tone: "danger",
+    },
+  ]
+
+  const apply = (patch: FilterPatch) => {
+    const next = { ...filters, ...patch } as ApprovalFilters
+    // Changing module invalidates a type belonging to the old one.
+    if ("module" in patch) next.type = "all"
+    onChange(next)
+  }
+
   return (
-    <div className="rounded-xl border bg-card">
-      <FilterSearchRow
+    <FilterToolbar
+      fields={fields}
+      onChange={apply}
+      onClear={() => {
+        onSearch("")
+        onClear()
+      }}
+    >
+      <FilterSearch
         value={search}
         onChange={onSearch}
         placeholder="Search by requester or summary"
-      >
-        <button
-          type="button"
-          aria-pressed={Boolean(filters.overdueOnly)}
-          onClick={() => set({ overdueOnly: !filters.overdueOnly })}
-          className={cn(
-            "h-10 rounded-lg border px-3 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-            filters.overdueOnly
-              ? "border-destructive bg-danger-muted font-medium text-destructive"
-              : "hover:bg-muted"
-          )}
-        >
-          Overdue only
-        </button>
-      </FilterSearchRow>
-
-      <FilterChipRow
-        showClear={activeCount(filters) > 0 || search !== ""}
-        onClear={() => {
-          onSearch("")
-          onClear()
-        }}
-      >
-        <FilterChoice
-          label="Module"
-          value={filters.module ?? "all"}
-          // Changing module invalidates a type from the old one.
-          onChange={(v) =>
-            set({ module: v as ApprovalModule | "all", type: "all" })
-          }
-          options={MODULES.map((m) => ({ value: m, label: MODULE_LABEL[m] }))}
-          allLabel="All modules"
-        />
-        <FilterChoice
-          label="Type"
-          value={filters.type ?? "all"}
-          onChange={(v) => set({ type: v as ApprovalType | "all" })}
-          options={types.map((t) => ({ value: t, label: TYPE_LABEL[t] }))}
-          allLabel="All types"
-        />
-        <FilterChoice
-          label="Requester"
-          value={filters.requester ?? "all"}
-          onChange={(v) => set({ requester: v })}
-          options={requesters.map((r) => ({
-            value: r,
-            label: fullName(store.employeeById(r)),
-          }))}
-          allLabel="Anyone"
-        />
-        <FilterChoice
-          label="Department"
-          value={filters.unit ?? "all"}
-          onChange={(v) => set({ unit: v })}
-          options={units.map((u) => ({ value: u, label: u }))}
-          allLabel="All departments"
-        />
-
-        <span className="ml-auto flex items-center gap-2">
-          <Label htmlFor="from" className="text-xs text-muted-foreground">
-            Submitted
-          </Label>
-          <Input
-            id="from"
-            type="date"
-            aria-label="Submitted from"
-            className="h-8 w-[140px]"
-            value={filters.from ?? ""}
-            onChange={(e) => set({ from: e.target.value || undefined })}
-          />
-          <span className="text-xs text-muted-foreground">to</span>
-          <Input
-            type="date"
-            aria-label="Submitted to"
-            className="h-8 w-[140px]"
-            value={filters.to ?? ""}
-            onChange={(e) => set({ to: e.target.value || undefined })}
-          />
-        </span>
-      </FilterChipRow>
-    </div>
+      />
+    </FilterToolbar>
   )
 }

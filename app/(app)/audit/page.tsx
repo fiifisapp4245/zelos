@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Lock, ScrollText, Search } from "lucide-react"
+import { Lock, ScrollText } from "lucide-react"
 
 import { PageShell } from "@/components/shell/page-shell"
 import {
@@ -12,6 +12,7 @@ import {
   Panel,
   Pill,
 } from "@/components/common"
+import { FilterSearch } from "@/components/common/filter-bar"
 import { useStore } from "@/lib/store"
 import { has } from "@/lib/rbac"
 import { formatDateTime, fullName } from "@/lib/format"
@@ -76,15 +77,13 @@ export default function AuditPage() {
 
       <Panel bodyClassName="p-0">
         <div className="border-b p-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Filter by action, field or person…"
-              className="h-10 w-full rounded-lg border bg-background pr-3 pl-9 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
-            />
-          </div>
+          {/* Nothing to facet here — one field over one immutable stream. */}
+          <FilterSearch
+            value={query}
+            onChange={setQuery}
+            placeholder="Search by action, field or person"
+            className="sm:max-w-none"
+          />
         </div>
 
         {entries.length === 0 ? (
