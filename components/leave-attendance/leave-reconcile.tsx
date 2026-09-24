@@ -28,14 +28,33 @@ import { addDays, datesBetween, startOfWeek } from "@/lib/time"
 import { TODAY_ISO, formatDate } from "@/lib/format"
 import type { LeaveRequest } from "@/lib/types"
 
-type PeriodKey = "twoWeeks" | "month"
+/**
+ * One period for the whole tab.
+ *
+ * Who is away, the timeline, the coverage and the reconciliation list
+ * are all readings of the same window, so they take the same control.
+ * Two period pickers on one screen only raises the question of which
+ * one is in charge.
+ */
+type PeriodKey = "today" | "week" | "twoWeeks" | "month"
 
 const PERIOD_LABEL: Record<PeriodKey, string> = {
-  twoWeeks: "2 weeks",
+  today: "Today",
+  week: "This week",
+  twoWeeks: "Next 2 weeks",
   month: "This month",
 }
 
+/** How the "who is away" heading reads for each of them. */
+const AWAY_LABEL: Record<PeriodKey, string> = {
+  today: "Away today",
+  week: "Away this week",
+  twoWeeks: "Away over the next 2 weeks",
+  month: "Away this month",
+}
+
 function rangeFor(key: PeriodKey) {
+  if (key === "today") return { from: TODAY_ISO, to: TODAY_ISO }
   if (key === "month") {
     const first = `${TODAY_ISO.slice(0, 7)}-01`
     const last = new Date(
@@ -46,7 +65,7 @@ function rangeFor(key: PeriodKey) {
     return { from: first, to: last.toISOString().slice(0, 10) }
   }
   const from = startOfWeek(TODAY_ISO)
-  return { from, to: addDays(from, 13) }
+  return { from, to: addDays(from, key === "week" ? 6 : 13) }
 }
 
 /**
@@ -111,36 +130,46 @@ function Reconcile({ title }: { title?: string }) {
 
   return (
     <div className="space-y-6">
+      {/* The period governs everything below it. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="tabular text-sm text-muted-foreground">
+          {period === "today"
+            ? formatDate(from)
+            : `${formatDate(from)} – ${formatDate(to)}`}
+        </span>
+        <Select value={period} onValueChange={(v) => setPeriod(v as PeriodKey)}>
+          <SelectTrigger className="h-9 w-[180px]" aria-label="Period">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(PERIOD_LABEL) as PeriodKey[]).map((k) => (
+              <SelectItem key={k} value={k}>
+                {PERIOD_LABEL[k]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <section aria-label="Who is away">
-        <WhosAway scope={scope} leave={leave} onOpen={setOpen} />
+        <WhosAway
+          scope={scope}
+          leave={leave}
+          from={from}
+          to={to}
+          label={AWAY_LABEL[period]}
+          onOpen={setOpen}
+        />
       </section>
 
       <section aria-label="Team leave timeline" className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-[15px] font-semibold">{title ?? "Team leave"}</h2>
-          <div className="flex items-center gap-2">
-            <span className="tabular text-sm text-muted-foreground">
-              {formatDate(from)} – {formatDate(to)}
-            </span>
-            <Select
-              value={period}
-              onValueChange={(v) => setPeriod(v as PeriodKey)}
-            >
-              <SelectTrigger className="h-9 w-[150px]" aria-label="Period">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(["twoWeeks", "month"] as PeriodKey[]).map((k) => (
-                  <SelectItem key={k} value={k}>
-                    {PERIOD_LABEL[k]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <h2 className="text-[15px] font-semibold">{title ?? "Team leave"}</h2>
 
         <Panel bodyClassName="p-0">
+          {/* The key comes before the grid it explains. */}
+          <div className="border-b">
+            <TimelineLegend warnPercent={policy.coverageWarnPercent} />
+          </div>
           <LeaveTimeline
             scope={scope}
             dates={dates}
@@ -149,9 +178,6 @@ function Reconcile({ title }: { title?: string }) {
             coverWarnPercent={policy.coverageWarnPercent}
             onOpen={setOpen}
           />
-          <div className="border-t">
-            <TimelineLegend warnPercent={policy.coverageWarnPercent} />
-          </div>
         </Panel>
       </section>
 
