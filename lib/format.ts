@@ -24,7 +24,9 @@ export function fullName(e: Employee | undefined | null) {
   return e ? `${e.firstName} ${e.lastName}` : "—"
 }
 
-export function initials(e: Employee | { firstName: string; lastName: string } | string) {
+export function initials(
+  e: Employee | { firstName: string; lastName: string } | string
+) {
   if (typeof e === "string") {
     const parts = e.trim().split(/\s+/)
     return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase()
@@ -39,7 +41,10 @@ export function ghs(amount: number, opts: { compact?: boolean } = {}) {
   return `GHS ${amount.toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-export function formatDate(iso: string | null | undefined, style: "short" | "long" = "short") {
+export function formatDate(
+  iso: string | null | undefined,
+  style: "short" | "long" = "short"
+) {
   if (!iso) return "—"
   const d = new Date(iso.length <= 10 ? `${iso}T00:00:00` : iso)
   if (Number.isNaN(d.getTime())) return "—"
@@ -115,7 +120,14 @@ export const LIFECYCLE_LABEL: Record<LifecycleState, string> = {
 export const LIFECYCLE_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
   pre_hire: ["probation", "active", "terminated"],
   probation: ["active", "on_leave", "terminated", "resigned"],
-  active: ["on_leave", "suspended", "notice", "resigned", "terminated", "retired"],
+  active: [
+    "on_leave",
+    "suspended",
+    "notice",
+    "resigned",
+    "terminated",
+    "retired",
+  ],
   on_leave: ["active", "resigned", "terminated"],
   suspended: ["active", "terminated", "resigned"],
   notice: ["resigned", "terminated", "retired", "active"],
@@ -124,7 +136,11 @@ export const LIFECYCLE_TRANSITIONS: Record<LifecycleState, LifecycleState[]> = {
   retired: [],
 }
 
-export const IRREVERSIBLE: LifecycleState[] = ["resigned", "terminated", "retired"]
+export const IRREVERSIBLE: LifecycleState[] = [
+  "resigned",
+  "terminated",
+  "retired",
+]
 
 export const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
   full_time: "Full-time",
@@ -154,6 +170,23 @@ export const LEAVE_TYPE_LABEL: Record<LeaveType, string> = {
   compassionate: "Compassionate",
   unpaid: "Unpaid",
   study: "Study",
+}
+
+/**
+ * The letter a leave type gets in a grid cell.
+ *
+ * Not simply the first letter: paternity and a pending request would
+ * both be "P", and a code that means two things is worse than no code.
+ * Every one of these is spelled out in the legend beside the grid.
+ */
+export const LEAVE_TYPE_LETTER: Record<LeaveType, string> = {
+  annual: "A",
+  sick: "S",
+  maternity: "M",
+  paternity: "Pt",
+  compassionate: "C",
+  unpaid: "U",
+  study: "St",
 }
 
 export const REQUEST_STATUS_LABEL: Record<RequestStatus, string> = {

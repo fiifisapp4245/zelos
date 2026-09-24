@@ -7,7 +7,12 @@ import { Initials } from "@/components/common"
 import { expectedFor, type ScheduleInput } from "@/lib/schedules/derive"
 import { coverage } from "@/lib/leave/reconcile"
 import { holidaysBetween } from "@/lib/fixtures/ghanaHolidays"
-import { LEAVE_TYPE_LABEL, formatDate, fullName } from "@/lib/format"
+import {
+  LEAVE_TYPE_LABEL,
+  LEAVE_TYPE_LETTER,
+  formatDate,
+  fullName,
+} from "@/lib/format"
 import type { Employee, LeaveRequest } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -151,9 +156,7 @@ export function LeaveTimeline({
                                   : "border border-dashed border-muted-foreground/60 text-muted-foreground"
                               )}
                             >
-                              {request.status === "approved"
-                                ? LEAVE_TYPE_LABEL[request.type][0]
-                                : "P"}
+                              {LEAVE_TYPE_LETTER[request.type]}
                             </button>
                           ) : (
                             <span
@@ -212,41 +215,62 @@ export function LeaveTimeline({
   )
 }
 
-/** The key underneath, since no block is only a colour. */
+/**
+ * The key underneath. Every letter that appears in the grid is spelled
+ * out here — a grid of single letters with nothing to read it against
+ * is a puzzle rather than a chart.
+ */
 export function TimelineLegend({ warnPercent }: { warnPercent: number }) {
+  const types = Object.keys(
+    LEAVE_TYPE_LETTER
+  ) as (keyof typeof LEAVE_TYPE_LETTER)[]
+
   return (
-    <ul className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 text-xs text-muted-foreground">
-      <li className="flex items-center gap-1.5">
-        <span className="grid size-5 place-items-center rounded bg-info-muted text-[10px] font-semibold text-info">
-          A
-        </span>
-        Approved leave, by first letter of the type
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="grid size-5 place-items-center rounded border border-dashed border-muted-foreground/60 text-[10px] font-semibold">
-          P
-        </span>
-        Pending
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="grid size-5 place-items-center rounded bg-muted text-[10px] font-semibold">
-          H
-        </span>
-        Public holiday
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="grid size-5 place-items-center rounded bg-muted/40 text-[10px]">
-          ·
-        </span>
-        Not a working day for that person
-      </li>
-      <li className="flex items-center gap-1.5">
-        <AlertTriangle
-          className="size-3.5 text-warning-foreground"
-          aria-hidden
-        />
-        Cover shaded where {warnPercent}% or more of a department is away
-      </li>
-    </ul>
+    <div className="space-y-2 px-5 py-3 text-xs text-muted-foreground">
+      <ul className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {types.map((type) => (
+          <li key={type} className="flex items-center gap-1.5">
+            <span className="grid size-5 place-items-center rounded bg-info-muted text-[10px] font-semibold text-info">
+              {LEAVE_TYPE_LETTER[type]}
+            </span>
+            {LEAVE_TYPE_LABEL[type]}
+          </li>
+        ))}
+      </ul>
+
+      <ul className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-2">
+        <li className="flex items-center gap-1.5">
+          <span className="grid size-5 place-items-center rounded bg-info-muted text-[10px] font-semibold text-info">
+            A
+          </span>
+          Solid — approved
+        </li>
+        <li className="flex items-center gap-1.5">
+          <span className="grid size-5 place-items-center rounded border border-dashed border-muted-foreground/60 text-[10px] font-semibold">
+            A
+          </span>
+          Dashed — still waiting on a decision
+        </li>
+        <li className="flex items-center gap-1.5">
+          <span className="grid size-5 place-items-center rounded bg-muted text-[10px] font-semibold">
+            H
+          </span>
+          Public holiday
+        </li>
+        <li className="flex items-center gap-1.5">
+          <span className="grid size-5 place-items-center rounded bg-muted/40 text-[10px]">
+            ·
+          </span>
+          Not a working day for that person
+        </li>
+        <li className="flex items-center gap-1.5">
+          <AlertTriangle
+            className="size-3.5 text-warning-foreground"
+            aria-hidden
+          />
+          Cover shaded where {warnPercent}% or more of a department is away
+        </li>
+      </ul>
+    </div>
   )
 }
