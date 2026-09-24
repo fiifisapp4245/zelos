@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { notFound, useParams } from "next/navigation"
+import { notFound, useParams, useSearchParams } from "next/navigation"
 import {
   AlertTriangle,
   ArrowLeftRight,
@@ -32,7 +32,6 @@ import {
   Field,
   Initials,
   Pill,
-  Restricted,
   SectionGrid,
 } from "@/components/common"
 import { DocumentBadge, LifecycleBadge } from "@/components/common/status"
@@ -47,6 +46,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { SegmentedTabs } from "@/components/common/segmented-tabs"
 import { EmployeeAttendanceTab } from "@/components/attendance/employee-attendance-tab"
+import { EmployeeCompensation } from "@/components/pay/compensation-tab"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { useStore } from "@/lib/store"
 import {
@@ -71,7 +71,6 @@ import {
   formatDate,
   formatDateTime,
   fullName,
-  ghs,
   maskId,
   yearsOfService,
 } from "@/lib/format"
@@ -108,7 +107,18 @@ function exportRecord(employee: Employee) {
 }
 
 export default function EmployeeRecordPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <EmployeeRecord />
+    </React.Suspense>
+  )
+}
+
+function EmployeeRecord() {
   const params = useParams<{ id: string }>()
+  // Other areas link straight to a tab — Pay sends people to the
+  // compensation one rather than to the top of the record.
+  const query = useSearchParams()
   const store = useStore()
   const { viewer, employees } = store
   const employee = store.employeeById(params.id)
@@ -371,7 +381,7 @@ export default function EmployeeRecordPage() {
       )}
 
       <Tabs
-        defaultValue="overview"
+        defaultValue={query.get("tab") ?? "overview"}
         className="overflow-hidden rounded-xl border bg-card"
       >
         <SegmentedTabs
@@ -958,30 +968,12 @@ function CompensationTab({ employeeId }: { employeeId: string }) {
 
   return (
     <div>
-      <Section
-        title="Compensation"
-        actions={
-          <Restricted reason="Visible to employee, HR Admin and Payroll only" />
-        }
-      >
-        <SectionGrid>
-          <Field
-            label="Gross monthly"
-            value={<span className="tabular">{ghs(c.grossMonthly)}</span>}
-          />
-          <Field
-            label="Annualised cost"
-            value={<span className="tabular">{ghs(c.grossMonthly * 12)}</span>}
-          />
-          <Field
-            label="Pay frequency"
-            value={c.payFrequency === "monthly" ? "Monthly" : "Bi-weekly"}
-          />
-          <Field label="Pay grade" value={c.payGrade} />
-          <Field label="Effective from" value={formatDate(c.effectiveFrom)} />
-          <Field label="Currency" value="GHS — Ghana Cedi" />
-        </SectionGrid>
-      </Section>
+      {/* The package and its history come from the pay versions, which are
+          the record — the fields below are the statutory and payment
+          details that sit alongside them. */}
+      <EmployeeCompensation employeeId={employeeId} />
+
+      <div className="mt-6" />
 
       <Section
         title="Statutory & tax"

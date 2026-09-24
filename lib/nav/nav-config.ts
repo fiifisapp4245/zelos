@@ -87,7 +87,7 @@ export const SECTION_ORDER: Record<NavAudience, NavSectionId[]> = {
     "relations",
     "pinned",
   ],
-  manager: ["primary", "team", "people", "me"],
+  manager: ["primary", "team", "pay", "people", "me"],
   employee: ["primary", "me", "people"],
   payroll: ["primary", "pay", "people", "me", "pinned"],
 }
@@ -243,15 +243,17 @@ export const NAV_ITEMS: NavItemConfig[] = [
   {
     id: "compensation",
     label: "Compensation",
-    href: "/compensation",
+    href: "/pay/compensation",
     icon: CircleDollarSign,
     section: "pay",
-    roles: ["hr_admin", "payroll"],
+    // A manager sees their own reports here and can argue for a change;
+    // the deciding stays with HR.
+    roles: ["hr_admin", "payroll", "manager"],
   },
   {
     id: "payroll",
     label: "Payroll",
-    href: "/payroll",
+    href: "/pay/payroll",
     icon: Wallet,
     section: "pay",
     roles: ["hr_admin", "payroll"],

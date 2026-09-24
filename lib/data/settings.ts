@@ -200,6 +200,12 @@ export const SETTINGS: SettingCategory[] = [
     icon: CircleDollarSign,
     items: [
       {
+        slug: "pay-groups",
+        label: "Pay groups",
+        blurb:
+          "One entity, one country, one currency and one cycle. Everyone is paid through exactly one pay group.",
+      },
+      {
         slug: "statutory-settings",
         label: "Country rules",
         blurb:
@@ -230,10 +236,9 @@ export const SETTINGS: SettingCategory[] = [
       },
       {
         slug: "payroll-approval",
-        label: "Payroll approval",
+        label: "Approvals",
         blurb:
           "Who signs off a run before it is disbursed, and whether two approvals are required.",
-        href: "/payroll",
       },
     ],
   },

@@ -29,7 +29,7 @@ const TOPICS = [
     icon: BookOpen,
     title: "Why records stay complete",
     body: "A payroll run that discovers a missing SSNIT number has already failed. Completeness is surfaced on the record and enforced before a run starts.",
-    href: "/payroll",
+    href: "/pay/payroll",
   },
 ]
 

@@ -114,6 +114,9 @@ describe("getNavForUser — Line Manager / HoD", () => {
           "Team performance",
         ],
       ],
+      // A manager sees Compensation for their own reports, and cannot
+      // approve anything there.
+      ["pay", ["Compensation"]],
       ["people", ["Directory", "Org chart"]],
       [
         "me",

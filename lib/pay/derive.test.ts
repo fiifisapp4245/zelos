@@ -14,7 +14,9 @@ import {
   prorate,
   scheduledVersion,
 } from "./derive"
+import { canProposeFor, payRoleOf, payScope } from "./access"
 import { money, totalPerCurrency } from "./money"
+import type { Employee } from "../types"
 import type {
   CompensationChangeRequest,
   CompensationVersion,
@@ -422,5 +424,46 @@ describe("money", () => {
       { currency: "GHS", amount: 150 },
       { currency: "USD", amount: 20 },
     ])
+  })
+})
+
+describe("who may see pay", () => {
+  const people = [
+    { id: "kofi", managerId: "adwoa", dottedLineManagerId: null },
+    { id: "afia", managerId: "adwoa", dottedLineManagerId: null },
+    { id: "ama", managerId: "kwesi", dottedLineManagerId: null },
+    { id: "adwoa", managerId: "esi", dottedLineManagerId: null },
+  ] as unknown as Employee[]
+
+  const manager = { employeeId: "adwoa", roles: ["line_manager" as const] }
+  const payroll = { employeeId: "maame", roles: ["payroll" as const] }
+  const hr = { employeeId: "fiifi", roles: ["hr_admin" as const] }
+  const employee = { employeeId: "kofi", roles: ["employee" as const] }
+
+  it("gives a manager their own reports and nobody else", () => {
+    expect(payScope(manager, people).map((e) => e.id).sort()).toEqual([
+      "adwoa",
+      "afia",
+      "kofi",
+    ])
+  })
+
+  it("gives payroll everyone, and lets them change nothing", () => {
+    expect(payScope(payroll, people)).toHaveLength(4)
+    expect(payRoleOf(payroll)).toBe("reader")
+    expect(canProposeFor(payroll, people[0], people)).toBe(false)
+  })
+
+  it("gives an employee only themselves", () => {
+    expect(payScope(employee, people).map((e) => e.id)).toEqual(["kofi"])
+  })
+
+  it("lets a manager propose for a report but never for themselves", () => {
+    expect(canProposeFor(manager, people[0], people)).toBe(true)
+    expect(canProposeFor(manager, people[3], people)).toBe(false)
+  })
+
+  it("lets HR propose for anyone but themselves", () => {
+    expect(canProposeFor(hr, people[2], people)).toBe(true)
   })
 })

@@ -80,12 +80,13 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     label: "Pay",
     icon: Wallet,
     items: [
+      { label: "Pay groups", href: "/settings/pay-groups" },
       { label: "Pay components", href: "/settings/allowance-deduction-type" },
       { label: "Country rules", href: "/settings/statutory-settings" },
       { label: "Pay schedule", href: "/settings/pay-schedule" },
       { label: "Payment methods", href: "/settings/payment-methods" },
       { label: "Pay-slip settings", href: "/settings/payslip-settings" },
-      { label: "Payroll approval", href: "/settings/payroll-approval" },
+      { label: "Approvals", href: "/settings/payroll-approval" },
     ],
   },
   {

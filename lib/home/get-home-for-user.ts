@@ -49,7 +49,7 @@ export interface QuickAction {
 export const QUICK_ACTIONS: Record<string, QuickAction[]> = {
   hr_admin: [
     { label: "Add employee", href: "/employees/new", icon: "userPlus" },
-    { label: "Run payroll", href: "/payroll", icon: "wallet" },
+    { label: "Run payroll", href: "/pay/payroll", icon: "wallet" },
     { label: "Record leave", href: "/leave", icon: "calendarDays" },
     { label: "Generate report", href: "/reports", icon: "chart" },
   ],
@@ -66,7 +66,7 @@ export const QUICK_ACTIONS: Record<string, QuickAction[]> = {
     { label: "Upload document", href: "/me/documents", icon: "upload" },
   ],
   payroll: [
-    { label: "Run payroll", href: "/payroll", icon: "wallet" },
+    { label: "Run payroll", href: "/pay/payroll", icon: "wallet" },
     { label: "View payslips", href: "/me/pay", icon: "receipt" },
     { label: "Generate report", href: "/reports", icon: "chart" },
     { label: "Request leave", href: "/me/leave", icon: "calendarDays" },

@@ -51,7 +51,7 @@ export function NeedsAttention({ scope }: { scope?: WidgetScope }) {
    */
   const more =
     scope === "payroll"
-      ? { href: "/payroll", label: "Open payroll" }
+      ? { href: "/pay/payroll", label: "Open payroll" }
       : scope === "team"
         ? { href: "/team", label: "View team" }
         : { href: "/alerts", label: "View more" }

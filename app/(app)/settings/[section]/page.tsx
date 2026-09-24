@@ -22,6 +22,12 @@ import { RETIREMENT_AGE } from "@/lib/format"
 import { findSetting } from "@/lib/data/settings"
 import { SETTINGS_CONTENT } from "@/lib/data/settings-content"
 import { SettingBlocks } from "./blocks"
+import {
+  CountryRulesPanel,
+  PayApprovalsPanel,
+  PayComponentsPanel,
+  PayGroupsPanel,
+} from "@/components/pay/settings-panels"
 import { CompanyInformation } from "./company-information"
 import type { PermissionRole } from "@/lib/types"
 
@@ -91,6 +97,14 @@ export default function SettingDetailPage() {
             <LocalizationPanel />
           ) : section === "role-assignment" ? (
             <RoleAssignmentPanel />
+          ) : section === "pay-groups" ? (
+            <PayGroupsPanel />
+          ) : section === "allowance-deduction-type" ? (
+            <PayComponentsPanel />
+          ) : section === "statutory-settings" ? (
+            <CountryRulesPanel />
+          ) : section === "payroll-approval" ? (
+            <PayApprovalsPanel />
           ) : blocks ? (
             <SettingBlocks blocks={blocks} />
           ) : (
@@ -181,9 +195,19 @@ const PERMISSION_MATRIX: {
     roles: {
       hr_admin: true,
       payroll: true,
+      head_of_department: "conditional",
+      line_manager: "conditional",
+      employee: "conditional",
+    },
+  },
+  {
+    capability: "Approve a pay change",
+    roles: {
+      hr_admin: "conditional",
+      payroll: false,
       head_of_department: false,
       line_manager: false,
-      employee: "conditional",
+      employee: false,
     },
   },
   {

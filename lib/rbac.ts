@@ -10,7 +10,12 @@
  * rather than scattered through components is the whole point.
  */
 
-import type { Employee, PermissionRole, DisciplinaryCase, CoachingNote } from "./types"
+import type {
+  Employee,
+  PermissionRole,
+  DisciplinaryCase,
+  CoachingNote,
+} from "./types"
 
 export interface Viewer {
   employeeId: string
@@ -42,7 +47,11 @@ export function isDottedReport(viewer: Viewer, employee: Employee) {
 }
 
 /** Everyone at or below the viewer in the primary reporting tree. */
-export function isInChain(viewer: Viewer, employee: Employee, all: Employee[]): boolean {
+export function isInChain(
+  viewer: Viewer,
+  employee: Employee,
+  all: Employee[]
+): boolean {
   let cursor: Employee | undefined = employee
   const seen = new Set<string>()
   while (cursor?.managerId && !seen.has(cursor.id)) {
@@ -58,11 +67,19 @@ export function departmentOf(viewer: Viewer, all: Employee[]) {
 }
 
 /** Can the viewer open this employee's record at all? */
-export function canViewRecord(viewer: Viewer, employee: Employee, all: Employee[]) {
+export function canViewRecord(
+  viewer: Viewer,
+  employee: Employee,
+  all: Employee[]
+) {
   if (has(viewer, "hr_admin") || has(viewer, "payroll")) return true
   if (isSelf(viewer, employee)) return true
-  if (isInChain(viewer, employee, all) || isDottedReport(viewer, employee)) return true
-  if (has(viewer, "head_of_department") && departmentOf(viewer, all) === employee.department)
+  if (isInChain(viewer, employee, all) || isDottedReport(viewer, employee))
+    return true
+  if (
+    has(viewer, "head_of_department") &&
+    departmentOf(viewer, all) === employee.department
+  )
     return true
   return false
 }
@@ -71,13 +88,29 @@ export function canViewRecord(viewer: Viewer, employee: Employee, all: Employee[
  * Salary: self + HR + Payroll only. Line managers are deliberately excluded —
  * a decided one-way door, not an oversight (system map §3).
  */
+/**
+ * Pay reaches further than it used to: a line manager can see what their
+ * own reports are on, because they are the ones asked to argue for a
+ * change. Seeing it is not deciding it — approval stays with HR, and
+ * amounts stay masked until the manager asks for them.
+ */
 export function canViewCompensation(viewer: Viewer, employee: Employee) {
-  return has(viewer, "hr_admin") || has(viewer, "payroll") || isSelf(viewer, employee)
+  return (
+    has(viewer, "hr_admin") ||
+    has(viewer, "payroll") ||
+    isSelf(viewer, employee) ||
+    isDirectReport(viewer, employee) ||
+    isDottedReport(viewer, employee)
+  )
 }
 
 /** Statutory IDs (SSNIT/TIN) are masked until an authorised user reveals them. */
 export function canRevealStatutoryIds(viewer: Viewer, employee: Employee) {
-  return has(viewer, "hr_admin") || has(viewer, "payroll") || isSelf(viewer, employee)
+  return (
+    has(viewer, "hr_admin") ||
+    has(viewer, "payroll") ||
+    isSelf(viewer, employee)
+  )
 }
 
 export function canEditRecord(viewer: Viewer, employee: Employee) {
@@ -105,19 +138,28 @@ export function canChangeLifecycle(viewer: Viewer) {
 
 export function canApproveLeave(viewer: Viewer, employee: Employee) {
   if (has(viewer, "hr_admin")) return true
-  if (isDirectReport(viewer, employee) || isDottedReport(viewer, employee)) return true
+  if (isDirectReport(viewer, employee) || isDottedReport(viewer, employee))
+    return true
   return false
 }
 
 /** Purpose-based: medical documents need a stated reason, seniority is not enough. */
-export function canViewMedical(viewer: Viewer, employee: Employee, statedPurpose: string | null) {
+export function canViewMedical(
+  viewer: Viewer,
+  employee: Employee,
+  statedPurpose: string | null
+) {
   if (isSelf(viewer, employee)) return true
   if (!statedPurpose || statedPurpose.trim().length < 8) return false
   return has(viewer, "hr_admin")
 }
 
 /** Lifecycle-based: who may read a disciplinary case depends on its state. */
-export function canViewCase(viewer: Viewer, c: DisciplinaryCase, employee: Employee) {
+export function canViewCase(
+  viewer: Viewer,
+  c: DisciplinaryCase,
+  employee: Employee
+) {
   if (has(viewer, "hr_admin")) return true
   if (c.raisedBy === viewer.employeeId) return true
   const finalised = c.state === "finalised" || c.state === "dismissed"
