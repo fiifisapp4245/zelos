@@ -121,19 +121,6 @@ export default function LifecycleEventsPage() {
               value: t.id,
               label: t.label,
               count: t.count,
-              // Overdue work carries its own mark rather than recolouring the
-              // total, since six due and one late is not seven late.
-              adornment:
-                t.id === "decisions" && overdue > 0 ? (
-                  <>
-                    <span className="tabular rounded-full bg-muted px-1.5 text-xs text-muted-foreground">
-                      {t.count}
-                    </span>
-                    <span className="tabular rounded-full bg-destructive/15 px-1.5 text-xs text-destructive">
-                      {overdue} overdue
-                    </span>
-                  </>
-                ) : undefined,
             }))}
           />
 

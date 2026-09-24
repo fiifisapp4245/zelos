@@ -23,7 +23,6 @@ import {
 } from "@/components/common"
 import { LifecycleBadge } from "@/components/common/status"
 import { RowActions } from "@/components/common/row-actions"
-import { Button } from "@/components/ui/button"
 import { ChangeStatusDialog } from "./change-status-dialog"
 import { useStore } from "@/lib/store"
 import { canChangeLifecycle } from "@/lib/rbac"
@@ -47,15 +46,20 @@ const ICON: Record<LifecycleTask["kind"], LucideIcon> = {
 
 /** How late, or how soon, the decision is. */
 function due(daysLeft: number) {
+  const n = Math.abs(daysLeft)
+  const days = `${n} day${n === 1 ? "" : "s"}`
   if (daysLeft < 0)
     return {
       tone: "danger" as const,
-      text: `${Math.abs(daysLeft)} day${Math.abs(daysLeft) === 1 ? "" : "s"} overdue`,
+      text: `${days} overdue`,
+      short: `${days} overdue`,
     }
-  if (daysLeft === 0) return { tone: "warning" as const, text: "Due today" }
+  if (daysLeft === 0)
+    return { tone: "warning" as const, text: "Due today", short: "Today" }
   return {
     tone: "warning" as const,
-    text: `Due in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`,
+    text: `Due in ${days}`,
+    short: `In ${days}`,
   }
 }
 
@@ -147,29 +151,20 @@ function TaskActions({
       </span>
     )
   }
+  // Every outcome in one place. Pulling the likeliest one out as its own
+  // button only asks the reader to check two controls before deciding.
   return (
-    <div className="flex items-center gap-1">
-      <Button
-        size="sm"
-        onClick={() => decide(task.employee.id, task.primary.to)}
-      >
-        {task.primary.label}
-      </Button>
-      <RowActions
-        label={`Other outcomes for ${fullName(task.employee)}`}
-        actions={[
-          ...task.alternatives.map((a) => ({
-            label: a.label,
-            onSelect: () => decide(task.employee.id, a.to),
-            destructive: a.to === "terminated",
-          })),
-          {
-            label: "Open record",
-            href: `/employees/${task.employee.id}`,
-          },
-        ]}
-      />
-    </div>
+    <RowActions
+      label={`Actions for ${fullName(task.employee)}`}
+      actions={[
+        ...[task.primary, ...task.alternatives].map((a) => ({
+          label: a.label,
+          onSelect: () => decide(task.employee.id, a.to),
+          destructive: a.to === "terminated",
+        })),
+        { label: "Open record", href: `/employees/${task.employee.id}` },
+      ]}
+    />
   )
 }
 
@@ -256,9 +251,10 @@ function TaskTable({
           <tr className="border-b bg-muted/40">
             {showPerson && <Th className="pl-5">Employee</Th>}
             <Th className={showPerson ? undefined : "pl-5"}>Decision</Th>
-            <Th>State</Th>
+            <Th>Current state</Th>
             <Th>Due</Th>
-            <Th className="pr-5 text-right">Action</Th>
+            <Th>Status</Th>
+            <Th className="pr-5 text-right">Actions</Th>
           </tr>
         </thead>
         <tbody className="divide-y">
@@ -293,11 +289,21 @@ function TaskTable({
                 <td className="py-3 pr-3">
                   <LifecycleBadge state={t.employee.lifecycleState} />
                 </td>
-                <td className="py-3 pr-3">
-                  <Pill tone={d.tone}>{d.text}</Pill>
-                  <span className="mt-1 block text-xs whitespace-nowrap text-muted-foreground">
-                    {formatDate(t.dueDate)}
-                  </span>
+                <td className="py-3 pr-3 whitespace-nowrap">
+                  {formatDate(t.dueDate)}
+                </td>
+                <td
+                  className={cn(
+                    "py-3 pr-3 whitespace-nowrap",
+                    // Colour carries the urgency; the words carry the fact.
+                    d.tone === "danger"
+                      ? "font-medium text-destructive"
+                      : t.daysLeft === 0
+                        ? "font-medium text-warning-foreground"
+                        : "text-muted-foreground"
+                  )}
+                >
+                  {d.short}
                 </td>
                 <td className="py-3 pr-5">
                   <div className="flex justify-end">

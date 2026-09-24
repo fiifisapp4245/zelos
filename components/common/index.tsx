@@ -348,10 +348,17 @@ export function ViewToggle({
     { id: "grid", label: "Grid", icon: LayoutGrid },
   ]
   return (
+    // Same shell and same active state as SegmentedTabs. It is not a tablist
+    // — it changes how one list is drawn, not which list — so it keeps the
+    // group and pressed semantics rather than borrowing tab roles it would
+    // then have to lie about.
     <div
       role="group"
       aria-label="Change layout"
-      className={cn("flex items-center rounded-lg border p-0.5", className)}
+      className={cn(
+        "flex w-fit items-center gap-1 rounded-xl border bg-card p-1",
+        className
+      )}
     >
       {options.map((o) => (
         <button
@@ -360,10 +367,11 @@ export function ViewToggle({
           onClick={() => onChange(o.id)}
           aria-pressed={view === o.id}
           className={cn(
-            "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
+            "flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm transition-colors",
+            "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
             view === o.id
-              ? "bg-muted font-medium"
-              : "text-muted-foreground hover:text-foreground"
+              ? "bg-success-muted font-medium text-primary"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
           )}
         >
           <o.icon className="size-4" />
