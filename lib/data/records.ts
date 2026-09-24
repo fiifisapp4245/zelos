@@ -65,6 +65,20 @@ export const BRANCHES: Branch[] = [
     region: "Northern",
     archived: true,
   },
+  {
+    id: "lagos",
+    name: "Lagos",
+    city: "Lagos",
+    region: "Nigeria",
+    archived: false,
+  },
+  {
+    id: "london",
+    name: "London",
+    city: "London",
+    region: "United Kingdom",
+    archived: false,
+  },
 ]
 
 export const DEPARTMENTS: Department[] = [

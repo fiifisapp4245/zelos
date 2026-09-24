@@ -176,6 +176,16 @@ export const PATTERN_ASSIGNMENTS: PatternAssignment[] = [
     createdAt: "2026-09-02T16:20:00",
   },
   {
+    id: "pa-harriet-engagement",
+    patternId: null,
+    scope: "employee",
+    target: "harriet",
+    effectiveFrom: "2026-04-01",
+    reason: "Contractor — invoices against agreed hours, not rostered.",
+    createdBy: "kwesi",
+    createdAt: "2026-03-24T10:00:00",
+  },
+  {
     id: "pa-kwame-engagement",
     patternId: null,
     scope: "employee",

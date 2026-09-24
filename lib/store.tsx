@@ -46,6 +46,16 @@ import {
   WORK_PATTERNS,
 } from "./data/schedules"
 import { RECONCILIATIONS } from "./data/reconciliations"
+import {
+  APPROVAL_SETTINGS,
+  ASSIGNMENTS_ABROAD,
+  CHANGE_REQUESTS,
+  COMPENSATION_VERSIONS,
+  COUNTRY_RULE_PACKS,
+  LEGAL_ENTITIES,
+  PAY_COMPONENTS,
+  PAY_GROUPS,
+} from "./data/pay"
 import type {
   ClockEvent,
   ExceptionResolution,
@@ -60,7 +70,18 @@ import type {
   WorkPattern,
 } from "./schedules/types"
 import type { Reconciliation } from "./leave/reconcile"
+import type {
+  ApprovalSettings,
+  AssignmentAbroad,
+  CompensationChangeRequest,
+  CompensationVersion,
+  CountryRulePack,
+  LegalEntity,
+  PayComponent,
+  PayGroup,
+} from "./pay/types"
 import { applyDecision } from "./approvals/selectors"
+import { applyChange } from "./pay/derive"
 import type { ApprovalItem, DecisionAction } from "./approvals/types"
 import type {
   Alert,
@@ -118,6 +139,14 @@ interface State {
   shifts: Shift[]
   shiftChanges: ShiftChange[]
   reconciliations: Reconciliation[]
+  legalEntities: LegalEntity[]
+  payGroups: PayGroup[]
+  payComponents: PayComponent[]
+  countryRulePacks: CountryRulePack[]
+  compensationVersions: CompensationVersion[]
+  changeRequests: CompensationChangeRequest[]
+  assignmentsAbroad: AssignmentAbroad[]
+  approvalSettings: ApprovalSettings
   clockEvents: ClockEvent[]
   timeAdjustments: TimeAdjustment[]
   exceptionResolutions: ExceptionResolution[]
@@ -156,6 +185,14 @@ const INITIAL: State = {
   shifts: SHIFTS,
   shiftChanges: SHIFT_CHANGES,
   reconciliations: RECONCILIATIONS,
+  legalEntities: LEGAL_ENTITIES,
+  payGroups: PAY_GROUPS,
+  payComponents: PAY_COMPONENTS,
+  countryRulePacks: COUNTRY_RULE_PACKS,
+  compensationVersions: COMPENSATION_VERSIONS,
+  changeRequests: CHANGE_REQUESTS,
+  assignmentsAbroad: ASSIGNMENTS_ABROAD,
+  approvalSettings: APPROVAL_SETTINGS,
   clockEvents: CLOCK_EVENTS,
   timeAdjustments: TIME_ADJUSTMENTS,
   exceptionResolutions: EXCEPTION_RESOLUTIONS,
@@ -175,7 +212,7 @@ const STORAGE_KEY = "zelos-hr-session"
  * this week's types is how you get a crash three screens away from the
  * change that caused it.
  */
-const STORAGE_VERSION = 3
+const STORAGE_VERSION = 4
 
 interface StoreValue extends State {
   viewer: Viewer
@@ -253,6 +290,27 @@ interface StoreValue extends State {
     note?: string
   ) => void
   reopenReconciliation: (key: string) => void
+
+  /**
+   * Pay is append-only. Proposing writes a request, deciding writes the
+   * decision and the versions it creates, and nothing is ever deleted.
+   */
+  proposeCompensationChange: (
+    draft: Omit<
+      CompensationChangeRequest,
+      "id" | "proposedBy" | "status" | "decision" | "events"
+    >
+  ) => CompensationChangeRequest
+  decideCompensationChange: (
+    id: string,
+    action: "approved" | "rejected",
+    reason: string
+  ) => void
+  /** Stands a future version down. It stays on the record, marked. */
+  cancelScheduledVersion: (versionId: string, reason: string) => void
+  savePayGroup: (group: PayGroup) => void
+  savePayComponent: (component: PayComponent) => void
+  saveApprovalSettings: (patch: Partial<ApprovalSettings>) => void
   decideTimesheet: (
     periodId: string,
     employeeIds: string[],
@@ -1036,6 +1094,189 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setState((s) => ({
           ...s,
           reconciliations: s.reconciliations.filter((r) => r.key !== key),
+        }))
+      },
+
+      /* ── Pay ───────────────────────────────────────────────────── */
+
+      proposeCompensationChange: (draft) => {
+        const request: CompensationChangeRequest = {
+          ...draft,
+          id: uid("cr"),
+          proposedBy: actorId,
+          status: "pending",
+          decision: null,
+          events: [{ at: nowIso(), by: actorId, action: "proposed" }],
+        }
+        setState((s) => ({
+          ...s,
+          changeRequests: [request, ...s.changeRequests],
+          auditLog: [
+            {
+              id: uid("a"),
+              employeeId: draft.employeeIds[0] ?? null,
+              actorId,
+              action: `Proposed a pay change for ${draft.employeeIds.length} ${draft.employeeIds.length === 1 ? "person" : "people"}`,
+              field: request.id,
+              after: draft.reason,
+              at: nowIso(),
+            },
+            ...s.auditLog,
+          ],
+        }))
+        return request
+      },
+
+      decideCompensationChange: (id, action, reason) => {
+        setState((s) => {
+          const request = s.changeRequests.find((r) => r.id === id)
+          if (!request || request.status !== "pending") return s
+          const at = nowIso()
+
+          const decided: CompensationChangeRequest = {
+            ...request,
+            status: action,
+            decision: { by: actorId, at, reason },
+            events: [
+              ...request.events,
+              { at, by: actorId, action, note: reason },
+            ],
+          }
+
+          // A rejection creates no version. An approval creates one per
+          // person, superseding what they are on without touching it.
+          const created: CompensationVersion[] = []
+          const superseded = new Set<string>()
+
+          if (action === "approved") {
+            for (const employeeId of request.employeeIds) {
+              const rows = applyChange(
+                request.definition,
+                [employeeId],
+                s.compensationVersions,
+                TODAY_ISO
+              )
+              const row = rows[0]
+              if (!row.current) continue
+              superseded.add(row.current.id)
+              created.push({
+                ...row.current,
+                id: uid("cv"),
+                versionNumber: row.current.versionNumber + 1,
+                effectiveFrom: request.effectiveFrom,
+                baseAmount: row.newAmount,
+                reason: request.reason,
+                proposedBy: request.proposedBy,
+                proposedAt: request.events[0]?.at ?? at,
+                approvedBy: actorId,
+                approvedAt: at,
+                status:
+                  request.effectiveFrom > TODAY_ISO ? "scheduled" : "effective",
+                supersedesVersionId: row.current.id,
+                changeRequestId: request.id,
+              })
+            }
+          }
+
+          return {
+            ...s,
+            changeRequests: s.changeRequests.map((r) =>
+              r.id === id ? decided : r
+            ),
+            compensationVersions: [
+              ...s.compensationVersions.map((v) =>
+                superseded.has(v.id) && request.effectiveFrom <= TODAY_ISO
+                  ? { ...v, status: "superseded" as const }
+                  : v
+              ),
+              ...created,
+            ],
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: request.employeeIds[0] ?? null,
+                actorId,
+                action: `${action === "approved" ? "Approved" : "Rejected"} pay change ${request.id}`,
+                field: request.id,
+                after: reason,
+                at,
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      cancelScheduledVersion: (versionId, reason) => {
+        setState((s) => {
+          const version = s.compensationVersions.find((v) => v.id === versionId)
+          if (!version) return s
+          const at = nowIso()
+          return {
+            ...s,
+            // Marked, not removed: it was agreed once, and the record
+            // has to keep saying so.
+            compensationVersions: s.compensationVersions.map((v) =>
+              v.id === versionId ? { ...v, status: "cancelled" as const } : v
+            ),
+            changeRequests: s.changeRequests.map((r) =>
+              r.id === version.changeRequestId
+                ? {
+                    ...r,
+                    status: "cancelled" as const,
+                    decision: { by: actorId, at, reason },
+                    events: [
+                      ...r.events,
+                      {
+                        at,
+                        by: actorId,
+                        action: "cancelled" as const,
+                        note: reason,
+                      },
+                    ],
+                  }
+                : r
+            ),
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: version.employeeId,
+                actorId,
+                action: "Cancelled a scheduled pay change",
+                field: versionId,
+                after: reason,
+                at,
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      savePayGroup: (group) => {
+        setState((s) => ({
+          ...s,
+          payGroups: s.payGroups.some((g) => g.id === group.id)
+            ? s.payGroups.map((g) => (g.id === group.id ? group : g))
+            : [...s.payGroups, group],
+        }))
+      },
+
+      savePayComponent: (component) => {
+        setState((s) => ({
+          ...s,
+          payComponents: s.payComponents.some((c) => c.id === component.id)
+            ? s.payComponents.map((c) =>
+                c.id === component.id ? component : c
+              )
+            : [...s.payComponents, component],
+        }))
+      },
+
+      saveApprovalSettings: (patch) => {
+        setState((s) => ({
+          ...s,
+          approvalSettings: { ...s.approvalSettings, ...patch },
         }))
       },
 
