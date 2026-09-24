@@ -450,7 +450,12 @@ describe("readiness", () => {
 
   const clean: ReadinessSource = {
     payPeriods: [
-      { start: "2026-09-01", end: "2026-09-30", status: "readyForPayroll" },
+      {
+        id: "pp-2026-09",
+        start: "2026-09-01",
+        end: "2026-09-30",
+        status: "readyForPayroll",
+      },
     ],
     openReconciliations: 0,
     pendingPaymentChanges: [],
@@ -470,6 +475,20 @@ describe("readiness", () => {
     expect(blockingChecks(checks).map((c) => c.id)).toEqual([
       "attendance-closed",
     ])
+  })
+
+  it("links at the period in question rather than the module", () => {
+    const checks = readiness(run, clean)
+    expect(checks.find((c) => c.id === "attendance-closed")?.link).toBe(
+      "/timesheets?period=pp-2026-09"
+    )
+  })
+
+  it("links at the one person with no account, when there is only one", () => {
+    const checks = readiness(run, { ...clean, missingDestinations: ["efua"] })
+    expect(checks.find((c) => c.id === "payment-details")?.link).toBe(
+      "/employees/efua"
+    )
   })
 
   it("warns rather than blocks on an unexplained day", () => {

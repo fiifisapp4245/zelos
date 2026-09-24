@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useSearchParams } from "next/navigation"
 import { Users } from "lucide-react"
 
 import { AttendanceShell } from "@/components/attendance/attendance-shell"
@@ -41,13 +42,25 @@ import { formatDate } from "@/lib/format"
 type Tab = "register" | "exceptions" | "leave"
 
 export default function RegisterPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <Register />
+    </React.Suspense>
+  )
+}
+
+function Register() {
   const store = useStore()
+  const params = useSearchParams()
   const [period, setPeriod] = React.useState<PeriodKey>("twoWeeks")
   const [custom, setCustom] = React.useState({ from: "", to: "" })
   const [departments, setDepartments] = React.useState<string[]>([])
   const [branches, setBranches] = React.useState<string[]>([])
   const [search, setSearch] = React.useState("")
-  const [view, setView] = React.useState<Tab>("register")
+  // Other modules link at a reading of the period, not just the page.
+  const [view, setView] = React.useState<Tab>(
+    (params.get("tab") as Tab | null) ?? "register"
+  )
   const [openDay, setOpenDay] = React.useState<DayRecord | null>(null)
 
   const { from, to } = rangeFor(period, custom)

@@ -3,21 +3,23 @@
 import * as React from "react"
 import Link from "next/link"
 import { Download, Eye, EyeOff } from "lucide-react"
-import { toast } from "sonner"
-
 import { Widget, WidgetEmpty } from "./widget"
 import { Button } from "@/components/ui/button"
+import { downloadPayslip } from "@/components/payroll/my-pay"
+import { usePayslips } from "@/components/payroll/use-payslips"
 import { useStore } from "@/lib/store"
-import { formatDate, ghs } from "@/lib/format"
+import { money } from "@/lib/pay/money"
+import { formatDate } from "@/lib/format"
 
 /** Net pay is masked until asked for — a payslip is nobody else's business. */
 export function LatestPayslip() {
   const store = useStore()
   const [revealed, setRevealed] = React.useState(false)
 
-  const slip = store.payslips
-    .filter((p) => p.employeeId === store.session.id)
-    .sort((a, b) => b.period.localeCompare(a.period))[0]
+  // The same payslips the Pay section derives, rather than a second
+  // set that could drift from the runs.
+  const { payslips } = usePayslips(store.session.id)
+  const slip = payslips[0]
 
   if (!slip) {
     return (
@@ -27,10 +29,13 @@ export function LatestPayslip() {
     )
   }
 
-  const month = new Date(`${slip.period}-01`).toLocaleDateString("en-GB", {
-    month: "long",
-    year: "numeric",
-  })
+  const month = new Date(`${slip.period}-01T00:00:00`).toLocaleDateString(
+    "en-GB",
+    {
+      month: "long",
+      year: "numeric",
+    }
+  )
 
   return (
     <Widget
@@ -47,11 +52,13 @@ export function LatestPayslip() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            {month} · paid {formatDate(slip.paidOn)}
+            {month} · paid {formatDate(slip.payDate)}
           </p>
           <p className="mt-1 flex items-center gap-2">
             <span className="tabular text-2xl leading-tight font-semibold">
-              {revealed ? ghs(slip.netGhs) : "GHS ••••••"}
+              {revealed
+                ? money(slip.net, slip.currency)
+                : `${slip.currency} ••••••`}
             </span>
             <button
               type="button"
@@ -72,7 +79,7 @@ export function LatestPayslip() {
 
         <Button
           variant="outline"
-          onClick={() => toast.success(`${month} payslip downloaded`)}
+          onClick={() => downloadPayslip(slip, store.company.tradingName)}
         >
           <Download className="size-4" />
           Download

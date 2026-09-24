@@ -50,6 +50,7 @@ import {
   EXTERNAL_RESULTS,
   LINE_ADJUSTMENTS,
   ONE_OFF_PAYMENTS,
+  PAYMENT_BATCHES,
   PAYROLL_RUNS,
   READINESS_ACKNOWLEDGEMENTS,
 } from "./data/payroll"
@@ -83,6 +84,8 @@ import type {
   ExternalResult,
   LineAdjustment,
   OneOffPayment,
+  PaymentBatch,
+  PaymentChannelKey,
   PayrollRun,
   ReadinessAcknowledgement,
   RunStatus,
@@ -165,6 +168,7 @@ interface State {
   oneOffPayments: OneOffPayment[]
   externalResults: ExternalResult[]
   readinessAcknowledgements: ReadinessAcknowledgement[]
+  paymentBatches: PaymentBatch[]
   clockEvents: ClockEvent[]
   timeAdjustments: TimeAdjustment[]
   exceptionResolutions: ExceptionResolution[]
@@ -216,6 +220,7 @@ const INITIAL: State = {
   oneOffPayments: ONE_OFF_PAYMENTS,
   externalResults: EXTERNAL_RESULTS,
   readinessAcknowledgements: READINESS_ACKNOWLEDGEMENTS,
+  paymentBatches: PAYMENT_BATCHES,
   clockEvents: CLOCK_EVENTS,
   timeAdjustments: TIME_ADJUSTMENTS,
   exceptionResolutions: EXCEPTION_RESOLUTIONS,
@@ -235,7 +240,7 @@ const STORAGE_KEY = "zelos-hr-session"
  * this week's types is how you get a crash three screens away from the
  * change that caused it.
  */
-const STORAGE_VERSION = 5
+const STORAGE_VERSION = 6
 
 interface StoreValue extends State {
   viewer: Viewer
@@ -359,6 +364,17 @@ interface StoreValue extends State {
     draft: Omit<OneOffPayment, "id" | "status" | "includedInRunId" | "events">
   ) => void
   cancelOneOffPayment: (id: string, reason: string) => void
+
+  /** Money leaves in batches, and every step of one is recorded. */
+  createPaymentBatches: (runId: string, batches: PaymentBatch[]) => void
+  advanceBatch: (batchId: string, to: PaymentBatch["status"]) => void
+  /** A failed item is tried again; the first attempt stays on the record. */
+  retryPaymentItem: (batchId: string, employeeId: string) => void
+  payItemByChannel: (
+    batchId: string,
+    employeeId: string,
+    channel: PaymentChannelKey
+  ) => void
   decideTimesheet: (
     periodId: string,
     employeeIds: string[],
@@ -1534,6 +1550,155 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             },
             ...s.oneOffPayments,
           ],
+        }))
+      },
+
+      createPaymentBatches: (runId, batches) => {
+        setState((s) => ({
+          ...s,
+          paymentBatches: [
+            ...s.paymentBatches.filter((b) => b.runId !== runId),
+            ...batches.map((b) => ({
+              ...b,
+              events: [{ at: nowIso(), by: actorId, action: "Initiated" }],
+            })),
+          ],
+          payrollRuns: s.payrollRuns.map((r) =>
+            r.id === runId && r.status === "approved"
+              ? {
+                  ...r,
+                  status: "paying" as const,
+                  events: [
+                    ...r.events,
+                    { at: nowIso(), by: actorId, action: "Payments started" },
+                  ],
+                }
+              : r
+          ),
+        }))
+      },
+
+      advanceBatch: (batchId, to) => {
+        setState((s) => {
+          const batches = s.paymentBatches.map((b) =>
+            b.id === batchId
+              ? {
+                  ...b,
+                  status: to,
+                  items: b.items.map((i) =>
+                    i.status === "failed"
+                      ? i
+                      : {
+                          ...i,
+                          status:
+                            to === "confirmed"
+                              ? ("confirmed" as const)
+                              : to === "sent"
+                                ? ("sent" as const)
+                                : i.status,
+                        }
+                  ),
+                  events: [
+                    ...b.events,
+                    {
+                      at: nowIso(),
+                      by: actorId,
+                      action:
+                        to === "sent"
+                          ? "Sent to the provider"
+                          : to === "confirmed"
+                            ? "Confirmed"
+                            : "Failed",
+                    },
+                  ],
+                }
+              : b
+          )
+
+          // A run is paid once every batch on it has settled.
+          const batch = batches.find((b) => b.id === batchId)
+          const runBatches = batch
+            ? batches.filter((b) => b.runId === batch.runId)
+            : []
+          const allDone =
+            runBatches.length > 0 &&
+            runBatches.every((b) => b.status === "confirmed")
+
+          return {
+            ...s,
+            paymentBatches: batches,
+            payrollRuns: s.payrollRuns.map((r) =>
+              batch && r.id === batch.runId && allDone && r.status !== "paid"
+                ? {
+                    ...r,
+                    status: "paid" as const,
+                    events: [
+                      ...r.events,
+                      { at: nowIso(), by: actorId, action: "Paid" },
+                    ],
+                  }
+                : r
+            ),
+          }
+        })
+      },
+
+      retryPaymentItem: (batchId, employeeId) => {
+        setState((s) => ({
+          ...s,
+          paymentBatches: s.paymentBatches.map((b) =>
+            b.id === batchId
+              ? {
+                  ...b,
+                  items: b.items.map((i) =>
+                    i.employeeId === employeeId
+                      ? { ...i, status: "sent" as const }
+                      : i
+                  ),
+                  status: "sent" as const,
+                  events: [
+                    ...b.events,
+                    {
+                      at: nowIso(),
+                      by: actorId,
+                      action: "Retried",
+                      note: `Sent again to the same destination.`,
+                    },
+                  ],
+                }
+              : b
+          ),
+        }))
+      },
+
+      payItemByChannel: (batchId, employeeId, channel) => {
+        setState((s) => ({
+          ...s,
+          paymentBatches: s.paymentBatches.map((b) =>
+            b.id === batchId
+              ? {
+                  ...b,
+                  items: b.items.map((i) =>
+                    i.employeeId === employeeId
+                      ? {
+                          ...i,
+                          status: "sent" as const,
+                          paidByChannel: channel,
+                        }
+                      : i
+                  ),
+                  events: [
+                    ...b.events,
+                    {
+                      at: nowIso(),
+                      by: actorId,
+                      action: "Sent by another channel",
+                      note: channel,
+                    },
+                  ],
+                }
+              : b
+          ),
         }))
       },
 

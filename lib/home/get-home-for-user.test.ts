@@ -48,7 +48,9 @@ const scopes = (s: SessionContext) => {
 describe("getHomeForUser — HR Admin", () => {
   it("leads with the approval queue, then attention, then the one metric", () => {
     expect(keys(HR)).toEqual({
-      header: ["meStrip"],
+      // Pay decisions hold other people up, so they sit full width
+      // under the greeting for the roles that can make them.
+      header: ["meStrip", "payActions"],
       main: ["needsApproval", "needsAttention", "workforceSnapshot"],
       rail: ["upcoming", "today", "celebrations"],
     })
@@ -114,7 +116,7 @@ describe("getHomeForUser — Employee", () => {
 describe("getHomeForUser — Payroll Officer", () => {
   it("gets pay-shaped approvals and attention, with the statutory rail", () => {
     expect(keys(PAYROLL)).toEqual({
-      header: ["meStrip"],
+      header: ["meStrip", "payActions"],
       main: ["needsApproval", "needsAttention"],
       rail: ["upcoming", "today", "celebrations"],
     })

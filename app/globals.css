@@ -239,3 +239,28 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* A payslip is a document before it is a screen. Printing it drops the
+   shell around it and leaves the page itself, on white, at full width. */
+@media print {
+  aside,
+  header[data-app-topbar],
+  .print\:hidden {
+    display: none !important;
+  }
+
+  main {
+    overflow: visible !important;
+  }
+
+  main > div {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+}

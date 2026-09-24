@@ -280,7 +280,7 @@ export function lineFromExternal(
 
 export interface ReadinessSource {
   /** Attendance's own pay periods, which have to be settled first. */
-  payPeriods: { start: string; end: string; status: string }[]
+  payPeriods: { id: string; start: string; end: string; status: string }[]
   /** Days in the period where attendance and leave still disagree. */
   openReconciliations: number
   /** People in this run whose payment details are awaiting approval. */
@@ -310,6 +310,9 @@ export function readiness(
   run: PayrollRun,
   source: ReadinessSource
 ): ReadinessCheck[] {
+  const covering = source.payPeriods.find(
+    (p) => p.start <= run.periodStart && p.end >= run.periodEnd
+  )
   const settled = source.payPeriods.find(
     (p) =>
       p.start <= run.periodStart &&
@@ -325,7 +328,8 @@ export function readiness(
       detail: settled
         ? "Timesheets for the period have been approved and the period marked ready."
         : "The attendance period covering this run has not been closed, so the hours behind it can still change.",
-      link: "/timesheets",
+      // Straight to the period in question, not to the module's front door.
+      link: covering ? `/timesheets?period=${covering.id}` : "/timesheets",
     },
     {
       id: "compensation-on-file",
@@ -345,7 +349,7 @@ export function readiness(
         source.openReconciliations === 0
           ? "Nothing in the period is unexplained."
           : `${source.openReconciliations} ${source.openReconciliations === 1 ? "day" : "days"} in the period are still unexplained between attendance and leave.`,
-      link: "/attendance",
+      link: "/attendance?tab=leave",
     },
     {
       id: "payment-changes",
@@ -355,7 +359,7 @@ export function readiness(
         source.pendingPaymentChanges.length === 0
           ? "Nobody in this run is waiting on a change of account."
           : `${source.pendingPaymentChanges.length} ${source.pendingPaymentChanges.length === 1 ? "change" : "changes"} of bank or mobile money details are still waiting on approval. Pay would go to the old account.`,
-      link: "/approvals",
+      link: "/approvals?type=bankDetailsChange",
     },
     {
       id: "payment-details",
@@ -365,7 +369,10 @@ export function readiness(
         source.missingDestinations.length === 0
           ? "Every line has a payment destination."
           : `${source.missingDestinations.length} ${source.missingDestinations.length === 1 ? "person has" : "people have"} no bank account or mobile money number on file.`,
-      link: "/employees",
+      link:
+        source.missingDestinations.length === 1
+          ? `/employees/${source.missingDestinations[0]}`
+          : "/employees",
     },
   ]
 

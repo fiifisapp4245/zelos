@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useSearchParams } from "next/navigation"
 import { FileCheck2 } from "lucide-react"
 
 import { AttendanceShell } from "@/components/attendance/attendance-shell"
@@ -19,8 +20,20 @@ const CRUMBS = [
 
 /** Hours across the team, checked before they reach payroll. */
 export default function TimesheetsPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <Timesheets />
+    </React.Suspense>
+  )
+}
+
+function Timesheets() {
   const store = useStore()
-  const [periodId, setPeriodId] = React.useState(store.payPeriods[0]?.id ?? "")
+  const params = useSearchParams()
+  // Payroll links straight at the period it is waiting on.
+  const [periodId, setPeriodId] = React.useState(
+    params.get("period") ?? store.payPeriods[0]?.id ?? ""
+  )
   const [openDay, setOpenDay] = React.useState<DayRecord | null>(null)
 
   const period =

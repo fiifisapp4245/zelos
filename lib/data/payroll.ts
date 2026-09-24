@@ -1,7 +1,17 @@
+import { EMPLOYEES } from "./employees"
+import {
+  COMPENSATION_VERSIONS,
+  COUNTRY_RULE_PACKS,
+  PAY_COMPONENTS,
+  PAY_GROUPS,
+} from "./pay"
+import { batchesFor } from "../pay/payments"
+import { linesForRun, type RunSource } from "../pay/run-lines"
 import type {
   ExternalResult,
   LineAdjustment,
   OneOffPayment,
+  PaymentBatch,
   PayrollRun,
   ReadinessAcknowledgement,
 } from "../pay/types"
@@ -411,3 +421,69 @@ export const ONE_OFF_PAYMENTS: OneOffPayment[] = [
 
 /** Warnings somebody has already decided to proceed past. */
 export const READINESS_ACKNOWLEDGEMENTS: ReadinessAcknowledgement[] = []
+
+/* ── Payments ────────────────────────────────────────────────────────── */
+
+/**
+ * The batches that carried the money out on the runs that have been
+ * paid, built from the same lines the register shows.
+ *
+ * One item on the August mobile money batch came back: the number is
+ * registered in somebody else's name. It is left failed rather than
+ * quietly retried, because somebody has to look at it.
+ */
+export const PAYMENT_BATCHES: PaymentBatch[] = (() => {
+  const source: RunSource = {
+    employees: EMPLOYEES,
+    versions: COMPENSATION_VERSIONS,
+    payGroups: PAY_GROUPS,
+    rulePacks: COUNTRY_RULE_PACKS,
+    components: PAY_COMPONENTS,
+    oneOffs: ONE_OFF_PAYMENTS,
+    adjustments: LINE_ADJUSTMENTS,
+    externalResults: EXTERNAL_RESULTS,
+    destinationOverrides: RUN_DESTINATION_OVERRIDES,
+    runs: PAYROLL_RUNS,
+  }
+
+  return PAYROLL_RUNS.filter((r) => r.status === "paid").flatMap((run) => {
+    const { lines } = linesForRun(run, source)
+    return batchesFor(run, lines, EMPLOYEES).map((batch) => {
+      const failed = batch.id === "pb-run-gh-2026-08-mtn_momo" ? "mensa" : null
+
+      const items = batch.items.map((item) =>
+        item.employeeId === failed
+          ? {
+              ...item,
+              status: "failed" as const,
+              failureReason:
+                "The mobile money account is registered in another name.",
+            }
+          : { ...item, status: "confirmed" as const }
+      )
+
+      const sentAt = `${run.payDate}T08:05:00`
+      return {
+        ...batch,
+        items,
+        status: failed ? ("failed" as const) : ("confirmed" as const),
+        events: [
+          { at: `${run.payDate}T08:00:00`, by: "maame", action: "Initiated" },
+          { at: sentAt, by: "maame", action: "Sent to the provider" },
+          failed
+            ? {
+                at: `${run.payDate}T09:40:00`,
+                by: "maame",
+                action: "Failed",
+                note: "One item came back; the rest settled.",
+              }
+            : {
+                at: `${run.payDate}T09:20:00`,
+                by: "maame",
+                action: "Confirmed",
+              },
+        ],
+      }
+    })
+  })
+})()

@@ -95,6 +95,16 @@ export interface RulePackUpdate {
   summary: string
 }
 
+export interface FilingDeadline {
+  name: string
+  /** The rule in words, as the authority states it. */
+  due: string
+  /** Day of the month it falls on, where it is monthly. */
+  dueDayOfMonth?: number
+  /** MM-DD, where it is annual. */
+  annualOn?: string
+}
+
 export interface CountryRulePack {
   country: string
   version: string
@@ -106,7 +116,7 @@ export interface CountryRulePack {
   /** Applied in order to taxable pay, per pay period. */
   taxBands: TaxBand[]
   statutoryReports: string[]
-  filingDeadlines: { name: string; due: string }[]
+  filingDeadlines: FilingDeadline[]
   updates: RulePackUpdate[]
 }
 
@@ -393,4 +403,80 @@ export interface ExternalResult {
   gross: number
   deductions: number
   net: number
+}
+
+/* ── Payments ────────────────────────────────────────────────────────── */
+
+/**
+ * How money actually leaves. A bank file goes to the bank as a file;
+ * the mobile money channels are per provider, because a batch goes to
+ * one provider at a time.
+ */
+export type PaymentChannelKey =
+  | "bank_file"
+  | "mtn_momo"
+  | "telecel_cash"
+  | "airteltigo_money"
+  | "international_transfer"
+
+export type BatchStatus = "initiated" | "sent" | "confirmed" | "failed"
+export type PaymentItemStatus = "pending" | "sent" | "confirmed" | "failed"
+
+export interface PaymentItem {
+  employeeId: string
+  amount: number
+  currency: Currency
+  destinationMasked: string
+  status: PaymentItemStatus
+  /** Why the money came back, in the provider's words. */
+  failureReason?: string
+  /** Set where a failed item was paid another way instead. */
+  paidByChannel?: PaymentChannelKey
+}
+
+export interface PaymentBatch {
+  id: string
+  runId: string
+  channel: PaymentChannelKey
+  count: number
+  totalsPerCurrency: { currency: Currency; amount: number }[]
+  status: BatchStatus
+  items: PaymentItem[]
+  events: PayrollEvent[]
+}
+
+/* ── Payslips ────────────────────────────────────────────────────────── */
+
+export interface YtdTotals {
+  gross: number
+  deductions: number
+  employerContributions: number
+  net: number
+}
+
+/**
+ * A payslip is a statement of a run's line, not a second copy of it. It
+ * is derived from the run every time, so a payslip and the register can
+ * never disagree.
+ */
+export interface Payslip {
+  id: string
+  runId: string
+  employeeId: string
+  /** yyyy-mm, the period it covers. */
+  period: string
+  payDate: string
+  earnings: LineItem[]
+  deductions: LineItem[]
+  employerContributions: LineItem[]
+  gross: number
+  net: number
+  currency: Currency
+  paymentChannel: PaymentChannel | null
+  destinationMasked: string | null
+  ytd: YtdTotals
+  /** Which version of the country's rules worked this out. */
+  rulePackVersion: string | null
+  /** The compensation version the figures were calculated from. */
+  compensationVersionId: string | null
 }

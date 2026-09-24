@@ -97,10 +97,22 @@ const GHANA_RULES: CountryRulePack = {
     "Annual employer return",
   ],
   filingDeadlines: [
-    { name: "PAYE monthly return", due: "15th of the following month" },
-    { name: "SSNIT contributions", due: "14th of the following month" },
-    { name: "Tier 2 remittance", due: "14th of the following month" },
-    { name: "Annual employer return", due: "30 April" },
+    {
+      name: "PAYE monthly return",
+      due: "15th of the following month",
+      dueDayOfMonth: 15,
+    },
+    {
+      name: "SSNIT contributions",
+      due: "14th of the following month",
+      dueDayOfMonth: 14,
+    },
+    {
+      name: "Tier 2 remittance",
+      due: "14th of the following month",
+      dueDayOfMonth: 14,
+    },
+    { name: "Annual employer return", due: "30 April", annualOn: "04-30" },
   ],
   updates: [
     {

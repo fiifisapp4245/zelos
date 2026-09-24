@@ -19,6 +19,7 @@ export type WidgetKey =
   | "upcoming"
   | "celebrations"
   | "profileCompletion"
+  | "payActions"
 
 /**
  * "header" is a full-width strip under the quick actions. It exists so the
@@ -47,6 +48,23 @@ export interface HomeWidgetConfig {
 }
 
 export const HOME_WIDGETS: HomeWidgetConfig[] = [
+  // Pay decisions hold other people up, so they sit near the top for the
+  // two roles that can actually make them.
+  {
+    id: "pay-actions-hr",
+    widget: "payActions",
+    column: "header",
+    roles: ["hr_admin"],
+    order: 2,
+  },
+  {
+    id: "pay-actions-payroll",
+    widget: "payActions",
+    column: "header",
+    roles: ["payroll"],
+    order: 2,
+  },
+
   // ── Main ───────────────────────────────────────────────────────────────
   {
     id: "approvals-hr",

@@ -14,6 +14,7 @@ import { MyDay } from "@/components/home/my-day"
 import { MyRequests } from "@/components/home/my-requests"
 import { NeedsApproval } from "@/components/home/needs-approval"
 import { NeedsAttention } from "@/components/home/needs-attention"
+import { PayActions } from "@/components/home/pay-actions"
 import { ProfileCompletion } from "@/components/home/profile-completion"
 import { TeamToday } from "@/components/home/team-today"
 import { Today } from "@/components/home/today"
@@ -49,6 +50,7 @@ const widgetRegistry: Record<WidgetKey, React.ComponentType<WidgetProps>> = {
   upcoming: Upcoming,
   celebrations: Celebrations,
   profileCompletion: ProfileCompletion,
+  payActions: PayActions,
 }
 
 export default function HomePage() {

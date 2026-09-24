@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useSearchParams } from "next/navigation"
-import { BarChart3, Lock, Send } from "lucide-react"
+import { Wallet } from "lucide-react"
 
 import { PageShell } from "@/components/shell/page-shell"
 import { EmptyState, PageHeader, Panel } from "@/components/common"
@@ -10,8 +10,12 @@ import { SegmentedTabs } from "@/components/common/segmented-tabs"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { RunsTab } from "@/components/payroll/runs-tab"
 import { OneOffsTab } from "@/components/payroll/one-offs-tab"
+import { PaymentsTab } from "@/components/payroll/payments-tab"
+import { ReportsTab } from "@/components/payroll/reports-tab"
+import { MyPay } from "@/components/payroll/my-pay"
 import { WidgetSkeleton } from "@/components/home/skeletons"
 import { usePayroll } from "@/components/payroll/use-payroll"
+import { useStore } from "@/lib/store"
 
 export default function PayrollPage() {
   return (
@@ -22,31 +26,39 @@ export default function PayrollPage() {
 }
 
 function Payroll() {
+  const store = useStore()
   const params = useSearchParams()
   const demo = params.get("demo")
   const { canOpenPayroll, isPreparer, isApprover } = usePayroll()
   const [tab, setTab] = React.useState("runs")
 
+  // An employee or a line manager has no run to prepare, so this route
+  // is their own pay rather than a locked door.
   if (!canOpenPayroll) {
+    const me = store.employeeById(store.session.id)
     return (
       <PageShell
         crumbs={[
           { label: "Workspace", href: "/overview" },
           { label: "Pay" },
-          { label: "Payroll" },
+          { label: "My pay" },
         ]}
       >
         <PageHeader
-          title="Payroll"
-          description="Preparing, checking and approving each pay period."
+          title="My pay"
+          description="What you were paid, period by period, and the payslip behind each one."
         />
-        <Panel bodyClassName="p-0">
-          <EmptyState
-            icon={Lock}
-            title="Payroll is restricted"
-            description="Runs are prepared by the Payroll Officer and approved by HR. Your own pay slips are on your profile."
-          />
-        </Panel>
+        {me ? (
+          <MyPay employeeId={me.id} />
+        ) : (
+          <Panel bodyClassName="p-0">
+            <EmptyState
+              icon={Wallet}
+              title="No record found"
+              description="Your employee record could not be found in this session."
+            />
+          </Panel>
+        )}
       </PageShell>
     )
   }
@@ -90,23 +102,11 @@ function Payroll() {
         </TabsContent>
 
         <TabsContent value="payments">
-          <Panel bodyClassName="p-0">
-            <EmptyState
-              icon={Send}
-              title="No payment batch is open"
-              description="Once a run is approved, its lines are batched by channel — bank transfer and mobile money — and sent, with each batch tracked until every line is settled."
-            />
-          </Panel>
+          <PaymentsTab canPay={isPreparer} />
         </TabsContent>
 
         <TabsContent value="reports">
-          <Panel bodyClassName="p-0">
-            <EmptyState
-              icon={BarChart3}
-              title="No reports for this period yet"
-              description="Statutory returns and the schedules behind them are produced from approved runs: PAYE, SSNIT, Tier 2 and the annual employer return."
-            />
-          </Panel>
+          <ReportsTab />
         </TabsContent>
       </Tabs>
     </PageShell>

@@ -2,21 +2,39 @@
 
 import { Wallet } from "lucide-react"
 
-import { ModulePlaceholder } from "@/components/common/module-placeholder"
+import { PageShell } from "@/components/shell/page-shell"
+import { EmptyState, PageHeader, Panel } from "@/components/common"
+import { MyPay } from "@/components/payroll/my-pay"
+import { useStore } from "@/lib/store"
 
-export default function Page() {
+/** The same view Payroll shows an employee, reached from their own menu. */
+export default function MyPayPage() {
+  const store = useStore()
+  const me = store.employeeById(store.session.id)
+
   return (
-    <ModulePlaceholder
-      title="My pay"
-      description="Your payslips, statutory deductions and the bank or mobile money account they are paid into."
-      icon={Wallet}
+    <PageShell
       crumbs={[
         { label: "Workspace", href: "/overview" },
         { label: "Me" },
         { label: "My pay" },
       ]}
-      emptyTitle="No payslips yet"
-      emptyDescription="Payslips appear here once a payroll run that includes you has been approved."
-    />
+    >
+      <PageHeader
+        title="My pay"
+        description="What you were paid, period by period, and the payslip behind each one."
+      />
+      {me ? (
+        <MyPay employeeId={me.id} />
+      ) : (
+        <Panel bodyClassName="p-0">
+          <EmptyState
+            icon={Wallet}
+            title="No record found"
+            description="Your employee record could not be found in this session."
+          />
+        </Panel>
+      )}
+    </PageShell>
   )
 }
