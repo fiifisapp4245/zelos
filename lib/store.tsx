@@ -118,7 +118,15 @@ const INITIAL: State = {
   activeRole: "hr_admin",
 }
 
-const STORAGE_KEY = "zelos-hr-session-v1"
+const STORAGE_KEY = "zelos-hr-session"
+
+/**
+ * Bump this whenever a persisted shape changes. A stored blob from an older
+ * version is discarded rather than merged — spreading last week's data over
+ * this week's types is how you get a crash three screens away from the
+ * change that caused it.
+ */
+const STORAGE_VERSION = 2
 
 interface StoreValue extends State {
   viewer: Viewer
@@ -243,8 +251,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (raw) setState({ ...INITIAL, ...(JSON.parse(raw) as State) })
+      if (raw) {
+        const saved = JSON.parse(raw) as { version?: number; state?: State }
+        if (saved.version === STORAGE_VERSION && saved.state) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setState({ ...INITIAL, ...saved.state })
+        } else {
+          sessionStorage.removeItem(STORAGE_KEY)
+        }
+      }
     } catch {
       // Private mode or blocked storage — the seeded state is still fine.
     }
@@ -254,7 +269,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (!hydrated) return
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+      sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ version: STORAGE_VERSION, state })
+      )
     } catch {
       // Over quota or blocked; the in-memory state remains authoritative.
     }
