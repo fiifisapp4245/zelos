@@ -2,6 +2,8 @@
 
 import * as React from "react"
 
+import { useSearchParams } from "next/navigation"
+
 import { PageShell } from "@/components/shell/page-shell"
 import { PageHeader } from "@/components/common"
 import { SegmentedTabs } from "@/components/common/segmented-tabs"
@@ -10,13 +12,24 @@ import { PatternsMode } from "@/components/schedules/patterns-mode"
 import { RosterMode } from "@/components/schedules/roster-mode"
 import { MySchedule } from "@/components/schedules/my-schedule"
 import { useSchedules } from "@/components/schedules/use-schedules"
+import { WidgetSkeleton } from "@/components/home/skeletons"
 import { useStore } from "@/lib/store"
 import { has } from "@/lib/rbac"
 import { addDays, datesBetween, startOfWeek } from "@/lib/time"
 import { TODAY_ISO } from "@/lib/format"
 
 export default function SchedulesPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <Schedules />
+    </React.Suspense>
+  )
+}
+
+function Schedules() {
   const store = useStore()
+  const params = useSearchParams()
+  const demo = params.get("demo")
   const { audience, scope, input, policy, defaultGraceMinutes } = useSchedules()
 
   // On-site and shift-based companies live in the roster; office and
@@ -75,17 +88,31 @@ export default function SchedulesPage() {
         </div>
 
         <TabsContent value="patterns">
-          <PatternsMode
-            scope={scope}
-            input={input}
-            defaultGraceMinutes={defaultGraceMinutes}
-            canEdit={canEdit}
-            dates={range}
-          />
+          {demo === "loading" ? (
+            <WidgetSkeleton rows={5} />
+          ) : (
+            <PatternsMode
+              scope={scope}
+              input={input}
+              defaultGraceMinutes={defaultGraceMinutes}
+              canEdit={canEdit}
+              dates={range}
+              // ?demo=empty shows the day the company starts, with no
+              // patterns written and nobody assigned to one.
+              empty={demo === "empty"}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="roster">
-          <RosterMode scope={scope} canEdit={canEdit} />
+          {demo === "loading" ? (
+            <WidgetSkeleton rows={6} />
+          ) : (
+            <RosterMode
+              scope={demo === "empty" ? [] : scope}
+              canEdit={canEdit}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </PageShell>

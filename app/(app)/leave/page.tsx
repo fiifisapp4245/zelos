@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { CalendarPlus, Check, ClipboardList, Ban, X } from "lucide-react"
 import { toast } from "sonner"
 
@@ -43,12 +44,31 @@ import type { LeaveRequest, LeaveType } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 export default function LeavePage() {
+  return (
+    <React.Suspense fallback={null}>
+      <Leave />
+    </React.Suspense>
+  )
+}
+
+/**
+ * Other modules link in here rather than deciding leave themselves, so
+ * the page reads the URL: which tab to open, which request to bring to
+ * the top, and whether to open the form already filled in for someone.
+ */
+function Leave() {
   const store = useStore()
+  const params = useSearchParams()
+  const router = useRouter()
   const { viewer, employees, leaveRequests, leaveBalances } = store
   const me = store.employeeById(viewer.employeeId)!
   const scopeIds = new Set(visibleEmployees(viewer, employees).map((e) => e.id))
 
-  const [requestOpen, setRequestOpen] = React.useState(false)
+  const highlighted = params.get("request")
+  const forEmployee = params.get("for")
+  const [requestOpen, setRequestOpen] = React.useState(
+    params.get("new") === "1"
+  )
   const [decision, setDecision] = React.useState<{
     request: LeaveRequest
     action: "approved" | "rejected"
@@ -59,6 +79,19 @@ export default function LeavePage() {
   const teamHistory = leaveRequests
     .filter((r) => scopeIds.has(r.employeeId) && r.employeeId !== me.id)
     .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
+
+  // The tab a link asked for, else the one with something waiting on you.
+  const defaultTab = approvals.length > 0 ? "approvals" : "mine"
+  const fromUrl = params.get("tab")
+  const tab =
+    fromUrl ??
+    (highlighted
+      ? approvals.some((r) => r.id === highlighted)
+        ? "approvals"
+        : leaveRequests.find((r) => r.id === highlighted)?.employeeId === me.id
+          ? "mine"
+          : "team"
+      : defaultTab)
 
   const balance = leaveBalances.find((b) => b.employeeId === me.id)
   const remaining = balance
@@ -111,7 +144,14 @@ export default function LeavePage() {
         />
       </div>
 
-      <Tabs defaultValue={approvals.length > 0 ? "approvals" : "mine"}>
+      <Tabs
+        value={tab}
+        onValueChange={(v) =>
+          router.replace(v === defaultTab ? "/leave" : `/leave?tab=${v}`, {
+            scroll: false,
+          })
+        }
+      >
         <SegmentedTabs
           className="mb-5"
           tabs={[
@@ -138,7 +178,10 @@ export default function LeavePage() {
                   return (
                     <li
                       key={r.id}
-                      className="flex flex-wrap items-center gap-3 px-5 py-4"
+                      className={cn(
+                        "flex flex-wrap items-center gap-3 px-5 py-4",
+                        r.id === highlighted && "bg-success-muted"
+                      )}
                     >
                       <Initials person={emp} size="md" />
                       <div className="min-w-0 flex-1">
@@ -206,7 +249,11 @@ export default function LeavePage() {
                 }
               />
             ) : (
-              <RequestList requests={mine} showPerson={false} />
+              <RequestList
+                requests={mine}
+                showPerson={false}
+                highlighted={highlighted}
+              />
             )}
           </Panel>
         </TabsContent>
@@ -219,7 +266,11 @@ export default function LeavePage() {
                 title="No team requests in your scope"
               />
             ) : (
-              <RequestList requests={teamHistory} showPerson />
+              <RequestList
+                requests={teamHistory}
+                showPerson
+                highlighted={highlighted}
+              />
             )}
           </Panel>
         </TabsContent>
@@ -304,7 +355,13 @@ export default function LeavePage() {
         </TabsContent>
       </Tabs>
 
-      <RequestLeaveDialog open={requestOpen} onOpenChange={setRequestOpen} />
+      <RequestLeaveDialog
+        open={requestOpen}
+        onOpenChange={setRequestOpen}
+        forEmployeeId={forEmployee}
+        from={params.get("from")}
+        to={params.get("to")}
+      />
       {decision && (
         <DecisionDialog
           key={`${decision.request.id}-${decision.action}`}
@@ -319,9 +376,12 @@ export default function LeavePage() {
 function RequestList({
   requests,
   showPerson,
+  highlighted,
 }: {
   requests: LeaveRequest[]
   showPerson: boolean
+  /** A request another module linked to, brought out of the list. */
+  highlighted?: string | null
 }) {
   const store = useStore()
   return (
@@ -332,7 +392,10 @@ function RequestList({
         return (
           <li
             key={r.id}
-            className="flex flex-wrap items-center gap-3 px-5 py-3.5"
+            className={cn(
+              "flex flex-wrap items-center gap-3 px-5 py-3.5",
+              r.id === highlighted && "bg-success-muted"
+            )}
           >
             {showPerson && emp && <Initials person={emp} size="sm" />}
             <div className="min-w-0 flex-1">
@@ -402,15 +465,27 @@ function nextRequestId(existing: LeaveRequest[]) {
 function RequestLeaveDialog({
   open,
   onOpenChange,
+  forEmployeeId,
+  from,
+  to,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
+  /**
+   * Filing on someone else's behalf, which is how a day the register
+   * could not explain becomes a leave record. Same form, same chain.
+   */
+  forEmployeeId?: string | null
+  from?: string | null
+  to?: string | null
 }) {
   const store = useStore()
-  const me = store.employeeById(store.viewer.employeeId)!
+  const viewer = store.employeeById(store.viewer.employeeId)!
+  const onBehalfOf = forEmployeeId ? store.employeeById(forEmployeeId) : null
+  const me = onBehalfOf ?? viewer
   const [type, setType] = React.useState<LeaveType>("annual")
-  const [start, setStart] = React.useState("")
-  const [end, setEnd] = React.useState("")
+  const [start, setStart] = React.useState(from ?? "")
+  const [end, setEnd] = React.useState(to ?? "")
   const [reason, setReason] = React.useState("")
 
   const days =
@@ -462,7 +537,11 @@ function RequestLeaveDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Request leave</DialogTitle>
+          <DialogTitle>
+            {onBehalfOf
+              ? `Request leave for ${fullName(onBehalfOf)}`
+              : "Request leave"}
+          </DialogTitle>
           <DialogDescription>
             Goes to {fullName(store.employeeById(me.managerId))} for approval
             {me.dottedLineManagerId &&

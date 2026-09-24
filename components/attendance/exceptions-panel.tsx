@@ -10,6 +10,7 @@ import {
   LogOut,
   type LucideIcon,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 import { EmptyState, Initials, Panel, Pill } from "@/components/common"
@@ -25,6 +26,7 @@ import {
   type ExceptionItem,
 } from "@/lib/attendance/derive"
 import type { DayRecord, ExceptionKind } from "@/lib/attendance/types"
+import { leaveLink } from "@/lib/leave/links"
 import { useStore } from "@/lib/store"
 import { formatDate, formatDateTime, fullName } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -46,6 +48,7 @@ const ICON: Record<ExceptionKind, LucideIcon> = {
  */
 export function ExceptionsPanel({ records }: { records: DayRecord[] }) {
   const store = useStore()
+  const router = useRouter()
   const [tab, setTab] = React.useState<"open" | "resolved">("open")
 
   const all = exceptionsFrom(records)
@@ -172,12 +175,18 @@ export function ExceptionsPanel({ records }: { records: DayRecord[] }) {
                       actions={[
                         {
                           label: "Link to leave",
-                          onSelect: () =>
-                            resolve(
-                              g.items,
-                              "linkedToLeave",
-                              "Linked to leave"
-                            ),
+                          // The same route the reconciliation list takes:
+                          // leave is filed in the Leave module, never here.
+                          onSelect: () => {
+                            resolve(g.items, "linkedToLeave", "Linked to leave")
+                            router.push(
+                              leaveLink.fileFor(
+                                g.employeeId,
+                                g.items[0].date,
+                                g.items[g.items.length - 1].date
+                              )
+                            )
+                          },
                         },
                         {
                           label: "Add note",

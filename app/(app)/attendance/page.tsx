@@ -33,8 +33,12 @@ import {
   metricsFor,
 } from "@/lib/attendance/derive"
 import type { DayRecord } from "@/lib/attendance/types"
+import { LeaveReconcile } from "@/components/leave-attendance/leave-reconcile"
 import { useStore } from "@/lib/store"
 import { formatDate } from "@/lib/format"
+
+/** The register is one of three readings of the same fortnight. */
+type Tab = "register" | "exceptions" | "leave"
 
 export default function RegisterPage() {
   const store = useStore()
@@ -43,7 +47,7 @@ export default function RegisterPage() {
   const [departments, setDepartments] = React.useState<string[]>([])
   const [branches, setBranches] = React.useState<string[]>([])
   const [search, setSearch] = React.useState("")
-  const [view, setView] = React.useState<"register" | "exceptions">("register")
+  const [view, setView] = React.useState<Tab>("register")
   const [openDay, setOpenDay] = React.useState<DayRecord | null>(null)
 
   const { from, to } = rangeFor(period, custom)
@@ -71,151 +75,171 @@ export default function RegisterPage() {
         { label: "Attendance" },
       ]}
     >
-      {/* The platform filter bar. Period sits on the bar rather than in
-          the popover: it is the range being looked at, never off. */}
-      <FilterToolbar
-        className="mb-4"
-        fields={[
-          {
-            kind: "multi",
-            key: "departments",
-            label: "Department",
-            values: departments,
-            options: allDepartments.map((d) => ({ value: d, label: d })),
-          },
-          {
-            kind: "multi",
-            key: "branches",
-            label: "Branch",
-            values: branches,
-            options: allBranches.map((b) => ({
-              value: b.name,
-              label: b.name,
-            })),
-          },
-        ]}
-        onChange={(patch) => {
-          if (patch.departments) setDepartments(patch.departments as string[])
-          if (patch.branches) setBranches(patch.branches as string[])
-        }}
-        onClear={() => {
-          setDepartments([])
-          setBranches([])
-          setSearch("")
-        }}
+      {/* The register is what happened, exceptions are what to do about
+          it, and leave is the record it has to agree with. One at a time
+          rather than one long scroll. */}
+      <Tabs
+        value={view}
+        onValueChange={(v) => setView(v as Tab)}
+        className="gap-0"
       >
-        <FilterSearch
-          value={search}
-          onChange={setSearch}
-          placeholder="Search by name or job title"
-        />
-        <Select value={period} onValueChange={(v) => setPeriod(v as PeriodKey)}>
-          <SelectTrigger className="h-9 w-[160px]" aria-label="Period">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {(Object.keys(PERIOD_LABEL) as PeriodKey[]).map((k) => (
-              <SelectItem key={k} value={k}>
-                {PERIOD_LABEL[k]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {period === "custom" && (
-          <>
-            <Input
-              type="date"
-              aria-label="From"
-              className="h-9 w-[150px]"
-              value={custom.from}
-              onChange={(e) =>
-                setCustom((c) => ({ ...c, from: e.target.value }))
-              }
-            />
-            <Input
-              type="date"
-              aria-label="To"
-              className="h-9 w-[150px]"
-              value={custom.to}
-              onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))}
-            />
-          </>
-        )}
-      </FilterToolbar>
-
-      <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Attendance rate"
-          value={`${metrics.attendanceRate}%`}
-          hint="Present, remote or late"
-        />
-        <StatCard
-          label="Hours logged"
-          value={formatHours(metrics.hoursLogged)}
-          hint="Across the period"
-        />
-        <StatCard
-          label="Late arrivals"
-          value={metrics.lateArrivals}
-          hint="After scheduled start plus grace"
-        />
-        <StatCard
-          label="Days with no record"
-          value={metrics.noRecordDays}
-          hint="No clock-in and no leave on file"
-        />
-      </div>
-
-      {scope.length === 0 ? (
-        <Panel bodyClassName="p-0">
-          <EmptyState
-            icon={Users}
-            title="Nobody matches these filters"
-            description="Widen the department, branch or search to see the register."
+        <div className="mb-4">
+          <SegmentedTabs
+            tabs={[
+              { value: "register", label: "Daily register" },
+              {
+                value: "exceptions",
+                label: "Exceptions",
+                count: openExceptions,
+              },
+              { value: "leave", label: "Leave reconciliation" },
+            ]}
+            emphasise={openExceptions > 0 ? ["exceptions"] : undefined}
           />
-        </Panel>
-      ) : (
-        /* The register is what happened; exceptions are what to do about
-           it. Two jobs, so one at a time rather than one long scroll. */
-        <Tabs
-          value={view}
-          onValueChange={(v) => setView(v as "register" | "exceptions")}
-          className="gap-0"
-        >
-          <div className="mb-4">
-            <SegmentedTabs
-              tabs={[
-                { value: "register", label: "Daily register" },
+        </div>
+
+        {view !== "leave" && (
+          <>
+            {/* The platform filter bar. Period sits on the bar rather than in
+          the popover: it is the range being looked at, never off. */}
+            <FilterToolbar
+              className="mb-4"
+              fields={[
                 {
-                  value: "exceptions",
-                  label: "Exceptions",
-                  count: openExceptions,
+                  kind: "multi",
+                  key: "departments",
+                  label: "Department",
+                  values: departments,
+                  options: allDepartments.map((d) => ({ value: d, label: d })),
+                },
+                {
+                  kind: "multi",
+                  key: "branches",
+                  label: "Branch",
+                  values: branches,
+                  options: allBranches.map((b) => ({
+                    value: b.name,
+                    label: b.name,
+                  })),
                 },
               ]}
-              emphasise={openExceptions > 0 ? ["exceptions"] : undefined}
-            />
-          </div>
-
-          <TabsContent value="register">
-            <Panel
-              description="Each cell opens the detail for that day."
-              bodyClassName="p-0"
-              actions={<DayCodeLegend />}
+              onChange={(patch) => {
+                if (patch.departments)
+                  setDepartments(patch.departments as string[])
+                if (patch.branches) setBranches(patch.branches as string[])
+              }}
+              onClear={() => {
+                setDepartments([])
+                setBranches([])
+                setSearch("")
+              }}
             >
-              <RegisterGrid
-                scope={scope}
-                dates={dates}
-                records={records}
-                onOpenDay={setOpenDay}
+              <FilterSearch
+                value={search}
+                onChange={setSearch}
+                placeholder="Search by name or job title"
               />
-            </Panel>
-          </TabsContent>
+              <Select
+                value={period}
+                onValueChange={(v) => setPeriod(v as PeriodKey)}
+              >
+                <SelectTrigger className="h-9 w-[160px]" aria-label="Period">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(PERIOD_LABEL) as PeriodKey[]).map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {PERIOD_LABEL[k]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {period === "custom" && (
+                <>
+                  <Input
+                    type="date"
+                    aria-label="From"
+                    className="h-9 w-[150px]"
+                    value={custom.from}
+                    onChange={(e) =>
+                      setCustom((c) => ({ ...c, from: e.target.value }))
+                    }
+                  />
+                  <Input
+                    type="date"
+                    aria-label="To"
+                    className="h-9 w-[150px]"
+                    value={custom.to}
+                    onChange={(e) =>
+                      setCustom((c) => ({ ...c, to: e.target.value }))
+                    }
+                  />
+                </>
+              )}
+            </FilterToolbar>
 
-          <TabsContent value="exceptions">
-            <ExceptionsPanel records={records} />
-          </TabsContent>
-        </Tabs>
-      )}
+            <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                label="Attendance rate"
+                value={`${metrics.attendanceRate}%`}
+                hint="Present, remote or late"
+              />
+              <StatCard
+                label="Hours logged"
+                value={formatHours(metrics.hoursLogged)}
+                hint="Across the period"
+              />
+              <StatCard
+                label="Late arrivals"
+                value={metrics.lateArrivals}
+                hint="After scheduled start plus grace"
+              />
+              <StatCard
+                label="Days with no record"
+                value={metrics.noRecordDays}
+                hint="No clock-in and no leave on file"
+              />
+            </div>
+          </>
+        )}
+
+        {scope.length === 0 && view !== "leave" ? (
+          <Panel bodyClassName="p-0">
+            <EmptyState
+              icon={Users}
+              title="Nobody matches these filters"
+              description="Widen the department, branch or search to see the register."
+            />
+          </Panel>
+        ) : (
+          <>
+            <TabsContent value="register">
+              <Panel
+                description="Each cell opens the detail for that day."
+                bodyClassName="p-0"
+                actions={<DayCodeLegend />}
+              >
+                <RegisterGrid
+                  scope={scope}
+                  dates={dates}
+                  records={records}
+                  onOpenDay={setOpenDay}
+                />
+              </Panel>
+            </TabsContent>
+
+            <TabsContent value="exceptions">
+              <ExceptionsPanel records={records} />
+            </TabsContent>
+
+            {/* Leave is owned by the Leave module; what lives here is the
+              place the two records are read against each other. */}
+            <TabsContent value="leave">
+              <LeaveReconcile />
+            </TabsContent>
+          </>
+        )}
+      </Tabs>
 
       <DaySheet record={openDay} onClose={() => setOpenDay(null)} />
     </AttendanceShell>

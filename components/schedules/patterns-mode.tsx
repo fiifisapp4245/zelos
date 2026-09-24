@@ -46,6 +46,7 @@ export function PatternsMode({
   defaultGraceMinutes,
   canEdit,
   dates,
+  empty,
 }: {
   scope: Employee[]
   input: ScheduleInput
@@ -53,6 +54,8 @@ export function PatternsMode({
   canEdit: boolean
   /** The range the "no schedule" warning is judged over. */
   dates: string[]
+  /** Renders the day the company starts, with nothing written yet. */
+  empty?: boolean
 }) {
   const [editing, setEditing] = React.useState<WorkPattern | null | undefined>(
     undefined
@@ -60,7 +63,11 @@ export function PatternsMode({
   const [assigning, setAssigning] = React.useState<WorkPattern | null>(null)
   const [showing, setShowing] = React.useState<WorkPattern | null>(null)
 
-  const gaps = unscheduled(scope, dates, input)
+  const source: ScheduleInput = empty
+    ? { ...input, patterns: [], assignments: [], shifts: [] }
+    : input
+  const people = empty ? [] : scope
+  const gaps = unscheduled(people, dates, source)
 
   return (
     <div className="space-y-4">
@@ -98,7 +105,7 @@ export function PatternsMode({
           )
         }
       >
-        {input.patterns.length === 0 ? (
+        {source.patterns.length === 0 ? (
           <EmptyState
             icon={CalendarClock}
             title="No patterns yet"
@@ -129,10 +136,10 @@ export function PatternsMode({
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {input.patterns.map((p) => {
-                  const on = scope.filter(
+                {source.patterns.map((p) => {
+                  const on = people.filter(
                     (e) =>
-                      assignmentFor(e, TODAY_ISO, input.assignments)
+                      assignmentFor(e, TODAY_ISO, source.assignments)
                         ?.patternId === p.id
                   )
                   return (
@@ -215,7 +222,7 @@ export function PatternsMode({
       {assigning && (
         <AssignSheet
           pattern={assigning}
-          scope={scope}
+          scope={people}
           onClose={() => setAssigning(null)}
         />
       )}
@@ -223,8 +230,8 @@ export function PatternsMode({
       {showing && (
         <PeopleSheet
           pattern={showing}
-          scope={scope}
-          input={input}
+          scope={people}
+          input={source}
           gaps={gaps}
           onClose={() => setShowing(null)}
         />

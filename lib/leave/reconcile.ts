@@ -140,6 +140,8 @@ export function reconcileItems({
 
   for (const r of records) {
     if (r.code !== "N") continue
+    // A day that has not happened yet is not a day with no record.
+    if (r.date > todayIso) continue
     raw.push({
       kind: "noRecordNoLeave",
       employeeId: r.employeeId,

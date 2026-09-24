@@ -1,22 +1,28 @@
 "use client"
 
-import { CalendarDays } from "lucide-react"
+import { PageShell } from "@/components/shell/page-shell"
+import { PageHeader } from "@/components/common"
+import { LeaveReconcile } from "@/components/leave-attendance/leave-reconcile"
 
-import { ModulePlaceholder } from "@/components/common/module-placeholder"
-
-export default function Page() {
+/**
+ * A manager's view of the same reconciliation the Attendance area runs,
+ * scoped to their reports.
+ */
+export default function TeamLeavePage() {
   return (
-    <ModulePlaceholder
-      title="Team leave"
-      description="Leave booked, pending and remaining across your reports, with the coverage gaps it creates."
-      icon={CalendarDays}
+    <PageShell
+      width="wide"
       crumbs={[
         { label: "Workspace", href: "/overview" },
         { label: "My team", href: "/team" },
         { label: "Team leave" },
       ]}
-      emptyTitle="No leave booked"
-      emptyDescription="Requests from your team appear here, alongside a calendar of who is already away."
-    />
+    >
+      <PageHeader
+        title="Team leave"
+        description="Who is away, what is still waiting on a decision, and where the attendance record and the leave record disagree."
+      />
+      <LeaveReconcile title="Who is off, and when" />
+    </PageShell>
   )
 }
