@@ -1,8 +1,15 @@
 "use client"
 
-import { Search, SlidersHorizontal, X } from "lucide-react"
+import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -63,6 +70,9 @@ export type FilterPatch = Record<
   string | string[] | boolean | undefined
 >
 
+/** Up to this many facets stay on the bar; more fold into the popover. */
+const INLINE_LIMIT = 3
+
 function isActive(f: FilterField) {
   if (f.kind === "select") return f.value !== "all" && f.value !== ""
   if (f.kind === "multi") return f.values.length > 0
@@ -95,34 +105,46 @@ export function FilterToolbar({
   /** Anything else for the bar, such as a search box. */
   children?: React.ReactNode
 }) {
-  const inPopover = fields.filter((f) => !(f.kind === "toggle" && f.inline))
-  const inline = fields.filter((f) => f.kind === "toggle" && f.inline)
+  const toggles = fields.filter((f) => f.kind === "toggle" && f.inline)
+  const facets = fields.filter((f) => !(f.kind === "toggle" && f.inline))
   const active = fields.filter(isActive)
+
+  // Three or fewer and each facet gets its own dropdown on the bar, where
+  // it can be read and set in one click. Past that the bar would be a wall
+  // of controls, so they fold into the Filters button and say what they
+  // are doing through chips instead.
+  const condensed = facets.length > INLINE_LIMIT
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       {children}
 
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className="h-9">
-            <SlidersHorizontal className="size-4" />
-            Filters
-            {active.length > 0 && (
-              <span className="tabular ml-0.5 rounded-full bg-primary/15 px-1.5 text-xs font-medium text-primary">
-                {active.length}
-              </span>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-[300px] space-y-3 p-4">
-          {inPopover.map((f) => (
-            <Field key={f.key} field={f} onChange={onChange} />
-          ))}
-        </PopoverContent>
-      </Popover>
+      {condensed ? (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-9">
+              <SlidersHorizontal className="size-4" />
+              Filters
+              {active.length > 0 && (
+                <span className="tabular ml-0.5 rounded-full bg-primary/15 px-1.5 text-xs font-medium text-primary">
+                  {active.length}
+                </span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-[300px] space-y-3 p-4">
+            {facets.map((f) => (
+              <Field key={f.key} field={f} onChange={onChange} />
+            ))}
+          </PopoverContent>
+        </Popover>
+      ) : (
+        facets.map((f) => (
+          <InlineField key={f.key} field={f} onChange={onChange} />
+        ))
+      )}
 
-      {inline.map((f) =>
+      {toggles.map((f) =>
         f.kind === "toggle" ? (
           <button
             key={f.key}
@@ -143,7 +165,9 @@ export function FilterToolbar({
         ) : null
       )}
 
-      {active.flatMap((f) => chipsFor(f, onChange))}
+      {/* Chips exist to surface what the popover is hiding. An inline
+          dropdown already shows its own value, so it needs none. */}
+      {condensed && active.flatMap((f) => chipsFor(f, onChange))}
 
       {active.length > 0 && (
         <Button variant="ghost" size="sm" className="h-9" onClick={onClear}>
@@ -152,6 +176,111 @@ export function FilterToolbar({
       )}
     </div>
   )
+}
+
+/** One facet as its own control on the bar. */
+function InlineField({
+  field,
+  onChange,
+}: {
+  field: FilterField
+  onChange: (p: FilterPatch) => void
+}) {
+  if (field.kind === "select") {
+    return (
+      <Select
+        value={field.value}
+        onValueChange={(v) => onChange({ [field.key]: v })}
+      >
+        <SelectTrigger
+          aria-label={field.label}
+          className={cn(
+            "h-9 w-auto min-w-[150px]",
+            isActive(field) && "border-primary text-primary"
+          )}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">{field.allLabel}</SelectItem>
+          {field.options.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    )
+  }
+
+  if (field.kind === "multi") {
+    const n = field.values.length
+    const label =
+      n === 0
+        ? field.label
+        : n === 1
+          ? (field.options.find((o) => o.value === field.values[0])?.label ??
+            field.values[0])
+          : `${field.label}: ${n}`
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              "h-9 justify-between gap-2 font-normal",
+              n > 0 && "border-primary font-medium text-primary"
+            )}
+          >
+            {label}
+            <ChevronDown className="size-4 opacity-60" aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          className="max-h-[320px] w-[240px] overflow-y-auto"
+        >
+          <DropdownMenuLabel>{field.label}</DropdownMenuLabel>
+          {field.options.map((o) => (
+            <DropdownMenuCheckboxItem
+              key={o.value}
+              checked={field.values.includes(o.value)}
+              // Radix closes on select; a multi-select should not.
+              onSelect={(e) => e.preventDefault()}
+              onCheckedChange={(on) =>
+                onChange({
+                  [field.key]: on
+                    ? [...field.values, o.value]
+                    : field.values.filter((x) => x !== o.value),
+                })
+              }
+            >
+              {o.label}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
+  if (field.kind === "date") {
+    return (
+      <Input
+        type="date"
+        aria-label={field.label}
+        className={cn(
+          "h-9 w-[150px]",
+          field.value && "border-primary text-primary"
+        )}
+        value={field.value ?? ""}
+        onChange={(e) => onChange({ [field.key]: e.target.value || undefined })}
+      />
+    )
+  }
+
+  return <Field field={field} onChange={onChange} />
 }
 
 /** The search box for a filter bar, so every screen's reads the same. */

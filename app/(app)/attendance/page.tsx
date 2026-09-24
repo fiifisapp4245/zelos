@@ -24,7 +24,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { FilterSearch, FilterToolbar } from "@/components/common/filter-bar"
-import { formatHours, metricsFor } from "@/lib/attendance/derive"
+import { SegmentedTabs } from "@/components/common/segmented-tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
+import {
+  exceptionsFrom,
+  formatHours,
+  isResolved,
+  metricsFor,
+} from "@/lib/attendance/derive"
 import type { DayRecord } from "@/lib/attendance/types"
 import { useStore } from "@/lib/store"
 import { formatDate } from "@/lib/format"
@@ -36,6 +43,7 @@ export default function RegisterPage() {
   const [departments, setDepartments] = React.useState<string[]>([])
   const [branches, setBranches] = React.useState<string[]>([])
   const [search, setSearch] = React.useState("")
+  const [view, setView] = React.useState<"register" | "exceptions">("register")
   const [openDay, setOpenDay] = React.useState<DayRecord | null>(null)
 
   const { from, to } = rangeFor(period, custom)
@@ -46,6 +54,9 @@ export default function RegisterPage() {
   })
 
   const metrics = metricsFor(records)
+  const openExceptions = exceptionsFrom(records).filter(
+    (i) => !isResolved(i, store.exceptionResolutions)
+  ).length
   const allDepartments = [
     ...new Set(store.employees.map((e) => e.department)),
   ].sort()
@@ -164,25 +175,46 @@ export default function RegisterPage() {
           />
         </Panel>
       ) : (
-        <>
-          <Panel
-            title="Daily register"
-            description="Each cell opens the detail for that day."
-            bodyClassName="p-0"
-            actions={<DayCodeLegend />}
-          >
-            <RegisterGrid
-              scope={scope}
-              dates={dates}
-              records={records}
-              onOpenDay={setOpenDay}
+        /* The register is what happened; exceptions are what to do about
+           it. Two jobs, so one at a time rather than one long scroll. */
+        <Tabs
+          value={view}
+          onValueChange={(v) => setView(v as "register" | "exceptions")}
+          className="gap-0"
+        >
+          <div className="mb-4">
+            <SegmentedTabs
+              tabs={[
+                { value: "register", label: "Daily register" },
+                {
+                  value: "exceptions",
+                  label: "Exceptions",
+                  count: openExceptions,
+                },
+              ]}
+              emphasise={openExceptions > 0 ? ["exceptions"] : undefined}
             />
-          </Panel>
-
-          <div className="mt-4">
-            <ExceptionsPanel records={records} />
           </div>
-        </>
+
+          <TabsContent value="register">
+            <Panel
+              description="Each cell opens the detail for that day."
+              bodyClassName="p-0"
+              actions={<DayCodeLegend />}
+            >
+              <RegisterGrid
+                scope={scope}
+                dates={dates}
+                records={records}
+                onOpenDay={setOpenDay}
+              />
+            </Panel>
+          </TabsContent>
+
+          <TabsContent value="exceptions">
+            <ExceptionsPanel records={records} />
+          </TabsContent>
+        </Tabs>
       )}
 
       <DaySheet record={openDay} onClose={() => setOpenDay(null)} />

@@ -14,6 +14,8 @@ import { toast } from "sonner"
 
 import { EmptyState, Initials, Panel, Pill } from "@/components/common"
 import { RowActions } from "@/components/common/row-actions"
+import { SegmentedTabs } from "@/components/common/segmented-tabs"
+import { Tabs } from "@/components/ui/tabs"
 import {
   EXCEPTION_LABEL,
   exceptionsFrom,
@@ -65,38 +67,24 @@ export function ExceptionsPanel({ records }: { records: DayRecord[] }) {
 
   return (
     <Panel
-      title="Exceptions"
       description="Grouped by what happened, then by person, so a repeated pattern reads as one line."
       bodyClassName="p-0"
       actions={
-        <div
-          role="group"
-          aria-label="Filter exceptions"
-          className="flex items-center gap-1 rounded-lg border p-0.5"
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as "open" | "resolved")}
         >
-          {(
-            [
-              ["open", "Open", open.length],
-              ["resolved", "Resolved", resolved.length],
-            ] as const
-          ).map(([id, label, n]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              aria-pressed={tab === id}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-xs transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                tab === id
-                  ? "bg-success-muted font-medium text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {label}
-              <span className="tabular ml-1.5 opacity-70">{n}</span>
-            </button>
-          ))}
-        </div>
+          <SegmentedTabs
+            tabs={[
+              { value: "open", label: "Open", count: open.length },
+              {
+                value: "resolved",
+                label: "Resolved",
+                count: resolved.length,
+              },
+            ]}
+          />
+        </Tabs>
       }
     >
       {groups.length === 0 ? (
