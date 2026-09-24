@@ -45,7 +45,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { SegmentedTabs } from "@/components/common/segmented-tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { useStore } from "@/lib/store"
 import {
   canChangeLifecycle,
@@ -372,32 +373,24 @@ export default function EmployeeRecordPage() {
         defaultValue="overview"
         className="overflow-hidden rounded-xl border bg-card"
       >
-        <TabsList
-          variant="line"
-          className="h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b bg-transparent px-4 py-0"
-        >
-          {[
-            ["overview", "Profile"],
-            ["employment", "Employment"],
-            ["compensation", "Compensation"],
-            ["time", "Time & leave"],
-            ["documents", "Documents"],
-            ["lifecycle", "History"],
-            ["audit", "Audit log"],
-          ].map(([value, label]) => (
-            <TabsTrigger
-              key={value}
-              value={value}
-              className="relative flex-none rounded-none border-0 px-3.5 py-2.5 text-sm after:bottom-0 data-active:font-medium data-active:text-primary data-active:after:bg-primary"
-            >
-              {label}
-              {value === "compensation" &&
-                !canViewCompensation(viewer, employee) && (
-                  <Lock className="ml-1.5 size-3 text-muted-foreground" />
-                )}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <SegmentedTabs
+          className="m-4 mb-0"
+          tabs={[
+            { value: "overview", label: "Profile" },
+            { value: "employment", label: "Employment" },
+            {
+              value: "compensation",
+              label: "Compensation",
+              adornment: !canViewCompensation(viewer, employee) && (
+                <Lock className="size-3 text-muted-foreground" />
+              ),
+            },
+            { value: "time", label: "Time & leave" },
+            { value: "documents", label: "Documents" },
+            { value: "lifecycle", label: "History" },
+            { value: "audit", label: "Audit log" },
+          ]}
+        />
 
         <TabsContent value="overview" className="p-5">
           <OverviewTab

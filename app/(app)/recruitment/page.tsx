@@ -18,7 +18,8 @@ import { EmptyState, PageHeader, Panel, StatCard } from "@/components/common"
 import { RequisitionBadge } from "@/components/common/status"
 import { RowActions } from "@/components/common/row-actions"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { SegmentedTabs } from "@/components/common/segmented-tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { useStore } from "@/lib/store"
 import { has } from "@/lib/rbac"
 import {
@@ -99,23 +100,13 @@ export default function RecruitmentPage() {
       </div>
 
       <Tabs defaultValue="pipeline">
-        <TabsList
-          variant="line"
-          className="mb-5 h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0"
-        >
-          {[
-            ["pipeline", "Pipeline"],
-            ["requisitions", "Requisitions"],
-          ].map(([v, l]) => (
-            <TabsTrigger
-              key={v}
-              value={v}
-              className="flex-none rounded-none border-0 px-3.5 py-2.5 text-sm after:bottom-0 data-active:font-medium data-active:text-primary data-active:after:bg-primary"
-            >
-              {l}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <SegmentedTabs
+          className="mb-5"
+          tabs={[
+            { value: "pipeline", label: "Pipeline" },
+            { value: "requisitions", label: "Requisitions" },
+          ]}
+        />
 
         <TabsContent value="pipeline">
           {pool.length === 0 ? (

@@ -15,6 +15,8 @@ import {
   type ListView,
 } from "@/components/common"
 import { LifecycleBadge } from "@/components/common/status"
+import { SegmentedTabs } from "@/components/common/segmented-tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { useStore } from "@/lib/store"
 import { visibleEmployees } from "@/lib/selectors"
 import { lifecycleTasks } from "@/lib/lifecycle-actions"
@@ -108,100 +110,91 @@ export default function LifecycleEventsPage() {
         />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-1 rounded-xl border bg-card p-1">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm transition-colors",
-                tab === t.id
-                  ? "bg-success-muted font-medium text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              {t.label}
-              <span
-                className={cn(
-                  "tabular rounded-full px-1.5 text-xs",
-                  tab === t.id
-                    ? "bg-primary/15 text-primary"
-                    : "bg-muted text-muted-foreground"
-                )}
-              >
-                {t.count}
-              </span>
-              {/* The count alone says nothing about urgency, so overdue work
-                  carries its own mark rather than recolouring the total. */}
-              {t.id === "decisions" && overdue > 0 && (
-                <span
-                  className="tabular rounded-full bg-destructive/15 px-1.5 text-xs text-destructive"
-                  title={`${overdue} overdue`}
-                >
-                  {overdue} overdue
-                </span>
-              )}
-            </button>
-          ))}
+      <Tabs
+        value={tab}
+        onValueChange={(v) => setTab(v as Tab)}
+        className="gap-0"
+      >
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <SegmentedTabs
+            tabs={TABS.map((t) => ({
+              value: t.id,
+              label: t.label,
+              count: t.count,
+              // Overdue work carries its own mark rather than recolouring the
+              // total, since six due and one late is not seven late.
+              adornment:
+                t.id === "decisions" && overdue > 0 ? (
+                  <>
+                    <span className="tabular rounded-full bg-muted px-1.5 text-xs text-muted-foreground">
+                      {t.count}
+                    </span>
+                    <span className="tabular rounded-full bg-destructive/15 px-1.5 text-xs text-destructive">
+                      {overdue} overdue
+                    </span>
+                  </>
+                ) : undefined,
+            }))}
+          />
+
+          <ViewToggle view={view} onChange={setView} />
         </div>
 
-        <ViewToggle view={view} onChange={setView} />
-      </div>
+        <TabsContent value={tab} className="mt-0">
+          {tab === "decisions" ? (
+            <section className="rounded-xl border bg-card">
+              <header className="border-b px-5 py-4">
+                <h2 className="text-sm font-semibold">Needs a decision</h2>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  Lifecycle states carry obligations. These have fallen due
+                  within the next 30 days — acting here writes the same audited
+                  event as a manual status change.
+                  {overdue > 0 && (
+                    <strong className="ml-1 font-medium text-destructive">
+                      {overdue} {overdue === 1 ? "is" : "are"} already overdue.
+                    </strong>
+                  )}
+                </p>
+              </header>
+              <LifecycleWorklist tasks={tasks} view={view} />
+            </section>
+          ) : (
+            <>
+              <div className="mb-4 flex flex-wrap gap-2">
+                <FilterChip
+                  active={filter === "all"}
+                  onClick={() => setFilter("all")}
+                >
+                  All events
+                </FilterChip>
+                {(Object.keys(LIFECYCLE_LABEL) as LifecycleState[]).map((s) => (
+                  <FilterChip
+                    key={s}
+                    active={filter === s}
+                    onClick={() => setFilter(s)}
+                  >
+                    {LIFECYCLE_LABEL[s]}
+                  </FilterChip>
+                ))}
+              </div>
 
-      {tab === "decisions" ? (
-        <section className="rounded-xl border bg-card">
-          <header className="border-b px-5 py-4">
-            <h2 className="text-sm font-semibold">Needs a decision</h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Lifecycle states carry obligations. These have fallen due within
-              the next 30 days — acting here writes the same audited event as a
-              manual status change.
-              {overdue > 0 && (
-                <strong className="ml-1 font-medium text-destructive">
-                  {overdue} {overdue === 1 ? "is" : "are"} already overdue.
-                </strong>
-              )}
-            </p>
-          </header>
-          <LifecycleWorklist tasks={tasks} view={view} />
-        </section>
-      ) : (
-        <>
-          <div className="mb-4 flex flex-wrap gap-2">
-            <FilterChip
-              active={filter === "all"}
-              onClick={() => setFilter("all")}
-            >
-              All events
-            </FilterChip>
-            {(Object.keys(LIFECYCLE_LABEL) as LifecycleState[]).map((s) => (
-              <FilterChip
-                key={s}
-                active={filter === s}
-                onClick={() => setFilter(s)}
-              >
-                {LIFECYCLE_LABEL[s]}
-              </FilterChip>
-            ))}
-          </div>
-
-          <section className="rounded-xl border bg-card">
-            {events.length === 0 ? (
-              <EmptyState
-                icon={RefreshCw}
-                title="No events match this filter"
-                description="Try another state, or clear the filter to see the whole history."
-              />
-            ) : view === "table" ? (
-              <HistoryTable events={events} />
-            ) : (
-              <HistoryCards events={events} />
-            )}
-          </section>
-        </>
-      )}
+              <section className="rounded-xl border bg-card">
+                {events.length === 0 ? (
+                  <EmptyState
+                    icon={RefreshCw}
+                    title="No events match this filter"
+                    description="Try another state, or clear the filter to see the whole history."
+                  />
+                ) : view === "table" ? (
+                  <HistoryTable events={events} />
+                ) : (
+                  <HistoryCards events={events} />
+                )}
+              </section>
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
     </PageShell>
   )
 }

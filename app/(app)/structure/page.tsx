@@ -18,6 +18,8 @@ import {
 import { toast } from "sonner"
 
 import { PageShell } from "@/components/shell/page-shell"
+import { SegmentedTabs } from "@/components/common/segmented-tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { EmptyState, Initials, Panel, Pill } from "@/components/common"
 import { FormDialog } from "@/components/common/form-dialog"
 import { RowActions } from "@/components/common/row-actions"
@@ -139,116 +141,104 @@ export default function StructurePage() {
         </div>
       </div>
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1 rounded-xl border bg-card p-1">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => {
-                setTab(t.id)
-                setSelected([])
-              }}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm transition-colors",
-                tab === t.id
-                  ? "bg-success-muted font-medium text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+      <Tabs
+        value={tab}
+        onValueChange={(v) => {
+          setTab(v as Tab)
+          setSelected([])
+        }}
+        className="gap-0"
+      >
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <SegmentedTabs
+            tabs={TABS.map((t) => ({
+              value: t.id,
+              label: t.label,
+              count: t.count,
+            }))}
+          />
+
+          <div className="relative min-w-[280px] flex-1 sm:max-w-[420px]">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name…"
+              aria-label="Search structure"
+              className="h-10 w-full rounded-lg border bg-card pr-3 pl-9 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+            />
+          </div>
+        </div>
+
+        <TabsContent value={tab} className="mt-0 rounded-xl border bg-card">
+          <div className="flex items-center justify-between border-b px-5 py-3 text-sm">
+            <p className="text-muted-foreground">
+              Showing{" "}
+              <strong className="tabular text-foreground">{rowCount}</strong>{" "}
+              {tab === "branches"
+                ? "branches"
+                : tab === "archive"
+                  ? "archived units"
+                  : "departments"}
+              {selected.length > 0 && (
+                <span className="ml-2 text-primary">
+                  · {selected.length} selected
+                </span>
               )}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Sorted by name · A→Z
+            </p>
+          </div>
+
+          {rowCount === 0 ? (
+            <EmptyState
+              icon={tab === "branches" ? MapPin : Building2}
+              title={q ? `Nothing matches “${query}”` : "Nothing here yet"}
+              description={
+                tab === "archive"
+                  ? "Archived departments and branches appear here and can be restored."
+                  : "Add the first one to get started."
+              }
+            />
+          ) : tab === "departments" ? (
+            <DepartmentTable
+              rows={orderedDepts}
+              selected={selected}
+              onToggle={(id) =>
+                setSelected((s) =>
+                  s.includes(id) ? s.filter((x) => x !== id) : [...s, id]
+                )
+              }
+              onEdit={setEditing}
+            />
+          ) : tab === "branches" ? (
+            <BranchTable rows={shownBranches} onEdit={setEditingBranch} />
+          ) : (
+            <ArchiveTable rows={archived} />
+          )}
+
+          <div className="flex items-center justify-end gap-1 border-t px-5 py-3 text-sm">
+            <button
+              type="button"
+              disabled
+              className="rounded-lg px-3 py-1.5 text-muted-foreground disabled:opacity-40"
             >
-              {t.label}
-              <span
-                className={cn(
-                  "tabular rounded-full px-1.5 text-xs",
-                  tab === t.id
-                    ? "bg-primary/15 text-primary"
-                    : "bg-muted text-muted-foreground"
-                )}
-              >
-                {t.count}
-              </span>
+              ‹ Previous
             </button>
-          ))}
-        </div>
-
-        <div className="relative min-w-[280px] flex-1 sm:max-w-[420px]">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name…"
-            aria-label="Search structure"
-            className="h-10 w-full rounded-lg border bg-card pr-3 pl-9 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
-          />
-        </div>
-      </div>
-
-      <div className="rounded-xl border bg-card">
-        <div className="flex items-center justify-between border-b px-5 py-3 text-sm">
-          <p className="text-muted-foreground">
-            Showing{" "}
-            <strong className="tabular text-foreground">{rowCount}</strong>{" "}
-            {tab === "branches"
-              ? "branches"
-              : tab === "archive"
-                ? "archived units"
-                : "departments"}
-            {selected.length > 0 && (
-              <span className="ml-2 text-primary">
-                · {selected.length} selected
-              </span>
-            )}
-          </p>
-          <p className="text-xs text-muted-foreground">Sorted by name · A→Z</p>
-        </div>
-
-        {rowCount === 0 ? (
-          <EmptyState
-            icon={tab === "branches" ? MapPin : Building2}
-            title={q ? `Nothing matches “${query}”` : "Nothing here yet"}
-            description={
-              tab === "archive"
-                ? "Archived departments and branches appear here and can be restored."
-                : "Add the first one to get started."
-            }
-          />
-        ) : tab === "departments" ? (
-          <DepartmentTable
-            rows={orderedDepts}
-            selected={selected}
-            onToggle={(id) =>
-              setSelected((s) =>
-                s.includes(id) ? s.filter((x) => x !== id) : [...s, id]
-              )
-            }
-            onEdit={setEditing}
-          />
-        ) : tab === "branches" ? (
-          <BranchTable rows={shownBranches} onEdit={setEditingBranch} />
-        ) : (
-          <ArchiveTable rows={archived} />
-        )}
-
-        <div className="flex items-center justify-end gap-1 border-t px-5 py-3 text-sm">
-          <button
-            type="button"
-            disabled
-            className="rounded-lg px-3 py-1.5 text-muted-foreground disabled:opacity-40"
-          >
-            ‹ Previous
-          </button>
-          <span className="grid size-8 place-items-center rounded-lg border bg-card text-sm font-medium">
-            1
-          </span>
-          <button
-            type="button"
-            disabled
-            className="rounded-lg px-3 py-1.5 text-muted-foreground disabled:opacity-40"
-          >
-            Next ›
-          </button>
-        </div>
-      </div>
+            <span className="grid size-8 place-items-center rounded-lg border bg-card text-sm font-medium">
+              1
+            </span>
+            <button
+              type="button"
+              disabled
+              className="rounded-lg px-3 py-1.5 text-muted-foreground disabled:opacity-40"
+            >
+              Next ›
+            </button>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {editing && (
         <DepartmentDialog

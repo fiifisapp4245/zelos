@@ -9,6 +9,8 @@ import { PageShell } from "@/components/shell/page-shell"
 import { EmptyState, PageHeader } from "@/components/common"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { SegmentedTabs } from "@/components/common/segmented-tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { WidgetSkeleton } from "@/components/home/skeletons"
 import { ApprovalRow } from "@/components/approvals/approval-row"
 import { ApprovalDrawer } from "@/components/approvals/approval-drawer"
@@ -32,7 +34,6 @@ import type {
   DecisionAction,
 } from "@/lib/approvals/types"
 import { TODAY } from "@/lib/format"
-import { cn } from "@/lib/utils"
 
 const TABS: { id: ApprovalTab; label: string }[] = [
   { id: "waiting", label: "Waiting on me" },
@@ -171,159 +172,145 @@ function Approvals() {
 
       {/* Tabs and filters share one line. They were two full-width bands,
           and the filter one wrapped to two rows below 1400px. */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-1 rounded-xl border bg-card p-1">
-          {TABS.map((t) => {
-            const n = getApprovalsForUser(session, pool, {
-              tab: t.id,
-              employees,
-              now: TODAY,
-            }).length
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => {
-                  setSelected([])
-                  pushQuery({ tab: t.id === "waiting" ? undefined : t.id })
-                }}
-                aria-current={tab === t.id ? "page" : undefined}
-                className={cn(
-                  "flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                  tab === t.id
-                    ? "bg-success-muted font-medium text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-              >
-                {t.label}
-                <span
-                  className={cn(
-                    "tabular rounded-full px-1.5 text-xs",
-                    tab === t.id
-                      ? "bg-primary/15 text-primary"
-                      : "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {n}
-                </span>
-              </button>
-            )
-          })}
+      <Tabs
+        value={tab}
+        onValueChange={(v) => {
+          setSelected([])
+          pushQuery({ tab: v === "waiting" ? undefined : v })
+        }}
+        className="gap-0"
+      >
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <SegmentedTabs
+            tabs={TABS.map((t) => ({
+              value: t.id,
+              label: t.label,
+              count: getApprovalsForUser(session, pool, {
+                tab: t.id,
+                employees,
+                now: TODAY,
+              }).length,
+            }))}
+          />
+
+          <ApprovalFiltersBar
+            items={unfiltered}
+            filters={filters}
+            onChange={(f) =>
+              pushQuery({
+                module: f.module,
+                type: f.type,
+                requester: f.requester,
+                unit: f.unit,
+                from: f.from,
+                to: f.to,
+                overdue: f.overdueOnly ? "1" : undefined,
+              })
+            }
+            onClear={() =>
+              router.replace(
+                `/approvals${tab === "waiting" ? "" : `?tab=${tab}`}`,
+                { scroll: false }
+              )
+            }
+          />
         </div>
 
-        <ApprovalFiltersBar
-          items={unfiltered}
-          filters={filters}
-          onChange={(f) =>
-            pushQuery({
-              module: f.module,
-              type: f.type,
-              requester: f.requester,
-              unit: f.unit,
-              from: f.from,
-              to: f.to,
-              overdue: f.overdueOnly ? "1" : undefined,
-            })
-          }
-          onClear={() =>
-            router.replace(
-              `/approvals${tab === "waiting" ? "" : `?tab=${tab}`}`,
-              { scroll: false }
-            )
-          }
-        />
-      </div>
-
-      {demo === "loading" ? (
-        <div className="space-y-4">
-          <WidgetSkeleton rows={4} />
-          <WidgetSkeleton rows={3} />
-        </div>
-      ) : (
-        <section
-          aria-label={`${TABS.find((t) => t.id === tab)?.label} approvals`}
-          className="rounded-xl border bg-card"
-        >
-          {items.length === 0 ? (
-            hasAnyFilter(filters) ? (
-              <EmptyState
-                icon={ClipboardCheck}
-                title="No approvals match these filters"
-                description="Widen the range, or clear the filters to see the whole queue."
-                action={
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      router.replace(
-                        `/approvals${tab === "waiting" ? "" : `?tab=${tab}`}`,
-                        { scroll: false }
-                      )
-                    }
-                  >
-                    Clear filters
-                  </Button>
-                }
-              />
-            ) : (
-              <EmptyState icon={ClipboardCheck} title={EMPTY[tab]} />
-            )
-          ) : (
-            <>
-              {tab === "waiting" && eligible.length > 0 && (
-                <div className="flex items-center gap-3 border-b px-4 py-2.5 md:px-5">
-                  <span className="flex w-8 shrink-0 justify-center">
-                    <Checkbox
-                      checked={allEligibleSelected}
-                      onCheckedChange={(v) =>
-                        setSelected(v === true ? eligible.map((i) => i.id) : [])
+        {demo === "loading" ? (
+          <div className="space-y-4">
+            <WidgetSkeleton rows={4} />
+            <WidgetSkeleton rows={3} />
+          </div>
+        ) : (
+          <TabsContent
+            value={tab}
+            aria-label={`${TABS.find((t) => t.id === tab)?.label} approvals`}
+            className="rounded-xl border bg-card"
+          >
+            {items.length === 0 ? (
+              hasAnyFilter(filters) ? (
+                <EmptyState
+                  icon={ClipboardCheck}
+                  title="No approvals match these filters"
+                  description="Widen the range, or clear the filters to see the whole queue."
+                  action={
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        router.replace(
+                          `/approvals${tab === "waiting" ? "" : `?tab=${tab}`}`,
+                          { scroll: false }
+                        )
                       }
-                      aria-label={`Select all ${eligible.length} eligible`}
-                    />
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    Select all {eligible.length} eligible
-                    {eligible.length !== items.length && (
-                      <>
-                        {" "}
-                        · {items.length - eligible.length} decided individually
-                      </>
-                    )}
-                  </span>
-                </div>
-              )}
+                    >
+                      Clear filters
+                    </Button>
+                  }
+                />
+              ) : (
+                <EmptyState icon={ClipboardCheck} title={EMPTY[tab]} />
+              )
+            ) : (
+              <>
+                {tab === "waiting" && eligible.length > 0 && (
+                  <div className="flex items-center gap-3 border-b px-4 py-2.5 md:px-5">
+                    <span className="flex w-8 shrink-0 justify-center">
+                      <Checkbox
+                        checked={allEligibleSelected}
+                        onCheckedChange={(v) =>
+                          setSelected(
+                            v === true ? eligible.map((i) => i.id) : []
+                          )
+                        }
+                        aria-label={`Select all ${eligible.length} eligible`}
+                      />
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Select all {eligible.length} eligible
+                      {eligible.length !== items.length && (
+                        <>
+                          {" "}
+                          · {items.length - eligible.length} decided
+                          individually
+                        </>
+                      )}
+                    </span>
+                  </div>
+                )}
 
-              <ul className="divide-y">
-                {items.map((item) => (
-                  <ApprovalRow
-                    key={item.id}
-                    item={item}
-                    selected={selected.includes(item.id)}
-                    onSelect={
-                      tab === "waiting"
-                        ? (next) =>
-                            setSelected((s) =>
-                              next
-                                ? [...s, item.id]
-                                : s.filter((id) => id !== item.id)
-                            )
-                        : undefined
-                    }
-                    onQuickDecide={
-                      tab === "waiting"
-                        ? (action) => decide(item, action)
-                        : undefined
-                    }
-                    onOpen={(el) => {
-                      setOpenedFrom(el)
-                      setOpen(item)
-                    }}
-                  />
-                ))}
-              </ul>
-            </>
-          )}
-        </section>
-      )}
+                <ul className="divide-y">
+                  {items.map((item) => (
+                    <ApprovalRow
+                      key={item.id}
+                      item={item}
+                      selected={selected.includes(item.id)}
+                      onSelect={
+                        tab === "waiting"
+                          ? (next) =>
+                              setSelected((s) =>
+                                next
+                                  ? [...s, item.id]
+                                  : s.filter((id) => id !== item.id)
+                              )
+                          : undefined
+                      }
+                      onQuickDecide={
+                        tab === "waiting"
+                          ? (action) => decide(item, action)
+                          : undefined
+                      }
+                      onOpen={(el) => {
+                        setOpenedFrom(el)
+                        setOpen(item)
+                      }}
+                    />
+                  ))}
+                </ul>
+              </>
+            )}
+          </TabsContent>
+        )}
+      </Tabs>
 
       {tab === "waiting" && (
         <BulkBar

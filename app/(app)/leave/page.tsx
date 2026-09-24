@@ -28,7 +28,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { SegmentedTabs } from "@/components/common/segmented-tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { useStore } from "@/lib/store"
 import { isDottedReport } from "@/lib/rbac"
 import { pendingApprovalsFor, visibleEmployees } from "@/lib/selectors"
@@ -111,28 +112,15 @@ export default function LeavePage() {
       </div>
 
       <Tabs defaultValue={approvals.length > 0 ? "approvals" : "mine"}>
-        <TabsList
-          variant="line"
-          className="mb-5 h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0"
-        >
-          {[
-            [
-              "approvals",
-              `Approvals${approvals.length ? ` (${approvals.length})` : ""}`,
-            ],
-            ["mine", "My leave"],
-            ["team", "Team history"],
-            ["balances", "Balances"],
-          ].map(([v, l]) => (
-            <TabsTrigger
-              key={v}
-              value={v}
-              className="flex-none rounded-none border-0 px-3.5 py-2.5 text-sm after:bottom-0 data-active:font-medium data-active:text-primary data-active:after:bg-primary"
-            >
-              {l}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <SegmentedTabs
+          className="mb-5"
+          tabs={[
+            { value: "approvals", label: "Approvals", count: approvals.length },
+            { value: "mine", label: "My leave" },
+            { value: "team", label: "Team history" },
+            { value: "balances", label: "Balances" },
+          ]}
+        />
 
         <TabsContent value="approvals">
           <Panel bodyClassName="p-0">

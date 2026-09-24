@@ -33,7 +33,8 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { SegmentedTabs } from "@/components/common/segmented-tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { useStore } from "@/lib/store"
 import {
   MIN_AGGREGATION_GROUP,
@@ -118,23 +119,13 @@ export default function PerformancePage() {
       </div>
 
       <Tabs defaultValue="reviews">
-        <TabsList
-          variant="line"
-          className="mb-5 h-auto w-full justify-start gap-1 rounded-none border-b bg-transparent p-0"
-        >
-          {[
-            ["reviews", "Review cycle"],
-            ["notes", "Coaching notes"],
-          ].map(([v, l]) => (
-            <TabsTrigger
-              key={v}
-              value={v}
-              className="flex-none rounded-none border-0 px-3.5 py-2.5 text-sm after:bottom-0 data-active:font-medium data-active:text-primary data-active:after:bg-primary"
-            >
-              {l}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <SegmentedTabs
+          className="mb-5"
+          tabs={[
+            { value: "reviews", label: "Review cycle" },
+            { value: "notes", label: "Coaching notes" },
+          ]}
+        />
 
         <TabsContent value="reviews">
           <Panel bodyClassName="p-0">
