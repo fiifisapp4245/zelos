@@ -169,46 +169,48 @@ function Approvals() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-1 rounded-xl border bg-card p-1">
-        {TABS.map((t) => {
-          const n = getApprovalsForUser(session, pool, {
-            tab: t.id,
-            employees,
-            now: TODAY,
-          }).length
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => {
-                setSelected([])
-                pushQuery({ tab: t.id === "waiting" ? undefined : t.id })
-              }}
-              aria-current={tab === t.id ? "page" : undefined}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                tab === t.id
-                  ? "bg-success-muted font-medium text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              {t.label}
-              <span
+      {/* Tabs and filters share one line. They were two full-width bands,
+          and the filter one wrapped to two rows below 1400px. */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1 rounded-xl border bg-card p-1">
+          {TABS.map((t) => {
+            const n = getApprovalsForUser(session, pool, {
+              tab: t.id,
+              employees,
+              now: TODAY,
+            }).length
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  setSelected([])
+                  pushQuery({ tab: t.id === "waiting" ? undefined : t.id })
+                }}
+                aria-current={tab === t.id ? "page" : undefined}
                 className={cn(
-                  "tabular rounded-full px-1.5 text-xs",
+                  "flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                   tab === t.id
-                    ? "bg-primary/15 text-primary"
-                    : "bg-muted text-muted-foreground"
+                    ? "bg-success-muted font-medium text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
-                {n}
-              </span>
-            </button>
-          )
-        })}
-      </div>
+                {t.label}
+                <span
+                  className={cn(
+                    "tabular rounded-full px-1.5 text-xs",
+                    tab === t.id
+                      ? "bg-primary/15 text-primary"
+                      : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {n}
+                </span>
+              </button>
+            )
+          })}
+        </div>
 
-      <div className="mb-4">
         <ApprovalFiltersBar
           items={unfiltered}
           filters={filters}
