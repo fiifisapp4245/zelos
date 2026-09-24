@@ -53,7 +53,11 @@ export function SegmentedTabs({
             className={cn(
               "h-auto flex-none gap-2 rounded-lg border-0 px-3.5 py-2 text-sm",
               "text-muted-foreground hover:bg-muted hover:text-foreground",
-              "data-active:bg-success-muted data-active:font-medium data-active:text-primary data-active:shadow-none",
+              "data-active:bg-success-muted data-active:font-medium data-active:text-primary",
+              // Flat, as the originals were. The primitive raises the active
+              // tab with shadow-sm behind a variant selector, which a plain
+              // shadow-none does not outrank — this matches its specificity.
+              "group-data-[variant=default]/tabs-list:data-active:shadow-none",
               "after:hidden"
             )}
           >
