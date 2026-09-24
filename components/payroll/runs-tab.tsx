@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { AlertTriangle, ArrowRight, Plus, Wallet } from "lucide-react"
 import { toast } from "sonner"
 
@@ -76,8 +76,9 @@ export function RunsTab() {
   const store = useStore()
   const router = useRouter()
   const { runs, groups, isApprover, isPreparer, linesFor } = usePayroll()
+  const params = useSearchParams()
   const [tab, setTab] = React.useState("active")
-  const [offCycle, setOffCycle] = React.useState(false)
+  const [offCycle, setOffCycle] = React.useState(params.get("offCycle") === "1")
 
   const settings = store.approvalSettings
   const rolesConfigured =

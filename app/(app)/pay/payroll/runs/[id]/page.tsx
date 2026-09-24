@@ -48,14 +48,8 @@ export default function RunPage() {
 function Run() {
   const { id } = useParams<{ id: string }>()
   const store = useStore()
-  const {
-    runs,
-    groupFor,
-    linesFor,
-    membersFor,
-    isPreparer,
-    canOpenPayroll,
-  } = usePayroll()
+  const { runs, groupFor, linesFor, membersFor, isPreparer, canOpenPayroll } =
+    usePayroll()
 
   const run = runs.find((r) => r.id === id)
   const [revealed, setRevealed] = React.useState(false)
@@ -224,7 +218,9 @@ function Run() {
 
             {settled && isPreparer && (
               <Button variant="outline" size="lg" asChild>
-                <Link href="/pay/payroll">Correct with off-cycle run</Link>
+                <Link href={`/pay/payroll?offCycle=1&group=${run.payGroupId}`}>
+                  Correct with off-cycle run
+                </Link>
               </Button>
             )}
           </div>

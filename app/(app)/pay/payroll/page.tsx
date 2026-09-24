@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useSearchParams } from "next/navigation"
 import { BarChart3, Lock, Send } from "lucide-react"
 
 import { PageShell } from "@/components/shell/page-shell"
@@ -9,9 +10,20 @@ import { SegmentedTabs } from "@/components/common/segmented-tabs"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { RunsTab } from "@/components/payroll/runs-tab"
 import { OneOffsTab } from "@/components/payroll/one-offs-tab"
+import { WidgetSkeleton } from "@/components/home/skeletons"
 import { usePayroll } from "@/components/payroll/use-payroll"
 
 export default function PayrollPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <Payroll />
+    </React.Suspense>
+  )
+}
+
+function Payroll() {
+  const params = useSearchParams()
+  const demo = params.get("demo")
   const { canOpenPayroll, isPreparer, isApprover } = usePayroll()
   const [tab, setTab] = React.useState("runs")
 
@@ -70,7 +82,7 @@ export default function PayrollPage() {
         </div>
 
         <TabsContent value="runs">
-          <RunsTab />
+          {demo === "loading" ? <WidgetSkeleton rows={5} /> : <RunsTab />}
         </TabsContent>
 
         <TabsContent value="one-offs">
