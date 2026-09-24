@@ -14,34 +14,66 @@ import {
   toMinutes,
   type AttendanceInput,
 } from "./derive"
-import type { ClockEvent, TimeAdjustment, WorkPattern } from "./types"
+import type { ClockEvent, TimeAdjustment } from "./types"
+import type { PatternAssignment, Shift, WorkPattern } from "../schedules/types"
 import type { Employee, LeaveRequest } from "../types"
 
 const OFFICE: WorkPattern = {
   id: "wp-office",
-  label: "Office",
-  workingDays: [1, 2, 3, 4, 5],
-  start: "08:00",
-  end: "17:00",
+  name: "Office",
+  days: ([1, 2, 3, 4, 5] as const).map((weekday) => ({
+    weekday,
+    start: "08:00",
+    end: "17:00",
+  })),
   breakMinutes: 60,
+  breakPaid: false,
+  graceMinutes: null,
+}
+
+const ASSIGNED_OFFICE: PatternAssignment = {
+  id: "pa-1",
+  patternId: "wp-office",
+  scope: "employee",
+  target: "kofi",
+  effectiveFrom: "2026-01-01",
+  reason: "Test fixture",
+  createdBy: "fiifi",
+  createdAt: "2026-01-01T09:00:00",
 }
 
 const EMPLOYEES = [
-  { id: "kofi", department: "Engineering" },
+  { id: "kofi", department: "Engineering", branch: "Accra HQ" },
 ] as unknown as Employee[]
 
 function input(over: Partial<AttendanceInput> = {}): AttendanceInput {
   return {
     employees: EMPLOYEES,
     patterns: [OFFICE],
-    schedules: [{ employeeId: "kofi", patternId: "wp-office" }],
+    assignments: [ASSIGNED_OFFICE],
+    shifts: [],
+    defaultGraceMinutes: 10,
     events: [],
     adjustments: [],
     leave: [],
-    graceMinutes: 10,
     ...over,
   }
 }
+
+const shift = (over: Partial<Shift> = {}): Shift => ({
+  id: "sh-1",
+  employeeId: "kofi",
+  date: "2026-09-16",
+  start: "14:00",
+  end: "22:00",
+  breakMinutes: 60,
+  position: "Warehouse floor",
+  branch: "Kumasi",
+  department: "Operations",
+  state: "published",
+  publishedAt: "2026-09-10T16:00:00",
+  ...over,
+})
 
 const event = (over: Partial<ClockEvent> = {}): ClockEvent => ({
   id: "e1",
@@ -107,13 +139,17 @@ describe("dayRecordFor", () => {
   })
 
   it("measures lateness against this person's own start, not a global one", () => {
-    const early: WorkPattern = { ...OFFICE, id: "wp-early", start: "07:00" }
+    const early: WorkPattern = {
+      ...OFFICE,
+      id: "wp-early",
+      days: OFFICE.days.map((d) => ({ ...d, start: "07:00" })),
+    }
     const r = dayRecordFor(
       "kofi",
       "2026-09-16",
       input({
         patterns: [early],
-        schedules: [{ employeeId: "kofi", patternId: "wp-early" }],
+        assignments: [{ ...ASSIGNED_OFFICE, patternId: "wp-early" }],
         events: [event({ clockIn: "07:30" })],
       })
     )

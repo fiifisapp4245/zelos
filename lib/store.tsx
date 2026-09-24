@@ -34,22 +34,32 @@ import { ACTING_ASSIGNMENTS, PAYSLIPS } from "./data/approvals"
 import { APPROVAL_ITEMS } from "./data/approval-items"
 import {
   CLOCK_EVENTS,
-  EMPLOYEE_SCHEDULES,
   EXCEPTION_RESOLUTIONS,
   PAY_PERIODS,
   TIMESHEETS as PERIOD_TIMESHEETS,
   TIME_ADJUSTMENTS,
-  WORK_PATTERNS,
 } from "./data/attendance-log"
+import {
+  PATTERN_ASSIGNMENTS,
+  SHIFTS,
+  SHIFT_CHANGES,
+  WORK_PATTERNS,
+} from "./data/schedules"
+import { RECONCILIATIONS } from "./data/reconciliations"
 import type {
   ClockEvent,
-  EmployeeSchedule,
   ExceptionResolution,
   PayPeriod,
   TimeAdjustment,
   Timesheet,
-  WorkPattern,
 } from "./attendance/types"
+import type {
+  PatternAssignment,
+  Shift,
+  ShiftChange,
+  WorkPattern,
+} from "./schedules/types"
+import type { Reconciliation } from "./leave/reconcile"
 import { applyDecision } from "./approvals/selectors"
 import type { ApprovalItem, DecisionAction } from "./approvals/types"
 import type {
@@ -78,6 +88,7 @@ import type {
   Requisition,
 } from "./types"
 import { TODAY, TODAY_ISO } from "./format"
+import { addDays } from "./time"
 import type { Viewer } from "./rbac"
 import type { SessionContext } from "./session"
 
@@ -103,7 +114,10 @@ interface State {
   approvals: ApprovalItem[]
   payslips: Payslip[]
   workPatterns: WorkPattern[]
-  employeeSchedules: EmployeeSchedule[]
+  patternAssignments: PatternAssignment[]
+  shifts: Shift[]
+  shiftChanges: ShiftChange[]
+  reconciliations: Reconciliation[]
   clockEvents: ClockEvent[]
   timeAdjustments: TimeAdjustment[]
   exceptionResolutions: ExceptionResolution[]
@@ -138,7 +152,10 @@ const INITIAL: State = {
   approvals: APPROVAL_ITEMS,
   payslips: PAYSLIPS,
   workPatterns: WORK_PATTERNS,
-  employeeSchedules: EMPLOYEE_SCHEDULES,
+  patternAssignments: PATTERN_ASSIGNMENTS,
+  shifts: SHIFTS,
+  shiftChanges: SHIFT_CHANGES,
+  reconciliations: RECONCILIATIONS,
   clockEvents: CLOCK_EVENTS,
   timeAdjustments: TIME_ADJUSTMENTS,
   exceptionResolutions: EXCEPTION_RESOLUTIONS,
@@ -158,7 +175,7 @@ const STORAGE_KEY = "zelos-hr-session"
  * this week's types is how you get a crash three screens away from the
  * change that caused it.
  */
-const STORAGE_VERSION = 2
+const STORAGE_VERSION = 3
 
 interface StoreValue extends State {
   viewer: Viewer
@@ -217,6 +234,25 @@ interface StoreValue extends State {
     note?: string
   ) => void
   reopenException: (key: string) => void
+
+  /** Schedules own what was expected, so they own these writes. */
+  savePattern: (pattern: WorkPattern) => void
+  assignPattern: (
+    draft: Omit<PatternAssignment, "id" | "createdBy" | "createdAt">
+  ) => void
+  /** An id on the draft edits that shift; without one it creates. */
+  saveShift: (draft: Shift, reason?: string) => void
+  cancelShift: (id: string, reason: string) => void
+  publishShifts: (ids: string[]) => void
+  copyWeek: (fromMonday: string, toMonday: string) => void
+
+  /** Records that a mismatch was dealt with. Neither record is altered. */
+  reconcile: (
+    key: string,
+    action: Reconciliation["action"],
+    note?: string
+  ) => void
+  reopenReconciliation: (key: string) => void
   decideTimesheet: (
     periodId: string,
     employeeIds: string[],
@@ -776,6 +812,230 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           exceptionResolutions: s.exceptionResolutions.filter(
             (r) => r.key !== key
           ),
+        }))
+      },
+
+      /* ── Schedules ─────────────────────────────────────────────── */
+
+      savePattern: (pattern) => {
+        setState((s) => ({
+          ...s,
+          workPatterns: s.workPatterns.some((p) => p.id === pattern.id)
+            ? s.workPatterns.map((p) => (p.id === pattern.id ? pattern : p))
+            : [...s.workPatterns, pattern],
+        }))
+      },
+
+      /**
+       * Assigning never edits what came before. The new row takes effect
+       * from its own date, and every date before it still resolves to
+       * whatever was in force then.
+       */
+      assignPattern: (draft) => {
+        setState((s) => ({
+          ...s,
+          patternAssignments: [
+            ...s.patternAssignments,
+            {
+              ...draft,
+              id: uid("pa"),
+              createdBy: actorId,
+              createdAt: nowIso(),
+            },
+          ],
+        }))
+      },
+
+      saveShift: (draft, reason) => {
+        setState((s) => {
+          const existing = draft.id
+            ? s.shifts.find((x) => x.id === draft.id)
+            : undefined
+
+          if (!existing) {
+            const shift: Shift = { ...draft, id: draft.id || uid("sh") }
+            return {
+              ...s,
+              shifts: [...s.shifts, shift],
+              shiftChanges: [
+                {
+                  id: uid("sc"),
+                  shiftId: shift.id,
+                  action: "created",
+                  summary: `${shift.position} ${shift.start}–${shift.end} drafted`,
+                  reason,
+                  by: actorId,
+                  at: nowIso(),
+                },
+                ...s.shiftChanges,
+              ],
+            }
+          }
+
+          const changed =
+            existing.start !== draft.start ||
+            existing.end !== draft.end ||
+            existing.position !== draft.position ||
+            existing.employeeId !== draft.employeeId
+          const summary =
+            existing.start !== draft.start || existing.end !== draft.end
+              ? `${existing.start}–${existing.end} → ${draft.start}–${draft.end}`
+              : existing.position !== draft.position
+                ? `${existing.position} → ${draft.position}`
+                : "Details updated"
+
+          return {
+            ...s,
+            shifts: s.shifts.map((x) =>
+              x.id === existing.id
+                ? {
+                    ...draft,
+                    id: existing.id,
+                    // Published and then edited: the people on it were
+                    // told something that is no longer true.
+                    changedSincePublish:
+                      existing.state === "published" && changed
+                        ? true
+                        : existing.changedSincePublish,
+                  }
+                : x
+            ),
+            shiftChanges: [
+              {
+                id: uid("sc"),
+                shiftId: existing.id,
+                action:
+                  existing.employeeId !== draft.employeeId
+                    ? "assigned"
+                    : "edited",
+                summary,
+                reason,
+                by: actorId,
+                at: nowIso(),
+              },
+              ...s.shiftChanges,
+            ],
+          }
+        })
+      },
+
+      /**
+       * A draft can go; a published shift cannot. Somebody was told to
+       * work it, so it stays on the roster marked cancelled with the
+       * reason attached.
+       */
+      cancelShift: (id, reason) => {
+        setState((s) => {
+          const shift = s.shifts.find((x) => x.id === id)
+          if (!shift) return s
+          const trail = {
+            id: uid("sc"),
+            shiftId: id,
+            action: "cancelled" as const,
+            summary: `${shift.position} ${shift.start}–${shift.end} cancelled`,
+            reason,
+            by: actorId,
+            at: nowIso(),
+          }
+          return {
+            ...s,
+            shifts:
+              shift.state === "draft"
+                ? s.shifts.filter((x) => x.id !== id)
+                : s.shifts.map((x) =>
+                    x.id === id ? { ...x, cancelled: true } : x
+                  ),
+            shiftChanges: [trail, ...s.shiftChanges],
+          }
+        })
+      },
+
+      publishShifts: (ids) => {
+        setState((s) => {
+          const at = nowIso()
+          return {
+            ...s,
+            shifts: s.shifts.map((x) =>
+              ids.includes(x.id)
+                ? {
+                    ...x,
+                    state: "published",
+                    publishedAt: at,
+                    changedSincePublish: false,
+                  }
+                : x
+            ),
+            shiftChanges: [
+              ...ids.map((shiftId) => ({
+                id: uid("sc"),
+                shiftId,
+                action: "published" as const,
+                summary: "Published to the people on it",
+                by: actorId,
+                at,
+              })),
+              ...s.shiftChanges,
+            ],
+          }
+        })
+      },
+
+      /** Last week again as drafts, which is how most weeks start. */
+      copyWeek: (fromMonday, toMonday) => {
+        setState((s) => {
+          const offset = Math.round(
+            (new Date(`${toMonday}T00:00:00`).getTime() -
+              new Date(`${fromMonday}T00:00:00`).getTime()) /
+              86_400_000
+          )
+          const source = s.shifts.filter(
+            (x) =>
+              !x.cancelled &&
+              x.date >= fromMonday &&
+              x.date <= addDays(fromMonday, 6)
+          )
+          const copies: Shift[] = source.map((x) => ({
+            ...x,
+            id: uid("sh"),
+            date: addDays(x.date, offset),
+            state: "draft",
+            publishedAt: undefined,
+            changedSincePublish: false,
+          }))
+          return {
+            ...s,
+            shifts: [...s.shifts, ...copies],
+            shiftChanges: [
+              ...copies.map((c) => ({
+                id: uid("sc"),
+                shiftId: c.id,
+                action: "created" as const,
+                summary: `Copied from the week of ${fromMonday}`,
+                by: actorId,
+                at: nowIso(),
+              })),
+              ...s.shiftChanges,
+            ],
+          }
+        })
+      },
+
+      /* ── Reconciliation ────────────────────────────────────────── */
+
+      reconcile: (key, action, note) => {
+        setState((s) => ({
+          ...s,
+          reconciliations: [
+            ...s.reconciliations.filter((r) => r.key !== key),
+            { key, action, note, by: actorId, at: nowIso() },
+          ],
+        }))
+      },
+
+      reopenReconciliation: (key) => {
+        setState((s) => ({
+          ...s,
+          reconciliations: s.reconciliations.filter((r) => r.key !== key),
         }))
       },
 

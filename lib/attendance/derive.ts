@@ -1,73 +1,43 @@
 import type { Employee, LeaveRequest } from "../types"
 import { holidaysBetween } from "../fixtures/ghanaHolidays"
+import {
+  expectedFor,
+  expectedHours,
+  type ScheduleInput,
+} from "../schedules/derive"
+import { toMinutes } from "../time"
 import type {
   ClockEvent,
   DayCode,
   DayRecord,
-  EmployeeSchedule,
   ExceptionKind,
   ExceptionResolution,
   TimeAdjustment,
-  WorkPattern,
 } from "./types"
 
 /* ── Time helpers ────────────────────────────────────────────────────── */
 
-export function toMinutes(hhmm: string) {
-  return Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
-}
-
-export function toHhmm(minutes: number) {
-  const m = Math.max(0, Math.round(minutes))
-  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`
-}
-
-/** "−0h 42m", the form the variance columns use. */
-export function formatHours(hours: number, { signed = false } = {}) {
-  const neg = hours < 0
-  const total = Math.round(Math.abs(hours) * 60)
-  const text = `${Math.floor(total / 60)}h ${String(total % 60).padStart(2, "0")}m`
-  if (!signed) return text
-  if (total === 0) return "0h 00m"
-  return `${neg ? "−" : "+"}${text}`
-}
-
-/** 1 = Monday … 7 = Sunday, so week arithmetic reads the way people speak. */
-export function isoWeekday(iso: string) {
-  const d = new Date(`${iso}T00:00:00`).getDay()
-  return d === 0 ? 7 : d
-}
-
-export function datesBetween(start: string, end: string) {
-  const out: string[] = []
-  const d = new Date(`${start}T00:00:00`)
-  const last = new Date(`${end}T00:00:00`)
-  while (d <= last) {
-    out.push(d.toISOString().slice(0, 10))
-    d.setDate(d.getDate() + 1)
-  }
-  return out
-}
+// Re-exported so attendance code has one import for reading a day, and the
+// helpers themselves stay below both modules in lib/time.
+export {
+  datesBetween,
+  formatHours,
+  isoWeekday,
+  toHhmm,
+  toMinutes,
+} from "../time"
 
 /* ── Inputs ──────────────────────────────────────────────────────────── */
 
-export interface AttendanceInput {
+/**
+ * Attendance reads schedules; it does not hold its own idea of expected
+ * hours. Everything in ScheduleInput comes straight from that module.
+ */
+export interface AttendanceInput extends ScheduleInput {
   employees: Employee[]
-  patterns: WorkPattern[]
-  schedules: EmployeeSchedule[]
   events: ClockEvent[]
   adjustments: TimeAdjustment[]
   leave: LeaveRequest[]
-  /** Minutes after the scheduled start before a arrival counts as late. */
-  graceMinutes: number
-}
-
-export function patternFor(
-  employeeId: string,
-  { patterns, schedules }: Pick<AttendanceInput, "patterns" | "schedules">
-) {
-  const assigned = schedules.find((s) => s.employeeId === employeeId)
-  return patterns.find((p) => p.id === assigned?.patternId) ?? null
 }
 
 /**
@@ -97,7 +67,8 @@ export function dayRecordFor(
   date: string,
   input: AttendanceInput
 ): DayRecord {
-  const pattern = patternFor(employeeId, input)
+  const employee = input.employees.find((e) => e.id === employeeId)
+  const expected = employee ? expectedFor(employee, date, input) : null
   const event = input.events.find(
     (e) => e.employeeId === employeeId && e.date === date
   )
@@ -112,19 +83,12 @@ export function dayRecordFor(
       l.endDate >= date
   )
   const holiday = holidaysBetween(date, date)[0]
-  const working = pattern?.workingDays.includes(isoWeekday(date)) ?? false
 
   const base: DayRecord = {
     employeeId,
     date,
     code: "-",
-    scheduled: working
-      ? {
-          start: pattern!.start,
-          end: pattern!.end,
-          breakMinutes: pattern!.breakMinutes,
-        }
-      : null,
+    scheduled: expected,
     clockIn: null,
     clockOut: null,
     source: null,
@@ -142,15 +106,14 @@ export function dayRecordFor(
   }
 
   if (holiday) return { ...base, code: "H" }
-  if (!working) return base
+  if (!expected) return base
   if (leaveRequest) return { ...base, code: "V" }
   if (!event || (!event.clockIn && !event.clockOut))
     return { ...base, code: "N" }
 
   const { clockIn, clockOut } = effectiveTimes(event, adjustments)
-  const scheduledStart = toMinutes(pattern!.start)
-  const scheduledMinutes =
-    toMinutes(pattern!.end) - scheduledStart - pattern!.breakMinutes
+  const scheduledStart = toMinutes(expected.start)
+  const scheduledMinutes = expectedHours(expected) * 60
 
   const workedMinutes =
     clockIn && clockOut
@@ -161,8 +124,10 @@ export function dayRecordFor(
       : 0
   const hours = Math.round((workedMinutes / 60) * 100) / 100
 
+  // Against this person's own start, plus whatever grace their schedule
+  // allows — never a single time for the whole company.
   const lateBy = clockIn
-    ? Math.max(0, toMinutes(clockIn) - scheduledStart - input.graceMinutes)
+    ? Math.max(0, toMinutes(clockIn) - scheduledStart - expected.graceMinutes)
     : 0
 
   // Remote is a property of where the capture came from, not of the clock.
@@ -235,16 +200,14 @@ export function totalHours(records: DayRecord[]) {
 }
 
 export function scheduledHours(records: DayRecord[]) {
-  const total = records.reduce((n, r) => {
-    if (!r.scheduled) return n
-    return (
-      n +
-      (toMinutes(r.scheduled.end) -
-        toMinutes(r.scheduled.start) -
-        r.scheduled.breakMinutes) /
-        60
-    )
-  }, 0)
+  const total = records.reduce(
+    // A holiday or a leave day is not hours anyone was expected to work.
+    (n, r) =>
+      r.scheduled && r.code !== "H" && r.code !== "V"
+        ? n + expectedHours(r.scheduled)
+        : n,
+    0
+  )
   return Math.round(total * 10) / 10
 }
 

@@ -1,13 +1,15 @@
 import { EMPLOYEES } from "./employees"
-import { isoWeekday, toHhmm, toMinutes } from "../attendance/derive"
+import { LEAVE_REQUESTS } from "./records"
+import { PATTERN_ASSIGNMENTS, SHIFTS, WORK_PATTERNS } from "./schedules"
+import { expectedFor } from "../schedules/derive"
+import { holidaysBetween } from "../fixtures/ghanaHolidays"
+import { datesBetween, toHhmm, toMinutes } from "../time"
 import type {
   ClockEvent,
-  EmployeeSchedule,
   ExceptionResolution,
   PayPeriod,
   TimeAdjustment,
   Timesheet,
-  WorkPattern,
 } from "../attendance/types"
 
 /**
@@ -29,56 +31,6 @@ export const ATTENDANCE_POLICY = {
   autoCloseAt: "23:59",
 }
 
-export const WORK_PATTERNS: WorkPattern[] = [
-  {
-    id: "wp-office",
-    label: "Office · Mon–Fri 08:00–17:00",
-    workingDays: [1, 2, 3, 4, 5],
-    start: "08:00",
-    end: "17:00",
-    breakMinutes: 60,
-  },
-  {
-    id: "wp-early",
-    label: "Early shift · Mon–Sat 07:00–15:00",
-    workingDays: [1, 2, 3, 4, 5, 6],
-    start: "07:00",
-    end: "15:00",
-    breakMinutes: 45,
-  },
-  {
-    id: "wp-late",
-    label: "Late shift · Mon–Sat 14:00–22:00",
-    workingDays: [1, 2, 3, 4, 5, 6],
-    start: "14:00",
-    end: "22:00",
-    breakMinutes: 45,
-  },
-  {
-    id: "wp-support",
-    label: "Support · Tue–Sat 09:00–18:00",
-    workingDays: [2, 3, 4, 5, 6],
-    start: "09:00",
-    end: "18:00",
-    breakMinutes: 60,
-  },
-]
-
-/** Operations and the branches run shifts; everyone else keeps office hours. */
-const SHIFTED: Record<string, string> = {
-  mensa: "wp-early",
-  nii: "wp-late",
-  yaa: "wp-early",
-  kojo: "wp-late",
-  akos: "wp-support",
-  abla: "wp-support",
-}
-
-export const EMPLOYEE_SCHEDULES: EmployeeSchedule[] = EMPLOYEES.map((e) => ({
-  employeeId: e.id,
-  patternId: SHIFTED[e.id] ?? "wp-office",
-}))
-
 const ON_STRENGTH = EMPLOYEES.filter(
   (e) =>
     !["pre_hire", "resigned", "terminated", "retired"].includes(
@@ -94,42 +46,54 @@ function hash(...parts: (string | number)[]) {
   return h
 }
 
-function dates(start: string, end: string) {
-  const out: string[] = []
-  const d = new Date(`${start}T00:00:00`)
-  const last = new Date(`${end}T00:00:00`)
-  while (d <= last) {
-    out.push(d.toISOString().slice(0, 10))
-    d.setDate(d.getDate() + 1)
-  }
-  return out
+const PERIOD_DATES = datesBetween("2026-08-01", "2026-09-18")
+
+const SCHEDULE_SOURCE = {
+  patterns: WORK_PATTERNS,
+  assignments: PATTERN_ASSIGNMENTS,
+  shifts: SHIFTS,
+  defaultGraceMinutes: ATTENDANCE_POLICY.graceMinutes,
 }
 
-const PERIOD_DATES = dates("2026-08-01", "2026-09-18")
+function onApprovedLeave(employeeId: string, date: string) {
+  return LEAVE_REQUESTS.some(
+    (l) =>
+      l.employeeId === employeeId &&
+      l.status === "approved" &&
+      l.startDate <= date &&
+      l.endDate >= date
+  )
+}
 
 /**
- * Two working months of captures. The shape is deliberately imperfect: a
- * handful of days close themselves, a few people drift past the grace
- * period, some work from home, and some days simply have nothing on them.
+ * Two working months of captures, generated against whatever Schedules
+ * expected of each person that day — a pattern for office staff, a
+ * published shift for the branches.
+ *
+ * The shape is deliberately imperfect: a handful of days close
+ * themselves, a few people drift past their own grace period, some work
+ * from home, and some days simply have nothing on them. Nothing is
+ * captured on a holiday or a day covered by leave, because the reader
+ * was not there to capture it.
  */
 export const CLOCK_EVENTS: ClockEvent[] = (() => {
   const out: ClockEvent[] = []
 
   for (const e of ON_STRENGTH) {
-    const patternId = SHIFTED[e.id] ?? "wp-office"
-    const pattern = WORK_PATTERNS.find((p) => p.id === patternId)!
-
     for (const date of PERIOD_DATES) {
-      if (!pattern.workingDays.includes(isoWeekday(date))) continue
+      const expected = expectedFor(e, date, SCHEDULE_SOURCE)
+      if (!expected) continue
+      if (holidaysBetween(date, date).length) continue
+      if (onApprovedLeave(e.id, date)) continue
 
       const n = hash(e.id, date)
 
       // Roughly one working day in twenty-five has nothing captured at all.
       if (n % 25 === 0) continue
 
-      const remote = patternId === "wp-office" && n % 11 === 0
+      const remote = expected.from === "pattern" && n % 11 === 0
       const drift = n % 17 === 0 ? 12 + (n % 25) : n % 7 === 0 ? 4 : 0
-      const clockIn = toHhmm(toMinutes(pattern.start) + drift - (n % 3))
+      const clockIn = toHhmm(toMinutes(expected.start) + drift - (n % 3))
       const autoClosed = n % 29 === 0
       const overtime = n % 13 === 0 ? 45 + (n % 40) : 0
 
@@ -140,14 +104,31 @@ export const CLOCK_EVENTS: ClockEvent[] = (() => {
         clockIn,
         clockOut: autoClosed
           ? null
-          : toHhmm(toMinutes(pattern.end) + overtime - (n % 5)),
+          : toHhmm(toMinutes(expected.end) + overtime - (n % 5)),
         source: remote ? "web" : n % 8 === 0 ? "web" : "fingerprint",
         branch: remote ? "Remote" : e.branch,
-        breakMinutes: pattern.breakMinutes,
+        breakMinutes: expected.breakMinutes,
         ...(autoClosed ? { autoClosed: true } : {}),
       })
     }
   }
+
+  /**
+   * One badge read on a day the person was signed off. It is the
+   * reconciliation case that matters most: the clock says one thing and
+   * the leave record says another, and only a person can say which is
+   * right.
+   */
+  out.push({
+    id: "ce-afia-2026-09-09",
+    employeeId: "afia",
+    date: "2026-09-09",
+    clockIn: "11:02",
+    clockOut: "12:40",
+    source: "fingerprint",
+    branch: "Accra HQ",
+    breakMinutes: 0,
+  })
 
   return out
 })()

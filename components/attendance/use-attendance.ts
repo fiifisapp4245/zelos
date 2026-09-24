@@ -120,17 +120,20 @@ export function useAttendance({
   const input: AttendanceInput = React.useMemo(
     () => ({
       employees: store.employees,
+      // What was expected comes from Schedules, whole.
       patterns: store.workPatterns,
-      schedules: store.employeeSchedules,
+      assignments: store.patternAssignments,
+      shifts: store.shifts,
+      defaultGraceMinutes: ATTENDANCE_POLICY.graceMinutes,
       events: store.clockEvents,
       adjustments: store.timeAdjustments,
       leave: store.leaveRequests,
-      graceMinutes: ATTENDANCE_POLICY.graceMinutes,
     }),
     [
       store.employees,
       store.workPatterns,
-      store.employeeSchedules,
+      store.patternAssignments,
+      store.shifts,
       store.clockEvents,
       store.timeAdjustments,
       store.leaveRequests,

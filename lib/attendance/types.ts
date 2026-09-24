@@ -5,7 +5,12 @@
  * is a day with **no record** — which is a gap in the data, not a finding
  * about the person. Calling it absence would be the system asserting
  * something it cannot know.
+ *
+ * What was *expected* of someone lives in lib/schedules, which owns work
+ * patterns and the roster. Attendance reads it and never redefines it.
  */
+
+import type { Expectation } from "../schedules/types"
 
 /** The letter shown in a register cell. N is no record, never absence. */
 export type DayCode =
@@ -18,23 +23,6 @@ export type DayCode =
   | "-" // not a working day for this person
 
 export type CaptureSource = "fingerprint" | "web"
-
-/** Mon–Fri office hours, or a named shift for branch and operations staff. */
-export interface WorkPattern {
-  id: string
-  label: string
-  /** 1 = Monday … 7 = Sunday. */
-  workingDays: number[]
-  /** HH:mm, local. */
-  start: string
-  end: string
-  breakMinutes: number
-}
-
-export interface EmployeeSchedule {
-  employeeId: string
-  patternId: string
-}
 
 /**
  * What the clock captured. Never edited and never deleted — a correction
@@ -132,8 +120,12 @@ export interface DayRecord {
   employeeId: string
   date: string
   code: DayCode
-  /** The schedule that applied, where the day was a working one. */
-  scheduled: { start: string; end: string; breakMinutes: number } | null
+  /**
+   * What Schedules expected of them, where anything did. Everything
+   * measured against expectation — lateness, variance, overtime — comes
+   * from this and nowhere else.
+   */
+  scheduled: Expectation | null
   /** After adjustments, which is what the hours are counted from. */
   clockIn: string | null
   clockOut: string | null

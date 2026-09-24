@@ -22,6 +22,9 @@ export const GHANA_HOLIDAYS: PublicHoliday[] = [
   { date: "2026-05-27", name: "Eid ul-Adha", kind: "statutory" },
   { date: "2026-08-04", name: "Founders' Day", kind: "statutory" },
   { date: "2026-09-21", name: "Kwame Nkrumah Memorial Day", kind: "statutory" },
+  // Xanthan's own closure day, declared by the board rather than the
+  // state. It shuts the branches exactly as a statutory day does.
+  { date: "2026-09-28", name: "Xanthan founding day", kind: "commemorative" },
   {
     date: "2026-12-07",
     name: "Farmers' Day",

@@ -577,6 +577,51 @@ export const LEAVE_REQUESTS: LeaveRequest[] = [
       "Campaign launch falls in that week — please re-submit for October.",
   },
   {
+    // Approved before the roster was rewritten, which is why Takoradi
+    // still has her on a shift for the 24th.
+    id: "LR-2026-034",
+    employeeId: "yaa",
+    type: "annual",
+    startDate: "2026-09-24",
+    endDate: "2026-09-25",
+    days: 2,
+    reason: "Two days for a family wedding in Sekondi",
+    status: "approved",
+    submittedAt: "2026-09-10T08:15:00",
+    decidedBy: "akwasi",
+    decidedAt: "2026-09-16T09:40:00",
+  },
+  {
+    // Still sitting with the approver although the days have been and
+    // gone: the attendance record and the leave record disagree.
+    id: "LR-2026-035",
+    employeeId: "maame",
+    type: "annual",
+    startDate: "2026-09-14",
+    endDate: "2026-09-16",
+    days: 3,
+    reason: "Annual leave",
+    status: "pending",
+    submittedAt: "2026-09-11T14:05:00",
+    decidedBy: null,
+    decidedAt: null,
+  },
+  {
+    // Filed and approved three days after the fact, which is what turned
+    // her 4 September from a day with no record into a day on leave.
+    id: "LR-2026-036",
+    employeeId: "adjoa",
+    type: "compassionate",
+    startDate: "2026-09-04",
+    endDate: "2026-09-04",
+    days: 1,
+    reason: "Funeral rites in Aburi",
+    status: "approved",
+    submittedAt: "2026-09-07T08:30:00",
+    decidedBy: "akwasi",
+    decidedAt: "2026-09-07T10:15:00",
+  },
+  {
     id: "LR-2026-027",
     employeeId: "kwabena",
     type: "annual",
