@@ -167,7 +167,7 @@ export const ATTENDANCE_LABEL: Record<AttendanceStatus, string> = {
   present: "Present",
   remote: "Remote",
   late: "Late",
-  absent: "Absent",
+  no_record: "No record",
   on_leave: "On leave",
   holiday: "Holiday",
   weekend: "Weekend",

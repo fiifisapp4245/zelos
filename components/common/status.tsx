@@ -69,7 +69,7 @@ const ATTENDANCE_TONE: Record<AttendanceStatus, Tone> = {
   present: "success",
   remote: "info",
   late: "warning",
-  absent: "danger",
+  no_record: "danger",
   on_leave: "info",
   holiday: "neutral",
   weekend: "neutral",

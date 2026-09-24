@@ -173,8 +173,18 @@ export interface LeaveBalance {
   byType: LeaveTypeBalance[]
 }
 
+/**
+ * The system records presence. A day with nothing captured is "no record",
+ * never absence — it is a gap in the data, not a finding about the person.
+ */
 export type AttendanceStatus =
-  "present" | "remote" | "late" | "absent" | "on_leave" | "holiday" | "weekend"
+  | "present"
+  | "remote"
+  | "late"
+  | "no_record"
+  | "on_leave"
+  | "holiday"
+  | "weekend"
 
 export interface AttendanceRecord {
   id: string

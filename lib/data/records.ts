@@ -600,7 +600,7 @@ const ATT_STATUSES: AttendanceRecord["status"][] = [
   "present",
   "remote",
   "present",
-  "absent",
+  "no_record",
   "present",
 ]
 

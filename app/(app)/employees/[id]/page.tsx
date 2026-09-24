@@ -46,6 +46,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SegmentedTabs } from "@/components/common/segmented-tabs"
+import { EmployeeAttendanceTab } from "@/components/attendance/employee-attendance-tab"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { useStore } from "@/lib/store"
 import {
@@ -386,6 +387,7 @@ export default function EmployeeRecordPage() {
               ),
             },
             { value: "time", label: "Time & leave" },
+            { value: "attendance", label: "Attendance" },
             { value: "documents", label: "Documents" },
             { value: "lifecycle", label: "History" },
             { value: "audit", label: "Audit log" },
@@ -406,6 +408,9 @@ export default function EmployeeRecordPage() {
         </TabsContent>
         <TabsContent value="compensation" className="p-5">
           <CompensationTab employeeId={employee.id} />
+        </TabsContent>
+        <TabsContent value="attendance" className="p-5">
+          <EmployeeAttendanceTab employeeId={employee.id} />
         </TabsContent>
         <TabsContent value="documents" className="p-5">
           <DocumentsTab employeeId={employee.id} />
@@ -1225,7 +1230,7 @@ function TimeTab({ employeeId }: { employeeId: string }) {
                         ? "success"
                         : r.status === "late"
                           ? "warning"
-                          : r.status === "absent"
+                          : r.status === "no_record"
                             ? "danger"
                             : "neutral"
                     }

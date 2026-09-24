@@ -30,7 +30,8 @@ export function TeamToday() {
   const statusOf = (e: Employee): Bucket => {
     const record = today.find((a) => a.employeeId === e.id)
     if (!record) return "notClocked"
-    if (record.status === "on_leave" || record.status === "absent") return "out"
+    if (record.status === "on_leave") return "out"
+    if (record.status === "no_record") return "notClocked"
     if (record.status === "late") return "late"
     if (record.clockIn && !record.clockOut) return "in"
     if (record.clockIn && record.clockOut) return "out"
