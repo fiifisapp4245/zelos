@@ -31,10 +31,11 @@ const ART: Record<string, { src: string; wash: string; width: number }> = {
 
 const CARD = cn(
   "group relative flex h-[164px] overflow-hidden rounded-2xl p-5 text-left",
-  // Tailwind v4 lifts with the standalone translate property, so
-  // naming "transform" here would not transition it.
-  "transition-[translate,box-shadow] duration-300 ease-out",
-  "hover:shadow-lg motion-safe:hover:-translate-y-0.5",
+  // Tailwind v4 lifts with the standalone translate property, so naming
+  // "transform" here would not transition it. No shadow on hover — the
+  // motion already says the card is live.
+  "transition-[translate] duration-300 ease-out",
+  "motion-safe:hover:-translate-y-0.5",
   "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
 )
 
