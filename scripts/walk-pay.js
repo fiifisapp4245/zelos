@@ -14,7 +14,8 @@
  * Note: Chromium's innerText applies text-transform, so uppercase
  * labels come back uppercase — compare with has(), not includes().
  */
-const { chromium } = require("playwright-core")
+
+import { chromium } from "playwright-core"
 
 const BASE = "http://localhost:3000"
 const results = []
