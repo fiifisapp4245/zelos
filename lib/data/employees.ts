@@ -137,7 +137,15 @@ const SEEDS: Seed[] = [
     managerId: "esi",
     gender: "male",
     startDate: "2021-01-11",
-    compensation: { grossMonthly: 24000, payGrade: "L6" } as never,
+    compensation: {
+      grossMonthly: 24000,
+      payGrade: "L6",
+      paymentMethod: "bank",
+      bankName: "Guaranty Trust Bank",
+      bankAccount: "0123 •••• 9052",
+      momoProvider: "",
+      momoNumber: "",
+    } as never,
   },
   {
     id: "kofi",
@@ -179,7 +187,15 @@ const SEEDS: Seed[] = [
     contractType: "fixed_term",
     contractEndDate: "2026-10-03",
     startDate: "2023-06-05",
-    compensation: { grossMonthly: 9800, payGrade: "L4" } as never,
+    compensation: {
+      grossMonthly: 9800,
+      payGrade: "L4",
+      paymentMethod: "bank",
+      bankName: "Guaranty Trust Bank",
+      bankAccount: "0123 •••• 4471",
+      momoProvider: "",
+      momoNumber: "",
+    } as never,
   },
   {
     id: "kwame",
@@ -193,7 +209,17 @@ const SEEDS: Seed[] = [
     contractType: "fixed_term",
     contractEndDate: "2026-09-25",
     startDate: "2025-05-21",
-    compensation: { grossMonthly: 8400, payGrade: "L3" } as never,
+    compensation: {
+      grossMonthly: 8400,
+      payGrade: "L3",
+      // Invoices from Nairobi, so he is paid by transfer rather than on
+      // a Ghanaian mobile money wallet.
+      paymentMethod: "bank",
+      bankName: "Equity Bank Kenya",
+      bankAccount: "0550 •••• 2287",
+      momoProvider: "",
+      momoNumber: "",
+    } as never,
   },
   {
     id: "serwa",
@@ -257,7 +283,15 @@ const SEEDS: Seed[] = [
     gender: "female",
     startDate: "2022-11-28",
     lifecycleState: "on_leave",
-    compensation: { grossMonthly: 10200, payGrade: "L4" } as never,
+    compensation: {
+      grossMonthly: 10200,
+      payGrade: "L4",
+      paymentMethod: "bank",
+      bankName: "Zenith Bank",
+      bankAccount: "1014 •••• 7736",
+      momoProvider: "",
+      momoNumber: "",
+    } as never,
   },
   {
     id: "kojo",

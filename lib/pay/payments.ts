@@ -5,6 +5,7 @@ import type {
   PaymentBatch,
   PaymentChannelKey,
   PaymentItem,
+  PayGroup,
   PayrollLine,
   PayrollRun,
 } from "./types"
@@ -27,18 +28,25 @@ export const CHANNEL_LABEL: Record<PaymentChannelKey, string> = {
   international_transfer: "International transfer",
 }
 
-/** Which channel a line goes out on, from the account it is paid to. */
+/**
+ * Which channel a line goes out on.
+ *
+ * The pay group decides first: contractors are paid across borders
+ * whatever account they hold, so they never land in a domestic batch.
+ * Within a country it is the account itself — a mobile money number
+ * goes out on its own provider's batch, because a provider will only
+ * accept its own.
+ */
 export function channelOf(
   line: PayrollLine,
-  employee: Employee | undefined
+  employee: Employee | undefined,
+  group?: PayGroup
 ): PaymentChannelKey | null {
   if (!line.paymentDestinationMasked) return null
+  if (group?.contractorGroup) return "international_transfer"
   if (line.paymentChannel === "international_transfer")
     return "international_transfer"
-  if (line.paymentChannel === "bank_transfer")
-    return employee && employee.branch === "London"
-      ? "international_transfer"
-      : "bank_file"
+  if (line.paymentChannel === "bank_transfer") return "bank_file"
 
   const provider = (employee?.compensation.momoProvider ?? "").toLowerCase()
   if (provider.includes("telecel")) return "telecel_cash"
@@ -56,14 +64,16 @@ export function channelOf(
 export function batchesFor(
   run: PayrollRun,
   lines: PayrollLine[],
-  employees: Employee[]
+  employees: Employee[],
+  group?: PayGroup
 ): PaymentBatch[] {
   const byChannel = new Map<PaymentChannelKey, PayrollLine[]>()
 
   for (const line of lines) {
     const channel = channelOf(
       line,
-      employees.find((e) => e.id === line.employeeId)
+      employees.find((e) => e.id === line.employeeId),
+      group
     )
     if (!channel) continue
     const list = byChannel.get(channel)

@@ -38,6 +38,7 @@ import {
 import type {
   PaymentBatch,
   PaymentChannelKey,
+  PayGroup,
   PayrollRun,
 } from "@/lib/pay/types"
 import { formatDate, formatDateTime, fullName } from "@/lib/format"
@@ -94,7 +95,7 @@ export function PaymentsTab({ canPay }: { canPay: boolean }) {
           <RunPayments
             key={run.id}
             run={run}
-            groupName={groupFor(run.payGroupId)?.name ?? run.payGroupId}
+            group={groupFor(run.payGroupId)}
             lines={linesFor(run).lines}
             canPay={canPay}
           />
@@ -106,12 +107,12 @@ export function PaymentsTab({ canPay }: { canPay: boolean }) {
 
 function RunPayments({
   run,
-  groupName,
+  group,
   lines,
   canPay,
 }: {
   run: PayrollRun
-  groupName: string
+  group: PayGroup | undefined
   lines: ReturnType<ReturnType<typeof usePayroll>["linesFor"]>["lines"]
   canPay: boolean
 }) {
@@ -121,7 +122,7 @@ function RunPayments({
 
   return (
     <Panel
-      title={`${groupName} · ${formatDate(run.periodStart).slice(0, -5)}`}
+      title={`${group?.name ?? run.payGroupId} · ${formatDate(run.periodStart).slice(0, -5)}`}
       description={`Paid ${formatDate(run.payDate)} · ${lines.length} lines`}
       bodyClassName="p-0"
       actions={
@@ -133,7 +134,7 @@ function RunPayments({
             onClick={() => {
               store.createPaymentBatches(
                 run.id,
-                batchesFor(run, lines, store.employees)
+                batchesFor(run, lines, store.employees, group)
               )
               toast.success("Batches created, one per channel")
             }}

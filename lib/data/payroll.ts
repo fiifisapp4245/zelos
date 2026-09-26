@@ -448,7 +448,8 @@ export const PAYMENT_BATCHES: PaymentBatch[] = (() => {
 
   return PAYROLL_RUNS.filter((r) => r.status === "paid").flatMap((run) => {
     const { lines } = linesForRun(run, source)
-    return batchesFor(run, lines, EMPLOYEES).map((batch) => {
+    const group = PAY_GROUPS.find((g) => g.id === run.payGroupId)
+    return batchesFor(run, lines, EMPLOYEES, group).map((batch) => {
       const failed = batch.id === "pb-run-gh-2026-08-mtn_momo" ? "mensa" : null
 
       const items = batch.items.map((item) =>

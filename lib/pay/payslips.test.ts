@@ -119,13 +119,28 @@ describe("channels", () => {
     )
   })
 
-  it("sends a foreign bank account by international transfer", () => {
+  it("sends a contractor across borders whatever account they hold", () => {
+    const contractorGroup = { contractorGroup: true } as PayGroup
+    expect(
+      channelOf(
+        line({ employeeId: "harriet", paymentChannel: "bank_transfer" }),
+        people[2],
+        contractorGroup
+      )
+    ).toBe("international_transfer")
+    // A mobile money wallet does not put a contractor on a domestic batch.
+    expect(channelOf(line(), people[0], contractorGroup)).toBe(
+      "international_transfer"
+    )
+  })
+
+  it("sends a domestic bank account to the bank file", () => {
     expect(
       channelOf(
         line({ employeeId: "harriet", paymentChannel: "bank_transfer" }),
         people[2]
       )
-    ).toBe("international_transfer")
+    ).toBe("bank_file")
   })
 
   it("refuses to pick a channel with nowhere to send it", () => {
