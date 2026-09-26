@@ -11,7 +11,8 @@
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "walk:pay": "node scripts/walk-pay.js"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
@@ -36,6 +37,7 @@
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.4",
     "eslint-config-next": "16.1.7",
+    "playwright-core": "^1.63.0",
     "postcss": "^8",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
@@ -43,5 +45,5 @@
     "typescript": "^5.9.3",
     "vitest": "^5.0.1"
   },
-  "description": "Zelos HR \u2014 employee operating system prototype"
+  "description": "Zelos HR — employee operating system prototype"
 }

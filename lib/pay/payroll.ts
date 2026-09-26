@@ -281,8 +281,13 @@ export function lineFromExternal(
 export interface ReadinessSource {
   /** Attendance's own pay periods, which have to be settled first. */
   payPeriods: { id: string; start: string; end: string; status: string }[]
-  /** Days in the period where attendance and leave still disagree. */
-  openReconciliations: number
+  /**
+   * The people in this run with days attendance and leave disagree
+   * about, by name. Names rather than ids, because the check exists to
+   * be read: "Kofi Mensah and two others" is what sends somebody to the
+   * right rows.
+   */
+  unexplainedNames: string[]
   /** People in this run whose payment details are awaiting approval. */
   pendingPaymentChanges: string[]
   /** People in this run with nowhere to send their pay. */
@@ -346,10 +351,12 @@ export function readiness(
       label: "Leave and attendance agree",
       severity: "warning",
       detail:
-        source.openReconciliations === 0
+        source.unexplainedNames.length === 0
           ? "Nothing in the period is unexplained."
-          : `${source.openReconciliations} ${source.openReconciliations === 1 ? "day" : "days"} in the period are still unexplained between attendance and leave.`,
-      link: "/attendance?tab=leave",
+          : `${namesOf(source.unexplainedNames)} ${source.unexplainedNames.length === 1 ? "has days" : "have days"} in this period that leave does not explain.`,
+      // Straight to the reconciliation list, over the same month, rather
+      // than to the top of a page the list sits three sections below.
+      link: "/attendance?tab=leave&period=month#reconciliation",
     },
     {
       id: "payment-changes",
@@ -358,7 +365,7 @@ export function readiness(
       detail:
         source.pendingPaymentChanges.length === 0
           ? "Nobody in this run is waiting on a change of account."
-          : `${source.pendingPaymentChanges.length} ${source.pendingPaymentChanges.length === 1 ? "change" : "changes"} of bank or mobile money details are still waiting on approval. Pay would go to the old account.`,
+          : `${source.pendingPaymentChanges.length} ${source.pendingPaymentChanges.length === 1 ? "change of bank or mobile money details is" : "changes of bank or mobile money details are"} still waiting on approval. Pay would go to the old account.`,
       link: "/approvals?type=bankDetailsChange",
     },
     {
@@ -379,7 +386,7 @@ export function readiness(
   const failing: Record<string, boolean> = {
     "attendance-closed": !settled,
     "compensation-on-file": source.missingCompensation.length > 0,
-    "leave-reconciled": source.openReconciliations > 0,
+    "leave-reconciled": source.unexplainedNames.length > 0,
     "payment-changes": source.pendingPaymentChanges.length > 0,
     "payment-details": source.missingDestinations.length > 0,
   }
@@ -395,6 +402,13 @@ export function readiness(
         : {}),
     }
   })
+}
+
+/** "Kofi Mensah", "Kofi and Ama", "Kofi, Ama and 2 others". */
+function namesOf(names: string[]) {
+  if (names.length === 1) return names[0]
+  if (names.length === 2) return `${names[0]} and ${names[1]}`
+  return `${names.slice(0, 2).join(", ")} and ${names.length - 2} ${names.length - 2 === 1 ? "other" : "others"}`
 }
 
 /** A run cannot be calculated while a blocker is outstanding. */

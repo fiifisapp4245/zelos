@@ -18,10 +18,13 @@ import { cn } from "@/lib/utils"
  */
 export function VariancePanel({
   lines,
+  total,
   threshold,
   onOpen,
 }: {
   lines: PayrollLine[]
+  /** How many lines the run has, so the count reads as a proportion. */
+  total: number
   threshold: number
   onOpen: (line: PayrollLine) => void
 }) {
@@ -36,7 +39,7 @@ export function VariancePanel({
       actions={
         <Pill tone="warning">
           <AlertTriangle className="size-3" aria-hidden />
-          {lines.length} of {lines.length === 1 ? "line" : "lines"} flagged
+          {lines.length} of {total} {total === 1 ? "line" : "lines"} flagged
         </Pill>
       }
     >

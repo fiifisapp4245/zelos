@@ -17,7 +17,7 @@ import { dayRecordsFor } from "@/lib/attendance/derive"
 import { ATTENDANCE_POLICY } from "@/lib/data/attendance-log"
 import { RUN_DESTINATION_OVERRIDES } from "@/lib/data/payroll"
 import { datesBetween } from "@/lib/time"
-import { TODAY_ISO } from "@/lib/format"
+import { TODAY_ISO, fullName } from "@/lib/format"
 import type { PayrollRun } from "@/lib/pay/types"
 
 /**
@@ -100,6 +100,8 @@ export function useReadiness(run: PayrollRun) {
       }
     )
 
+    const ids = new Set(members.map((e) => e.id))
+
     const open = reconcileItems({
       records,
       leave: store.leaveRequests,
@@ -108,11 +110,13 @@ export function useReadiness(run: PayrollRun) {
       todayIso: TODAY_ISO,
     }).filter((i) => !isReconciled(i, store.reconciliations))
 
-    const ids = new Set(members.map((e) => e.id))
-
     const checkSource: ReadinessSource = {
       payPeriods: store.payPeriods,
-      openReconciliations: open.reduce((n, i) => n + i.dates.length, 0),
+      // Named, and only the people this run pays: the warning has to
+      // send somebody to rows they can actually find.
+      unexplainedNames: [...new Set(open.map((i) => i.employeeId))]
+        .filter((id) => ids.has(id))
+        .map((id) => fullName(store.employeeById(id))),
       pendingPaymentChanges: store.approvals
         .filter(
           (a) =>

@@ -457,7 +457,7 @@ describe("readiness", () => {
         status: "readyForPayroll",
       },
     ],
-    openReconciliations: 0,
+    unexplainedNames: [],
     pendingPaymentChanges: [],
     missingDestinations: [],
     missingCompensation: [],
@@ -492,17 +492,39 @@ describe("readiness", () => {
   })
 
   it("warns rather than blocks on an unexplained day", () => {
-    const checks = readiness(run, { ...clean, openReconciliations: 3 })
+    const checks = readiness(run, {
+      ...clean,
+      unexplainedNames: ["Kofi Mensah", "Ama Asante", "Efua Tetteh"],
+    })
     const leave = checks.find((c) => c.id === "leave-reconciled")!
     expect(leave.status).toBe("fail")
     expect(leave.severity).toBe("warning")
     expect(blockingChecks(checks)).toHaveLength(0)
+    // The warning names who, so it can be acted on where it lands.
+    expect(leave.detail).toBe(
+      "Kofi Mensah, Ama Asante and 1 other have days in this period that leave does not explain."
+    )
+    expect(leave.link).toContain("#reconciliation")
+  })
+
+  it("says one person's name on its own, and agrees in number", () => {
+    const one = readiness(run, {
+      ...clean,
+      unexplainedNames: ["Kofi Mensah"],
+      pendingPaymentChanges: ["abla"],
+    })
+    expect(one.find((c) => c.id === "leave-reconciled")!.detail).toBe(
+      "Kofi Mensah has days in this period that leave does not explain."
+    )
+    expect(one.find((c) => c.id === "payment-changes")!.detail).toContain(
+      "1 change of bank or mobile money details is still waiting"
+    )
   })
 
   it("keeps an acknowledgement on the check rather than clearing it", () => {
     const checks = readiness(run, {
       ...clean,
-      openReconciliations: 3,
+      unexplainedNames: ["Kofi Mensah"],
       acknowledgements: [
         {
           checkId: "leave-reconciled",

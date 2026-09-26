@@ -89,8 +89,11 @@ function Reconcile({ title }: { title?: string }) {
   const params = useSearchParams()
   const demo = params.get("demo")
   const { audience, scope, input, policy } = useSchedules()
-  // The month, because reconciling is looking back over what happened.
-  const [period, setPeriod] = React.useState<PeriodKey>("month")
+  // The month, because reconciling is looking back over what happened —
+  // unless a link asked for a particular window.
+  const [period, setPeriod] = React.useState<PeriodKey>(
+    (params.get("period") as PeriodKey | null) ?? "month"
+  )
   const [open, setOpen] = React.useState<LeaveRequest | null>(null)
 
   const { from, to } = rangeFor(period)
@@ -113,6 +116,18 @@ function Reconcile({ title }: { title?: string }) {
   })
 
   const monthsToYearEnd = 12 - Number(TODAY_ISO.slice(5, 7))
+
+  // A tab's content does not exist when the browser handles the hash, so
+  // the section brings itself into view once it has rendered.
+  React.useEffect(() => {
+    if (window.location.hash !== "#reconciliation") return
+    const id = window.requestAnimationFrame(() =>
+      document
+        .getElementById("reconciliation")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+    )
+    return () => window.cancelAnimationFrame(id)
+  }, [])
 
   // An employee sees their own summary, not a team view of one person.
   const me = store.employeeById(store.session.id)
@@ -186,7 +201,11 @@ function Reconcile({ title }: { title?: string }) {
         <PendingRequests scope={scope} leave={leave} />
       </section>
 
-      <section aria-label="Reconciliation" className="space-y-3">
+      <section
+        id="reconciliation"
+        aria-label="Reconciliation"
+        className="scroll-mt-6 space-y-3"
+      >
         <div>
           <h2 className="text-[15px] font-semibold">Reconciliation</h2>
           <p className="text-sm text-muted-foreground">

@@ -339,6 +339,7 @@ function Run() {
 
               <VariancePanel
                 lines={flagged}
+                total={lines.length}
                 threshold={group?.varianceThresholdPercent ?? 10}
                 onOpen={setOpen}
               />
