@@ -71,6 +71,8 @@ export interface EmployeeContributionRule {
   id: string
   name: string
   percentOfBase: number
+  /** The scheme or trustee the money goes to, for the remittance file. */
+  remittedTo: string
   note: string
 }
 
@@ -86,6 +88,20 @@ export interface EmployerContributionRule {
   name: string
   /** Percent of the base the employer pays on top of gross. */
   percentOfBase: number
+  /** The scheme or trustee the money goes to, for the remittance file. */
+  remittedTo: string
+  note: string
+}
+
+/**
+ * A scheme the country recognises but neither side is obliged to join,
+ * so it carries no rate. What somebody actually contributes is their own
+ * pay component; this is only the country saying the scheme exists.
+ */
+export interface VoluntaryScheme {
+  id: string
+  name: string
+  remittedTo: string
   note: string
 }
 
@@ -113,6 +129,8 @@ export interface CountryRulePack {
   componentTreatments: Record<string, ComponentTreatment>
   employerContributionRules: EmployerContributionRule[]
   employeeContributionRules: EmployeeContributionRule[]
+  /** Recognised but optional. Nothing is deducted for these by default. */
+  voluntarySchemes: VoluntaryScheme[]
   /** Applied in order to taxable pay, per pay period. */
   taxBands: TaxBand[]
   statutoryReports: string[]

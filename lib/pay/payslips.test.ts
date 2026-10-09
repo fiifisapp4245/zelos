@@ -101,6 +101,7 @@ const pack: CountryRulePack = {
   componentTreatments: {},
   employeeContributionRules: [],
   employerContributionRules: [],
+  voluntarySchemes: [],
   taxBands: [],
   statutoryReports: ["PAYE monthly return"],
   filingDeadlines: [

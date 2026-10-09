@@ -224,10 +224,9 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
   ],
 
   // ---------------------------------------------------------------- Payroll
-  "statutory-settings": [
-    { kind: "managedTable", tableId: "ssnit-tiers" },
-    { kind: "managedTable", tableId: "paye-bands" },
-  ],
+  // Statutory settings and the component library are not listed here:
+  // both render a dedicated panel that reads the country rule pack, so a
+  // rate is never typed into a settings table.
 
   "pay-schedule": [
     {
@@ -251,11 +250,6 @@ export const SETTINGS_CONTENT: Record<string, Block[]> = {
       title: "What the cut-off locks",
       text: "After cut-off, salary changes, new starters and bank or MoMo detail changes roll into the following month. Leave and attendance keep recording as normal — they only affect pay from the next cycle.",
     },
-  ],
-
-  "allowance-deduction-type": [
-    { kind: "managedTable", tableId: "allowances" },
-    { kind: "managedTable", tableId: "deductions" },
   ],
 
   "payment-methods": [

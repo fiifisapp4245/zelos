@@ -125,14 +125,17 @@ export default function SettingDetailPage() {
 /**
  * Country-varying values live as configuration, not as a generalised engine.
  * A second jurisdiction is added by adding a profile here, not by rewriting logic.
+ *
+ * No statutory rate appears in this list. Social security and the pension
+ * tiers are read from the country rule pack below, because a percentage
+ * written in two places is a percentage that will eventually disagree
+ * with itself — and only one of the two will be the law.
  */
 const JURISDICTION: Record<string, string> = {
   Country: "Ghana",
   Currency: "GHS — Ghana Cedi",
   "National ID": "Ghana Card",
   "Tax identifier": "TIN (Ghana Revenue Authority)",
-  "Social security": "SSNIT — 5.5% employee, 13% employer",
-  "Pension tiers": "Tier 1 & 2 mandatory, Tier 3 voluntary",
   "Minimum annual leave": "15 working days",
   "Maternity leave": "14 weeks statutory",
   "Retirement age": `${RETIREMENT_AGE} years`,
@@ -141,30 +144,96 @@ const JURISDICTION: Record<string, string> = {
 }
 
 function LocalizationPanel() {
+  const { countryRulePacks } = useStore()
+  const pack = countryRulePacks[0] ?? null
+
+  // Every contribution the country defines, named and costed by the pack
+  // itself, with the scheme that receives it. Read-only on purpose.
+  const contributions = pack
+    ? [
+        ...pack.employeeContributionRules.map((r) => ({
+          id: r.id,
+          name: r.name,
+          rate: `${r.percentOfBase}% of base`,
+          remittedTo: r.remittedTo,
+        })),
+        ...pack.employerContributionRules.map((r) => ({
+          id: r.id,
+          name: r.name,
+          rate: `${r.percentOfBase}% of base`,
+          remittedTo: r.remittedTo,
+        })),
+        ...pack.voluntarySchemes.map((s) => ({
+          id: s.id,
+          name: s.name,
+          rate: "Voluntary",
+          remittedTo: s.remittedTo,
+        })),
+      ]
+    : []
+
   return (
-    <Panel
-      className="max-w-3xl"
-      title="Active jurisdiction"
-      description="Country-varying values are configuration. Adding a second country means adding a profile here, not rewriting the system."
-      actions={
-        <Pill tone="success" dot>
-          <Globe className="size-3" />
-          Ghana
-        </Pill>
-      }
-    >
-      <dl className="space-y-2.5 text-sm">
-        {Object.entries(JURISDICTION).map(([k, v]) => (
-          <div
-            key={k}
-            className="flex justify-between gap-4 border-b pb-2 last:border-0"
-          >
-            <dt className="text-muted-foreground">{k}</dt>
-            <dd className="text-right font-medium">{v}</dd>
-          </div>
-        ))}
-      </dl>
-    </Panel>
+    <div className="max-w-3xl space-y-4">
+      <Panel
+        title="Active jurisdiction"
+        description="Country-varying values are configuration. Adding a second country means adding a profile here, not rewriting the system."
+        actions={
+          <Pill tone="success" dot>
+            <Globe className="size-3" />
+            Ghana
+          </Pill>
+        }
+      >
+        <dl className="space-y-2.5 text-sm">
+          {Object.entries(JURISDICTION).map(([k, v]) => (
+            <div
+              key={k}
+              className="flex justify-between gap-4 border-b pb-2 last:border-0"
+            >
+              <dt className="text-muted-foreground">{k}</dt>
+              <dd className="text-right font-medium">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      </Panel>
+
+      {pack && (
+        <Panel
+          title="Statutory contributions"
+          description={`Set by law, not by this company. Version ${pack.version} of the ${pack.country} rules.`}
+          bodyClassName="p-0"
+          actions={
+            <Link
+              href="/settings/statutory-settings"
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              Country rules
+            </Link>
+          }
+        >
+          <ul className="divide-y text-sm">
+            {contributions.map((c) => (
+              <li
+                key={c.id}
+                className="flex flex-wrap justify-between gap-x-4 gap-y-1 px-5 py-2.5"
+              >
+                <span className="min-w-0">
+                  <span className="block font-medium">{c.name}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Remitted to {c.remittedTo}
+                  </span>
+                </span>
+                <span className="tabular shrink-0 font-medium">{c.rate}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="border-t px-5 py-3 text-xs text-muted-foreground">
+            These cannot be edited here, or anywhere else in settings. They
+            change when the rule pack is updated.
+          </p>
+        </Panel>
+      )}
+    </div>
   )
 }
 

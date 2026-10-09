@@ -24,6 +24,16 @@ import type {
  * is the only way a payroll disagreement can be settled by looking.
  */
 
+/**
+ * Money is carried as a decimal number of major units and rounded to the
+ * minor unit at defined points only — never mid-formula, so a percentage
+ * of a percentage does not lose a pesewa twice.
+ *
+ * The defined points are: each earning as it joins the line, each
+ * deduction and employer contribution as it is worked out, the tax total
+ * once the whole band walk is done, and gross and net at the end. A
+ * figure that is rounded here is a figure somebody could be shown.
+ */
 function round(n: number) {
   return Math.round(n * 100) / 100
 }

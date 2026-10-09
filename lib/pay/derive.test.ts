@@ -78,16 +78,24 @@ const RULE_PACK: CountryRulePack = {
     "pc-transport": { taxable: false, socialSecurity: false, cap: 300 },
   },
   employerContributionRules: [
-    { id: "ssnit", name: "SSNIT employer", percentOfBase: 13, note: "" },
+    {
+      id: "ssnit",
+      name: "SSNIT employer",
+      percentOfBase: 13,
+      remittedTo: "SSNIT",
+      note: "",
+    },
   ],
   employeeContributionRules: [
     {
       id: "ssnit-employee",
       name: "SSNIT employee",
       percentOfBase: 5.5,
+      remittedTo: "SSNIT",
       note: "",
     },
   ],
+  voluntarySchemes: [],
   taxBands: [
     { upTo: 490, ratePercent: 0 },
     { upTo: null, ratePercent: 25 },

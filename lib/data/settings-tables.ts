@@ -152,17 +152,15 @@ export const TABLE_SPECS: Record<string, TableSpec> = {
     description:
       "Each type changes how payroll, leave accrual and statutory contributions behave.",
     footnote:
-      "Types with no SSNIT deduction are excluded from the remittance file automatically.",
+      "Types with no social security deduction are left out of the remittance file automatically. Which scheme that is, and at what rate, is set by the country rule pack — not here.",
     addLabel: "Add type",
     labelKey: "name",
     columns: [
       t("name", "Type", { required: true }),
-      sel("ssnit", "SSNIT", ["Tier 1, 2 & 3", "Tier 1 & 2", "Not deducted"], {
-        tone: {
-          "Not deducted": "neutral",
-          "Tier 1 & 2": "success",
-          "Tier 1, 2 & 3": "success",
-        },
+      // Whether the country's scheme applies, not which scheme it is. The
+      // scheme has a name in Ghana and a different one everywhere else.
+      sel("socialSecurity", "Social security", ["Deducted", "Not deducted"], {
+        tone: { "Not deducted": "neutral", Deducted: "success" },
       }),
       t("accrual", "Leave accrual"),
       t("notice", "Notice period"),
@@ -297,73 +295,6 @@ export const TABLE_SPECS: Record<string, TableSpec> = {
         "Owner",
       ]),
       t("escalates", "Escalates after"),
-    ],
-  },
-
-  "ssnit-tiers": {
-    id: "ssnit-tiers",
-    title: "SSNIT contributions",
-    description: "Three-tier scheme. Tier 1 and 2 are mandatory.",
-    footnote:
-      "Of the 18.5% total Tier 1+2 contribution, 13.5% goes to SSNIT and 5% to the approved Tier 2 trustee.",
-    addLabel: "Add tier",
-    labelKey: "tier",
-    columns: [
-      t("tier", "Tier", { required: true }),
-      t("employee", "Employee"),
-      t("employer", "Employer"),
-      t("remittedTo", "Remitted to"),
-    ],
-  },
-
-  "paye-bands": {
-    id: "paye-bands",
-    title: "PAYE bands — monthly (GRA)",
-    description:
-      "Applied at disbursement on the chargeable amount after SSNIT relief.",
-    footnote:
-      "Bands are configuration. When the GRA revises them, this table changes — no code is touched.",
-    addLabel: "Add band",
-    labelKey: "band",
-    columns: [
-      t("band", "Chargeable income", { required: true }),
-      t("rate", "Rate", { required: true }),
-      t("tax", "Tax on band"),
-    ],
-  },
-
-  allowances: {
-    id: "allowances",
-    title: "Allowances",
-    addLabel: "Add allowance",
-    labelKey: "name",
-    columns: [
-      t("name", "Allowance", { required: true }),
-      t("amount", "Amount", { required: true }),
-      sel("frequency", "Frequency", [
-        "Monthly",
-        "Per week on call",
-        "Annually",
-        "One-off",
-      ]),
-      tog("taxable", "Taxable"),
-      t("appliesTo", "Applies to"),
-    ],
-  },
-
-  deductions: {
-    id: "deductions",
-    title: "Deductions",
-    footnote:
-      "Total voluntary deductions are capped so that net pay never falls below 60% of gross.",
-    addLabel: "Add deduction",
-    labelKey: "name",
-    columns: [
-      t("name", "Deduction", { required: true }),
-      t("amount", "Amount", { required: true }),
-      sel("frequency", "Frequency", ["Monthly", "Per pay run", "One-off"]),
-      tog("statutory", "Statutory"),
-      t("appliesTo", "Applies to"),
     ],
   },
 
@@ -598,31 +529,31 @@ export const TABLE_ROWS: Record<string, TableRow[]> = {
   "employment-types": rows("et", [
     {
       name: "Full-time",
-      ssnit: "Tier 1, 2 & 3",
+      socialSecurity: "Deducted",
       accrual: "15–21 days / year",
       notice: "30 days",
     },
     {
       name: "Part-time",
-      ssnit: "Tier 1 & 2",
+      socialSecurity: "Deducted",
       accrual: "Pro-rata",
       notice: "14 days",
     },
     {
       name: "Contractor",
-      ssnit: "Not deducted",
+      socialSecurity: "Not deducted",
       accrual: "None",
       notice: "Per contract",
     },
     {
       name: "Intern",
-      ssnit: "Not deducted",
+      socialSecurity: "Not deducted",
       accrual: "None",
       notice: "7 days",
     },
     {
       name: "National Service",
-      ssnit: "Not deducted",
+      socialSecurity: "Not deducted",
       accrual: "Per NSS scheme",
       notice: "Per posting",
     },
@@ -903,120 +834,6 @@ export const TABLE_ROWS: Record<string, TableRow[]> = {
       first: "Line manager",
       second: "Finance",
       escalates: "5 days",
-    },
-  ]),
-
-  "ssnit-tiers": rows("st", [
-    {
-      tier: "Tier 1 — Basic National Scheme",
-      employee: "5.5%",
-      employer: "13.0%",
-      remittedTo: "SSNIT",
-    },
-    {
-      tier: "Tier 2 — Occupational Pension",
-      employee: "—",
-      employer: "5.0%",
-      remittedTo: "Petra Trust",
-    },
-    {
-      tier: "Tier 3 — Provident Fund",
-      employee: "Voluntary",
-      employer: "Voluntary",
-      remittedTo: "Employee's choice",
-    },
-  ]),
-
-  "paye-bands": rows("pb", [
-    { band: "First GHS 490", rate: "0%", tax: "GHS 0.00" },
-    { band: "Next GHS 110", rate: "5%", tax: "GHS 5.50" },
-    { band: "Next GHS 130", rate: "10%", tax: "GHS 13.00" },
-    { band: "Next GHS 3,166", rate: "17.5%", tax: "GHS 554.05" },
-    { band: "Next GHS 16,000", rate: "25%", tax: "GHS 4,000.00" },
-    { band: "Next GHS 30,520", rate: "30%", tax: "GHS 9,156.00" },
-    { band: "Above GHS 50,416", rate: "35%", tax: "On the excess" },
-  ]),
-
-  allowances: rows("al", [
-    {
-      name: "Transport",
-      amount: "GHS 600",
-      frequency: "Monthly",
-      taxable: true,
-      appliesTo: "All staff",
-    },
-    {
-      name: "Fuel",
-      amount: "GHS 1,200",
-      frequency: "Monthly",
-      taxable: true,
-      appliesTo: "L5 and above",
-    },
-    {
-      name: "Mobile data",
-      amount: "GHS 150",
-      frequency: "Monthly",
-      taxable: false,
-      appliesTo: "All staff",
-    },
-    {
-      name: "On-call",
-      amount: "GHS 400",
-      frequency: "Per week on call",
-      taxable: true,
-      appliesTo: "Engineering rota",
-    },
-    {
-      name: "Responsibility",
-      amount: "10% of basic",
-      frequency: "Monthly",
-      taxable: true,
-      appliesTo: "Heads of Department",
-    },
-    {
-      name: "Long service",
-      amount: "GHS 5,000",
-      frequency: "One-off",
-      taxable: true,
-      appliesTo: "On 5-year anniversary",
-    },
-  ]),
-
-  deductions: rows("dd", [
-    {
-      name: "SSNIT Tier 1",
-      amount: "5.5% of basic",
-      frequency: "Monthly",
-      statutory: true,
-      appliesTo: "Full & part-time",
-    },
-    {
-      name: "PAYE",
-      amount: "Per GRA bands",
-      frequency: "Monthly",
-      statutory: true,
-      appliesTo: "All taxable staff",
-    },
-    {
-      name: "Staff loan repayment",
-      amount: "Per agreement",
-      frequency: "Monthly",
-      statutory: false,
-      appliesTo: "3 employees",
-    },
-    {
-      name: "Welfare fund",
-      amount: "GHS 50",
-      frequency: "Monthly",
-      statutory: false,
-      appliesTo: "Opt-in — 17 employees",
-    },
-    {
-      name: "Tier 3 top-up",
-      amount: "Employee-set",
-      frequency: "Monthly",
-      statutory: false,
-      appliesTo: "Opt-in — 4 employees",
     },
   ]),
 

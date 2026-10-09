@@ -56,13 +56,28 @@ const GHANA_RULES: CountryRulePack = {
     "pc-loan": { taxable: false, socialSecurity: false },
     "pc-ssnit-employer": { taxable: false, socialSecurity: true },
     "pc-tier2": { taxable: false, socialSecurity: true },
+    "pc-mobile-data": { taxable: false, socialSecurity: false },
+    "pc-on-call": { taxable: true, socialSecurity: false },
+    "pc-responsibility": { taxable: true, socialSecurity: false },
+    "pc-long-service": { taxable: true, socialSecurity: false },
+    "pc-welfare": { taxable: false, socialSecurity: false },
+    "pc-tier3": { taxable: false, socialSecurity: false },
   },
   employeeContributionRules: [
     {
       id: "ssnit-employee",
       name: "SSNIT Tier 1 & 2 (employee)",
       percentOfBase: 5.5,
+      remittedTo: "SSNIT",
       note: "Deducted from gross before PAYE is worked out.",
+    },
+  ],
+  voluntarySchemes: [
+    {
+      id: "tier3",
+      name: "Tier 3 provident fund",
+      remittedTo: "The employee's chosen trustee",
+      note: "Voluntary on both sides. What anyone puts in is a pay component, not a rate set here.",
     },
   ],
   // Monthly bands, applied in order to taxable pay after the social
@@ -81,12 +96,14 @@ const GHANA_RULES: CountryRulePack = {
       id: "ssnit-tier1",
       name: "SSNIT Tier 1",
       percentOfBase: 13,
+      remittedTo: "SSNIT",
       note: "Employer share of the first-tier social security contribution.",
     },
     {
       id: "tier2",
       name: "Tier 2 occupational scheme",
       percentOfBase: 5,
+      remittedTo: "Petra Trust",
       note: "Paid to the employee's chosen trustee.",
     },
   ],
@@ -237,6 +254,51 @@ export const PAY_COMPONENTS: PayComponent[] = [
     name: "Tier 2 (employer)",
     category: "employer_contribution",
     calculation: "percent_of_base",
+    recurrence: "recurring",
+  },
+  // Company policy, carried over from the allowance and deduction lists
+  // that used to be configured as free text. Who each one applies to is
+  // not expressible yet — see the note in the pay rules work.
+  {
+    id: "pc-mobile-data",
+    name: "Mobile data allowance",
+    category: "allowance",
+    calculation: "fixed",
+    recurrence: "recurring",
+  },
+  {
+    id: "pc-on-call",
+    name: "On-call allowance",
+    category: "allowance",
+    calculation: "fixed",
+    recurrence: "recurring",
+  },
+  {
+    id: "pc-responsibility",
+    name: "Responsibility allowance",
+    category: "allowance",
+    calculation: "percent_of_base",
+    recurrence: "recurring",
+  },
+  {
+    id: "pc-long-service",
+    name: "Long service award",
+    category: "earning",
+    calculation: "fixed",
+    recurrence: "one_off",
+  },
+  {
+    id: "pc-welfare",
+    name: "Welfare fund",
+    category: "deduction",
+    calculation: "fixed",
+    recurrence: "recurring",
+  },
+  {
+    id: "pc-tier3",
+    name: "Tier 3 top-up",
+    category: "deduction",
+    calculation: "fixed",
     recurrence: "recurring",
   },
 ]

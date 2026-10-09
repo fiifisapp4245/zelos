@@ -694,8 +694,13 @@ export function CountryRulesPanel() {
               <ul className="space-y-1 text-sm">
                 {pack.employerContributionRules.map((r) => (
                   <li key={r.id} className="flex justify-between gap-3">
-                    <span>{r.name}</span>
-                    <span className="tabular text-muted-foreground">
+                    <span>
+                      {r.name}
+                      <span className="block text-xs text-muted-foreground">
+                        Remitted to {r.remittedTo}
+                      </span>
+                    </span>
+                    <span className="tabular shrink-0 text-muted-foreground">
                       {r.percentOfBase}% of base
                     </span>
                   </li>
