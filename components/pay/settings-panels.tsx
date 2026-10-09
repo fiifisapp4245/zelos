@@ -30,6 +30,7 @@ import {
   bandThresholds,
   coveredCountries,
   differences,
+  packFor,
   versionsFor,
 } from "@/lib/pay/rule-packs"
 import { useStore } from "@/lib/store"
@@ -46,7 +47,7 @@ import type {
   PayGroup,
 } from "@/lib/pay/types"
 import type { PermissionRole } from "@/lib/types"
-import { formatDate, fullName } from "@/lib/format"
+import { TODAY_ISO, formatDate, fullName } from "@/lib/format"
 
 /* ── 1. Pay groups ───────────────────────────────────────────────────── */
 
@@ -86,7 +87,7 @@ export function PayGroupsPanel() {
                   "Currency",
                   "Cycle",
                   "Pay day",
-                  "Variance",
+                  "Flags a person at",
                   "Calculation",
                   "",
                 ].map((h) => (
@@ -129,7 +130,11 @@ export function PayGroupsPanel() {
                       {g.payDayRule}
                     </td>
                     <td className="tabular px-4 text-muted-foreground">
-                      {g.varianceThresholdPercent}%
+                      <span
+                        title={`Anyone whose net pay moves more than ${g.varianceThresholdPercent}% against this group's last run is flagged for the preparer to look at. On GHS 4,000 last month, that is a move of about ${money((4000 * g.varianceThresholdPercent) / 100, g.currency)}.`}
+                      >
+                        {g.varianceThresholdPercent}% net change
+                      </span>
                     </td>
                     <td className="px-4">
                       <span className="block">
@@ -291,7 +296,7 @@ function PayGroupSheet({
             </div>
             <div>
               <Label htmlFor="variance" className="mb-1.5 block">
-                Variance threshold
+                Flag a person when net pay moves by
               </Label>
               <Input
                 id="variance"
@@ -307,7 +312,11 @@ function PayGroupSheet({
                 }
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Percent movement that asks the preparer to explain itself.
+                Compared per person against this group&rsquo;s previous run. At{" "}
+                {draft.varianceThresholdPercent}%, somebody who took home GHS
+                4,000 last month is flagged if they are now more than{" "}
+                {money((4000 * draft.varianceThresholdPercent) / 100, "GHS")}{" "}
+                above or below it. It never blocks a run — it asks for a look.
               </p>
             </div>
           </div>
@@ -407,7 +416,15 @@ export function PayComponentsPanel() {
   const [editing, setEditing] = React.useState<PayComponent | null | undefined>(
     undefined
   )
-  const pack = store.countryRulePacks[0] ?? null
+
+  // Only countries somebody is actually paid in. A column per country
+  // would grow with every pay group until the table stopped being
+  // readable; one country at a time, chosen here, does not.
+  const countries = [
+    ...new Set(store.payGroups.map((g) => g.country).filter((c) => c !== "—")),
+  ].sort((a, b) => a.localeCompare(b))
+  const [country, setCountry] = React.useState(countries[0] ?? "")
+  const pack = packFor(store.countryRulePacks, country, TODAY_ISO)
 
   return (
     <div className="space-y-4">
@@ -416,10 +433,29 @@ export function PayComponentsPanel() {
         description="The library every package is built from. How each one is taxed is read from the country rules, not set here."
         bodyClassName="p-0"
         actions={
-          <Button size="sm" className="h-9" onClick={() => setEditing(null)}>
-            <Plus className="size-4" />
-            New component
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {countries.length > 1 && (
+              <Select value={country} onValueChange={setCountry}>
+                <SelectTrigger
+                  className="h-9 w-[150px]"
+                  aria-label="Country whose treatment is shown"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {countries.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Button size="sm" className="h-9" onClick={() => setEditing(null)}>
+              <Plus className="size-4" />
+              New component
+            </Button>
+          </div>
         }
       >
         <div className="overflow-x-auto">
@@ -431,8 +467,8 @@ export function PayComponentsPanel() {
                   "Category",
                   "Calculation",
                   "Recurrence",
-                  pack ? `${pack.country}: taxable` : "Taxable",
-                  pack ? `${pack.country}: social security` : "Social security",
+                  "Taxable",
+                  "Social security",
                   "",
                 ].map((h) => (
                   <th
@@ -476,7 +512,9 @@ export function PayComponentsPanel() {
                         </span>
                       ) : (
                         <span className="text-muted-foreground">
-                          Not in the pack
+                          {pack
+                            ? "Not in the pack"
+                            : `No rules for ${country}`}
                         </span>
                       )}
                     </td>
@@ -507,8 +545,11 @@ export function PayComponentsPanel() {
       </Panel>
 
       <p className="text-xs text-muted-foreground">
-        Treatment is read-only. Nobody types a tax rate into Zelos — the country
-        rule pack decides what is taxable and what social security applies to.
+        Treatment is read-only, and shown for {country || "the selected country"}
+        . Nobody types a tax rate into Zelos — the country rule pack decides
+        what is taxable and what social security applies to. The same component
+        can be taxed differently in another country, which is why this is a
+        switch rather than a column.
       </p>
 
       {editing !== undefined && (

@@ -18,7 +18,6 @@ import { SETTINGS_NAV_GROUPS } from "@/lib/nav/settings-nav"
 import { EmptyState, Panel, Pill } from "@/components/common"
 import { useStore } from "@/lib/store"
 import { MIN_AGGREGATION_GROUP, ROLE_LABEL, has } from "@/lib/rbac"
-import { RETIREMENT_AGE } from "@/lib/format"
 import { findSetting } from "@/lib/data/settings"
 import { SETTINGS_CONTENT } from "@/lib/data/settings-content"
 import { SettingBlocks } from "./blocks"
@@ -123,60 +122,56 @@ export default function SettingDetailPage() {
 }
 
 /**
- * Country-varying values live as configuration, not as a generalised engine.
- * A second jurisdiction is added by adding a profile here, not by rewriting logic.
+ * Company-wide defaults, and nothing that payroll depends on.
  *
- * No statutory rate appears in this list. Social security and the pension
- * tiers are read from the country rule pack below, because a percentage
- * written in two places is a percentage that will eventually disagree
- * with itself — and only one of the two will be the law.
+ * These are the choices a company makes once — how dates are written,
+ * which currency a figure means when nothing says otherwise. The
+ * countries payroll actually calculates for are not here: they come
+ * from the pay groups, because a company can run payroll in three
+ * countries and there is no single "active jurisdiction" to name.
  */
-const JURISDICTION: Record<string, string> = {
-  Country: "Ghana",
-  Currency: "GHS — Ghana Cedi",
-  "National ID": "Ghana Card",
-  "Tax identifier": "TIN (Ghana Revenue Authority)",
-  "Minimum annual leave": "15 working days",
-  "Maternity leave": "14 weeks statutory",
-  "Retirement age": `${RETIREMENT_AGE} years`,
-  "Payroll cycle": "Monthly, 28th",
+const COMPANY_DEFAULTS: Record<string, string> = {
+  "Main country": "Ghana",
+  "Default currency": "GHS — Ghana Cedi",
+  "Date format": "18 Sept 2026",
+  "Time format": "24-hour",
+  Timezone: "GMT (UTC+0) — Africa/Accra",
+  "Week starts": "Monday",
   "Address format": "GhanaPost GPS",
 }
 
 function LocalizationPanel() {
-  const { countryRulePacks } = useStore()
-  const pack = countryRulePacks[0] ?? null
+  const { payGroups, legalEntities, countryRulePacks } = useStore()
 
-  // Every contribution the country defines, named and costed by the pack
-  // itself, with the scheme that receives it. Read-only on purpose.
-  const contributions = pack
-    ? [
-        ...pack.employeeContributionRules.map((r) => ({
-          id: r.id,
-          name: r.name,
-          rate: `${r.percentOfBase}% of base`,
-          remittedTo: r.remittedTo,
-        })),
-        ...pack.employerContributionRules.map((r) => ({
-          id: r.id,
-          name: r.name,
-          rate: `${r.percentOfBase}% of base`,
-          remittedTo: r.remittedTo,
-        })),
-        ...pack.voluntarySchemes.map((s) => ({
-          id: s.id,
-          name: s.name,
-          rate: "Voluntary",
-          remittedTo: s.remittedTo,
-        })),
-      ]
-    : []
+  // Jurisdictions are derived from where people are actually paid, so
+  // this list cannot fall out of step with payroll.
+  const jurisdictions = [
+    ...new Set(payGroups.map((g) => g.country).filter((c) => c !== "—")),
+  ]
+    .sort((a, b) => a.localeCompare(b))
+    .map((country) => ({
+      country,
+      groups: payGroups.filter((g) => g.country === country),
+      entities: [
+        ...new Set(
+          payGroups
+            .filter((g) => g.country === country)
+            .map(
+              (g) =>
+                legalEntities.find((e) => e.id === g.entityId)?.name ?? "—"
+            )
+        ),
+      ],
+      covered: countryRulePacks.some((p) => p.country === country),
+    }))
+
+  const unlocated = payGroups.filter((g) => g.country === "—")
 
   return (
     <div className="max-w-3xl space-y-4">
       <Panel
-        title="Active jurisdiction"
-        description="Country-varying values are configuration. Adding a second country means adding a profile here, not rewriting the system."
+        title="Company defaults"
+        description="How this company writes dates, times and money when nothing more specific applies."
         actions={
           <Pill tone="success" dot>
             <Globe className="size-3" />
@@ -185,7 +180,7 @@ function LocalizationPanel() {
         }
       >
         <dl className="space-y-2.5 text-sm">
-          {Object.entries(JURISDICTION).map(([k, v]) => (
+          {Object.entries(COMPANY_DEFAULTS).map(([k, v]) => (
             <div
               key={k}
               className="flex justify-between gap-4 border-b pb-2 last:border-0"
@@ -197,42 +192,56 @@ function LocalizationPanel() {
         </dl>
       </Panel>
 
-      {pack && (
-        <Panel
-          title="Statutory contributions"
-          description={`Set by law, not by this company. Version ${pack.version} of the ${pack.country} rules.`}
-          bodyClassName="p-0"
-          actions={
-            <Link
-              href="/settings/statutory-settings"
-              className="text-sm font-medium text-primary hover:underline"
-            >
-              Country rules
-            </Link>
-          }
-        >
-          <ul className="divide-y text-sm">
-            {contributions.map((c) => (
-              <li
-                key={c.id}
-                className="flex flex-wrap justify-between gap-x-4 gap-y-1 px-5 py-2.5"
-              >
-                <span className="min-w-0">
-                  <span className="block font-medium">{c.name}</span>
-                  <span className="block text-xs text-muted-foreground">
-                    Remitted to {c.remittedTo}
-                  </span>
-                </span>
-                <span className="tabular shrink-0 font-medium">{c.rate}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="border-t px-5 py-3 text-xs text-muted-foreground">
-            These cannot be edited here, or anywhere else in settings. They
-            change when the rule pack is updated.
-          </p>
-        </Panel>
-      )}
+      <Panel
+        title="Countries payroll runs in"
+        description="Read from the pay groups. A country is added by creating a pay group for it, not by changing a setting here."
+        bodyClassName="p-0"
+        actions={
+          <Link
+            href="/settings/pay-groups"
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Pay groups
+          </Link>
+        }
+      >
+        <ul className="divide-y text-sm">
+          {jurisdictions.map((j) => (
+            <li key={j.country} className="px-5 py-3">
+              <span className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <span className="font-medium">{j.country}</span>
+                {j.covered ? (
+                  <Link
+                    href="/settings/statutory-settings"
+                    className="text-sm font-medium text-primary hover:underline"
+                  >
+                    Country rules
+                  </Link>
+                ) : (
+                  <Pill tone="neutral">Uploaded results</Pill>
+                )}
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                {j.entities.join(", ")} ·{" "}
+                {j.groups.length === 1
+                  ? "1 pay group"
+                  : `${j.groups.length} pay groups`}{" "}
+                · {[...new Set(j.groups.map((g) => g.currency))].join(", ")}
+              </span>
+            </li>
+          ))}
+          {unlocated.length > 0 && (
+            <li className="px-5 py-3">
+              <span className="font-medium">No single country</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                {unlocated.map((g) => g.name).join(", ")} — people are paid
+                where they are, so no country&rsquo;s rules apply to the group
+                as a whole.
+              </span>
+            </li>
+          )}
+        </ul>
+      </Panel>
     </div>
   )
 }
