@@ -1,3 +1,4 @@
+import { packFor } from "./rule-packs"
 import type { Employee } from "../types"
 import { currentVersion } from "./derive"
 import { calculateLine, flagLines, lineFromExternal } from "./payroll"
@@ -98,8 +99,12 @@ export function previousRunOf(run: PayrollRun, runs: PayrollRun[]) {
 
 function rawLines(run: PayrollRun, source: RunSource): PayrollLine[] {
   const group = source.payGroups.find((g) => g.id === run.payGroupId)
-  const pack =
-    source.rulePacks.find((p) => p.country === group?.country) ?? null
+  // The rules as they stood at the end of the period being paid, not as
+  // they stand today — so a re-run of a closed month still agrees with
+  // the payslips people already have.
+  const pack = group
+    ? packFor(source.rulePacks, group.country, run.periodEnd)
+    : null
   const overrides = source.destinationOverrides?.[run.id] ?? {}
 
   return membersOf(run, source).flatMap((employee) => {

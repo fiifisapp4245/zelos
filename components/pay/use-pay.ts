@@ -5,6 +5,7 @@ import * as React from "react"
 import { useStore } from "@/lib/store"
 import { payRoleOf, payScope } from "@/lib/pay/access"
 import { currentVersion, scheduledVersion } from "@/lib/pay/derive"
+import { packFor } from "@/lib/pay/rule-packs"
 import { TODAY_ISO } from "@/lib/format"
 import type { Employee } from "@/lib/types"
 
@@ -59,8 +60,9 @@ export function usePay() {
     requests: store.changeRequests,
     groupFor: (id: string | undefined) =>
       store.payGroups.find((g) => g.id === id),
-    rulePackFor: (country: string) =>
-      store.countryRulePacks.find((p) => p.country === country) ?? null,
+    /** Defaults to the rules in force today; pass a date for a past run. */
+    rulePackFor: (country: string, onIso: string = TODAY_ISO) =>
+      packFor(store.countryRulePacks, country, onIso),
   }
 }
 

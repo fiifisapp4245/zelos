@@ -153,8 +153,48 @@ const GHANA_RULES: CountryRulePack = {
   ],
 }
 
-/** No Nigeria pack: that country's results are uploaded from a provider. */
-export const COUNTRY_RULE_PACKS: CountryRulePack[] = [GHANA_RULES]
+/**
+ * The year before, kept so a closed period still calculates the way it
+ * was paid. Bands and the transport cap moved on 1 January 2026; the
+ * contribution rates did not.
+ */
+const GHANA_RULES_2025: CountryRulePack = {
+  ...GHANA_RULES,
+  version: "2025.1",
+  effectiveFrom: "2025-01-01",
+  componentTreatments: {
+    ...GHANA_RULES.componentTreatments,
+    "pc-transport": { taxable: false, socialSecurity: false, cap: 250 },
+    "pc-fuel-card": { taxable: true, socialSecurity: false, cap: 400 },
+  },
+  taxBands: [
+    { upTo: 402, ratePercent: 0 },
+    { upTo: 110, ratePercent: 5 },
+    { upTo: 130, ratePercent: 10 },
+    { upTo: 3000, ratePercent: 17.5 },
+    { upTo: 16000, ratePercent: 25 },
+    { upTo: 30520, ratePercent: 30 },
+    { upTo: null, ratePercent: 35 },
+  ],
+  updates: [
+    {
+      title: "Rule pack 2025.1 published",
+      effectiveFrom: "2025-01-01",
+      summary: "Bands for the 2025 year of assessment.",
+    },
+  ],
+}
+
+/**
+ * Every version of every country's rules, in one list. Nothing reads
+ * this by position — use packFor(), which picks by country and date.
+ *
+ * No Nigeria pack: that country's results are uploaded from a provider.
+ */
+export const COUNTRY_RULE_PACKS: CountryRulePack[] = [
+  GHANA_RULES,
+  GHANA_RULES_2025,
+]
 
 function group(
   g: Omit<PayGroup, "calculationMode"> & { contractorGroup?: boolean }
