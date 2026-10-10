@@ -220,6 +220,7 @@ export const PAY_GROUPS: PayGroup[] = [
     payDayRule: "28th, or the last working day before it",
     paymentChannels: ["bank_transfer", "mobile_money"],
     varianceThresholdPercent: 10,
+    prorationMethod: "thirtieths",
   }),
   group({
     id: "pg-ng-monthly",
@@ -231,6 +232,7 @@ export const PAY_GROUPS: PayGroup[] = [
     payDayRule: "Last working day of the month",
     paymentChannels: ["bank_transfer"],
     varianceThresholdPercent: 12,
+    prorationMethod: "calendar_days",
   }),
   group({
     id: "pg-contractors",
@@ -242,6 +244,7 @@ export const PAY_GROUPS: PayGroup[] = [
     payDayRule: "Within 14 days of an approved invoice",
     paymentChannels: ["international_transfer"],
     varianceThresholdPercent: 20,
+    prorationMethod: "calendar_days",
     contractorGroup: true,
   }),
 ]

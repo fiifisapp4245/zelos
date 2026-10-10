@@ -18,6 +18,8 @@
  *    anyone can act on.
  */
 
+import type { ProrationMethod } from "./proration"
+
 export type Currency = string
 
 export interface LegalEntity {
@@ -53,6 +55,8 @@ export interface PayGroup {
   paymentChannels: PaymentChannel[]
   /** Period-on-period movement above this asks the preparer to explain it. */
   varianceThresholdPercent: number
+  /** How a part-period is worked out for joiners and leavers. */
+  prorationMethod: ProrationMethod
   calculationMode: CalculationMode
   contractorGroup?: boolean
 }

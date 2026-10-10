@@ -27,6 +27,11 @@ import {
 import { CountryLabel } from "./money"
 import { money } from "@/lib/pay/money"
 import {
+  PRORATION_BLURB,
+  PRORATION_LABEL,
+  type ProrationMethod,
+} from "@/lib/pay/proration"
+import {
   bandThresholds,
   coveredCountries,
   differences,
@@ -88,6 +93,7 @@ export function PayGroupsPanel() {
                   "Cycle",
                   "Pay day",
                   "Flags a person at",
+                  "Part periods",
                   "Calculation",
                   "",
                 ].map((h) => (
@@ -134,6 +140,11 @@ export function PayGroupsPanel() {
                         title={`Anyone whose net pay moves more than ${g.varianceThresholdPercent}% against this group's last run is flagged for the preparer to look at. On GHS 4,000 last month, that is a move of about ${money((4000 * g.varianceThresholdPercent) / 100, g.currency)}.`}
                       >
                         {g.varianceThresholdPercent}% net change
+                      </span>
+                    </td>
+                    <td className="px-4 text-muted-foreground">
+                      <span title={PRORATION_BLURB[g.prorationMethod]}>
+                        {PRORATION_LABEL[g.prorationMethod]}
                       </span>
                     </td>
                     <td className="px-4">
@@ -194,6 +205,7 @@ const BLANK_GROUP: PayGroup = {
   payDayRule: "Last working day of the month",
   paymentChannels: ["bank_transfer"],
   varianceThresholdPercent: 10,
+  prorationMethod: "thirtieths",
   calculationMode: "native",
 }
 
@@ -317,6 +329,36 @@ function PayGroupSheet({
                 4,000 last month is flagged if they are now more than{" "}
                 {money((4000 * draft.varianceThresholdPercent) / 100, "GHS")}{" "}
                 above or below it. It never blocks a run — it asks for a look.
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="proration" className="mb-1.5 block">
+                Part periods are worked out in
+              </Label>
+              <Select
+                value={draft.prorationMethod}
+                onValueChange={(v) =>
+                  setDraft((d) => ({
+                    ...d,
+                    prorationMethod: v as ProrationMethod,
+                  }))
+                }
+              >
+                <SelectTrigger id="proration" className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(
+                    ["calendar_days", "working_days", "thirtieths"] as const
+                  ).map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {PRORATION_LABEL[m]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {PRORATION_BLURB[draft.prorationMethod]}
               </p>
             </div>
           </div>

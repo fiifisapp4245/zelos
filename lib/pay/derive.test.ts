@@ -49,6 +49,7 @@ const GH_GROUP: PayGroup = {
   payDayRule: "28th",
   paymentChannels: ["bank_transfer"],
   varianceThresholdPercent: 10,
+  prorationMethod: "thirtieths",
   calculationMode: "native",
 }
 const NG_GROUP: PayGroup = {
