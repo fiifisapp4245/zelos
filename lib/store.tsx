@@ -181,7 +181,7 @@ interface State {
   activeRole: PermissionRole
 }
 
-const INITIAL: State = {
+export const INITIAL: State = {
   employees: EMPLOYEES,
   lifecycleEvents: LIFECYCLE_EVENTS,
   auditLog: AUDIT_LOG,
@@ -240,7 +240,55 @@ const STORAGE_KEY = "zelos-hr-session"
  * this week's types is how you get a crash three screens away from the
  * change that caused it.
  */
-const STORAGE_VERSION = 6
+export const STORAGE_VERSION = 7
+
+/**
+ * Keeps only the restored slices that still look like the ones we seed.
+ *
+ * Bumping the version above is the intended way to retire old data, and
+ * it is one line somebody will one day forget — which white-screens the
+ * whole app several screens from the change that caused it. So a slice
+ * whose records are missing a field the seeded records carry is dropped
+ * in favour of the seed, rather than being spread over types that no
+ * longer describe it.
+ *
+ * Losing a session's edits is a small, visible cost. Loading a page that
+ * cannot render is not.
+ */
+function reconcile(saved: State): Partial<State> {
+  const kept: Record<string, unknown> = {}
+
+  for (const [key, savedValue] of Object.entries(saved)) {
+    const seeded = (INITIAL as unknown as Record<string, unknown>)[key]
+
+    // A slice we no longer hold at all.
+    if (seeded === undefined) continue
+
+    if (!Array.isArray(savedValue) || !Array.isArray(seeded)) {
+      kept[key] = savedValue
+      continue
+    }
+
+    // Nothing seeded to compare against, so nothing to check it with.
+    const sample = seeded[0]
+    if (!sample || typeof sample !== "object") {
+      kept[key] = savedValue
+      continue
+    }
+
+    const expected = Object.keys(sample as object)
+    const intact = savedValue.every(
+      (record) =>
+        record &&
+        typeof record === "object" &&
+        expected.every((field) => field in (record as object))
+    )
+
+    kept[key] = intact ? savedValue : seeded
+  }
+
+  return kept as Partial<State>
+}
 
 interface StoreValue extends State {
   viewer: Viewer
@@ -505,7 +553,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const saved = JSON.parse(raw) as { version?: number; state?: State }
         if (saved.version === STORAGE_VERSION && saved.state) {
           // eslint-disable-next-line react-hooks/set-state-in-effect
-          setState({ ...INITIAL, ...saved.state })
+          setState({ ...INITIAL, ...reconcile(saved.state) })
         } else {
           sessionStorage.removeItem(STORAGE_KEY)
         }
