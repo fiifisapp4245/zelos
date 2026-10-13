@@ -155,12 +155,21 @@ exports[`persisted state and its version > has not changed shape without the ver
     "employeeContributionRules",
     "employerContributionRules",
     "filingDeadlines",
+    "payees",
+    "registrations",
     "statutoryReports",
     "taxBands",
     "taxBandsToVerify",
     "updates",
     "version",
     "voluntarySchemes",
+  ],
+  "countrySetups": [
+    "country",
+    "filingOwnerId",
+    "providers",
+    "registrations",
+    "remittanceRefs",
   ],
   "departments": [
     "archived",
@@ -227,6 +236,15 @@ exports[`persisted state and its version > has not changed shape without the ver
     "gross",
     "net",
     "runId",
+  ],
+  "filingRecords": [
+    "country",
+    "deadlineId",
+    "filed",
+    "id",
+    "paid",
+    "period",
+    "receiptName",
   ],
   "leaveBalances": [
     "annualEntitlement",
@@ -322,6 +340,12 @@ exports[`persisted state and its version > has not changed shape without the ver
     "recurrence",
     "status",
   ],
+  "packAcknowledgements": [
+    "at",
+    "by",
+    "country",
+    "version",
+  ],
   "patternAssignments": [
     "createdAt",
     "createdBy",
@@ -351,7 +375,6 @@ exports[`persisted state and its version > has not changed shape without the ver
     "payDayRule",
     "paymentChannels",
     "prorationMethod",
-    "remittanceProviders",
     "varianceThresholdPercent",
   ],
   "payPeriods": [

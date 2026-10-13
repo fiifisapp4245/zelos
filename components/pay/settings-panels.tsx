@@ -25,6 +25,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { CountryLabel } from "./money"
+import { ToVerify, countryMoney } from "./country-rules"
 import { money } from "@/lib/pay/money"
 import {
   PRORATION_BLURB,
@@ -32,16 +33,10 @@ import {
   type ProrationMethod,
 } from "@/lib/pay/proration"
 import {
-  allocationGap,
-  bandThresholds,
-  coveredCountries,
-  differences,
   packFor,
   paidCountries,
-  remitteeName,
   taxTreatmentText,
   treatmentFor,
-  versionsFor,
 } from "@/lib/pay/rule-packs"
 import { useStore } from "@/lib/store"
 import {
@@ -57,7 +52,7 @@ import type {
   PayGroup,
 } from "@/lib/pay/types"
 import type { PermissionRole } from "@/lib/types"
-import { TODAY_ISO, formatDate, fullName } from "@/lib/format"
+import { TODAY_ISO, fullName } from "@/lib/format"
 
 /* ── 1. Pay groups ───────────────────────────────────────────────────── */
 
@@ -211,7 +206,6 @@ const BLANK_GROUP: PayGroup = {
   paymentChannels: ["bank_transfer"],
   varianceThresholdPercent: 10,
   prorationMethod: "thirtieths",
-  remittanceProviders: {},
   calculationMode: "native",
 }
 
@@ -235,15 +229,6 @@ function PayGroupSheet({
     store.countryRulePacks
   )
   const copy = CALCULATION_MODE_COPY[mode]
-
-  // The allocations a company names its own provider for. Contractor
-  // groups contribute nothing, so they have none to name.
-  const chosenByCompany = draft.contractorGroup
-    ? []
-    : (packFor(store.countryRulePacks, country, TODAY_ISO)
-        ?.contributionAllocations.filter(
-          (a) => a.remittedTo.kind === "company_choice"
-        ) ?? [])
 
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
@@ -422,40 +407,6 @@ function PayGroupSheet({
             </div>
           </fieldset>
 
-          {chosenByCompany.length > 0 && (
-            <fieldset className="space-y-3">
-              <legend className="mb-1.5 text-sm font-medium">
-                Who this group remits to
-              </legend>
-              {chosenByCompany.map((a) => (
-                <div key={a.id}>
-                  <Label htmlFor={`provider-${a.id}`} className="mb-1.5 block">
-                    {a.remittedTo.kind === "company_choice"
-                      ? a.remittedTo.role
-                      : a.name}
-                  </Label>
-                  <Input
-                    id={`provider-${a.id}`}
-                    value={draft.remittanceProviders[a.id] ?? ""}
-                    onChange={(e) =>
-                      setDraft((d) => ({
-                        ...d,
-                        remittanceProviders: {
-                          ...d.remittanceProviders,
-                          [a.id]: e.target.value,
-                        },
-                      }))
-                    }
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {country}&rsquo;s rules send {a.percentOfBase}% of base
-                    here, to a provider each company appoints.
-                  </p>
-                </div>
-              ))}
-            </fieldset>
-          )}
-
           <div className="rounded-xl border bg-muted/40 p-3">
             <p className="text-sm font-medium">Calculation · {copy.label}</p>
             <p className="mt-0.5 text-sm text-muted-foreground">
@@ -493,23 +444,6 @@ function PayGroupSheet({
 }
 
 /* ── 2. Pay components ───────────────────────────────────────────────── */
-
-/**
- * Money in the currency a country is paid in: its pay group's, or its
- * entity's where no group pays there yet. Rule packs hold amounts, not
- * currencies, so the country's own currency is looked up rather than
- * assumed.
- */
-function countryMoney(
-  store: ReturnType<typeof useStore>,
-  country: string
-): (amount: number) => string {
-  const currency =
-    store.payGroups.find((g) => g.country === country)?.currency ??
-    store.legalEntities.find((e) => e.country === country)?.currency
-  return (amount) =>
-    currency ? money(amount, currency) : amount.toLocaleString("en-GB")
-}
 
 const CATEGORY_LABEL: Record<ComponentCategory, string> = {
   earning: "Earning",
@@ -852,389 +786,6 @@ function ComponentSheet({
     </Sheet>
   )
 }
-
-/* ── 3. Country rules ────────────────────────────────────────────────── */
-
-export function CountryRulesPanel() {
-  const store = useStore()
-  const covered = coveredCountries(store.countryRulePacks)
-  const used = [
-    ...new Set(store.payGroups.map((g) => g.country).filter((c) => c !== "—")),
-  ]
-
-  return (
-    <div className="space-y-4">
-      {covered.map((country) => (
-        <CountryPack key={country} country={country} />
-      ))}
-
-      {used
-        .filter((c) => !covered.includes(c))
-        .map((country) => (
-          <Panel key={country} bodyClassName="px-5 py-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <Globe className="size-4 shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">
-                  <CountryLabel country={country} />
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  No rule pack. Pay for this country is calculated by your local
-                  provider and the results uploaded.
-                </p>
-              </div>
-              <Pill tone="neutral">Uploaded results</Pill>
-            </div>
-          </Panel>
-        ))}
-    </div>
-  )
-}
-
-/** A heading above a list, used throughout the pack. */
-function RuleHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="mb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-      {children}
-    </h3>
-  )
-}
-
-function Row({
-  label,
-  note,
-  value,
-  toVerify,
-}: {
-  label: string
-  note?: string
-  value: string
-  toVerify?: string
-}) {
-  return (
-    <li className="flex justify-between gap-3">
-      <span className="min-w-0">
-        {label}
-        {note && (
-          <span className="block text-xs text-muted-foreground">{note}</span>
-        )}
-        {toVerify && <ToVerify against={toVerify} />}
-      </span>
-      <span className="tabular shrink-0 text-muted-foreground">{value}</span>
-    </li>
-  )
-}
-
-/**
- * A figure the pack holds that has not yet been confirmed against its
- * source. Shown beside the figure, so nobody reads a placeholder as law.
- */
-function ToVerify({ against }: { against: string }) {
-  return (
-    <span className="mt-0.5 block">
-      <Pill tone="warning" className="whitespace-normal">
-        To verify against {against}
-      </Pill>
-    </span>
-  )
-}
-
-/**
- * One country's rules, in full and read-only, with the version that was
- * in force selectable. Everything here is the law rather than a company
- * decision, so there is nothing to edit — but there is a great deal to
- * check, which is why it is all on screen rather than summarised.
- */
-function CountryPack({ country }: { country: string }) {
-  const store = useStore()
-  const versions = versionsFor(store.countryRulePacks, country)
-  const [versionId, setVersionId] = React.useState(versions[0]?.version ?? "")
-  const pack = versions.find((v) => v.version === versionId) ?? versions[0]
-  if (!pack) return null
-
-  const current = versions[0]?.version === pack.version
-  const previous = versions[versions.indexOf(pack) + 1] ?? null
-  const componentName = (id: string) =>
-    store.payComponents.find((c) => c.id === id)?.name ?? id
-  const changes = previous ? differences(previous, pack, componentName) : []
-
-  const payerTotal = [
-    ...pack.employeeContributionRules,
-    ...pack.employerContributionRules,
-  ].reduce((n, r) => n + r.percentOfBase, 0)
-  const gap = allocationGap(pack)
-
-  // Thresholds rather than widths, which is what a person checking their
-  // own tax actually wants to see.
-  const bands = bandThresholds(pack)
-
-  const fmt = countryMoney(store, country)
-  const caps = Object.entries(pack.componentTreatments).filter(
-    ([, t]) => t.cap !== undefined
-  )
-  const preTax = Object.entries(pack.componentTreatments).filter(
-    ([, t]) => t.preTax
-  )
-
-  return (
-    <Panel
-      title={<CountryLabel country={pack.country} />}
-      description={`Version ${pack.version} · in force from ${formatDate(pack.effectiveFrom)}`}
-      actions={
-        <div className="flex flex-wrap items-center gap-2">
-          <Pill tone={current ? "success" : "neutral"}>
-            {current ? "Calculated by Zelos" : "Past version"}
-          </Pill>
-          {versions.length > 1 && (
-            <Select value={pack.version} onValueChange={setVersionId}>
-              <SelectTrigger className="h-9 w-[150px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {versions.map((v) => (
-                  <SelectItem key={v.version} value={v.version}>
-                    {v.version}
-                    {v.version === versions[0].version ? " (current)" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-      }
-    >
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div>
-          <RuleHeading>Contributions · who pays</RuleHeading>
-          <ul className="space-y-1 text-sm">
-            {pack.employeeContributionRules.map((r) => (
-              <Row
-                key={r.id}
-                label={r.name}
-                note={r.note}
-                value={`${r.percentOfBase}% of base`}
-                toVerify={r.toVerify}
-              />
-            ))}
-            {pack.employerContributionRules.map((r) => (
-              <Row
-                key={r.id}
-                label={r.name}
-                note={r.note}
-                value={`${r.percentOfBase}% of base`}
-                toVerify={r.toVerify}
-              />
-            ))}
-            {payerTotal === 0 && (
-              <li className="text-sm text-muted-foreground">None.</li>
-            )}
-          </ul>
-          {payerTotal > 0 && (
-            <p className="mt-1.5 text-xs text-muted-foreground">
-              {payerTotal}% of base between them. The employee&rsquo;s share
-              comes out of gross; the employer&rsquo;s is paid on top.
-            </p>
-          )}
-        </div>
-
-        {pack.contributionAllocations.length > 0 && (
-          <div>
-            <RuleHeading>Contributions · where it goes</RuleHeading>
-            <ul className="space-y-1 text-sm">
-              {pack.contributionAllocations.map((a) => (
-                <Row
-                  key={a.id}
-                  label={a.name}
-                  note={`${a.note} Remitted to ${remitteeName(a.remittedTo)}${
-                    a.remittedTo.kind === "company_choice"
-                      ? ", named on each pay group."
-                      : "."
-                  }`}
-                  value={`${a.percentOfBase}% of base`}
-                  toVerify={a.toVerify}
-                />
-              ))}
-            </ul>
-            {gap === 0 ? (
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                The same {payerTotal}%, split by destination rather than by
-                who pays it.
-              </p>
-            ) : (
-              <p className="mt-1.5 flex items-start gap-1.5 text-xs text-destructive">
-                <AlertTriangle className="mt-px size-3.5 shrink-0" />
-                These add up to {payerTotal - gap}%, but {payerTotal}% is
-                collected. The pack disagrees with itself.
-              </p>
-            )}
-          </div>
-        )}
-
-        {pack.voluntarySchemes.length > 0 && (
-          <div className="sm:col-span-2">
-            <RuleHeading>Voluntary schemes</RuleHeading>
-            <ul className="space-y-1 text-sm">
-              {pack.voluntarySchemes.map((v) => (
-                <Row
-                  key={v.id}
-                  label={v.name}
-                  note={v.note}
-                  value="No set rate"
-                />
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div className="sm:col-span-2">
-          <RuleHeading>Income tax bands, per month</RuleHeading>
-          {pack.taxBandsToVerify && (
-            <div className="mb-1.5">
-              <ToVerify against={pack.taxBandsToVerify} />
-            </div>
-          )}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  {["Chargeable income", "Width", "Rate"].map((h) => (
-                    <th
-                      key={h}
-                      scope="col"
-                      className="py-1.5 pr-4 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {bands.map((b, i) => (
-                  <tr key={i}>
-                    <td className="tabular py-1.5 pr-4">
-                      {b.to === null
-                        ? `Above ${fmt(b.from)}`
-                        : `${fmt(b.from)} – ${fmt(b.to)}`}
-                    </td>
-                    <td className="tabular py-1.5 pr-4 text-muted-foreground">
-                      {b.to === null
-                        ? "The rest"
-                        : fmt(b.to - b.from)}
-                    </td>
-                    <td className="tabular py-1.5 pr-4">{b.ratePercent}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            The first {fmt(bands[0]?.to ?? 0)} is taxed at nothing.
-            Bands apply to pay after the employee contribution is taken off.
-          </p>
-        </div>
-
-        {caps.length > 0 && (
-          <div className="sm:col-span-2">
-            <RuleHeading>Exempt up to a cap</RuleHeading>
-            <ul className="space-y-1 text-sm">
-              {caps.map(([id, t]) => (
-                <Row
-                  key={id}
-                  label={componentName(id)}
-                  note={taxTreatmentText(t, "allowance", fmt).label}
-                  value={fmt(t.cap!)}
-                  toVerify={t.toVerify}
-                />
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {preTax.length > 0 && (
-          <div className="sm:col-span-2">
-            <RuleHeading>Deductions taken before tax</RuleHeading>
-            <ul className="space-y-1 text-sm">
-              {preTax.map(([id, t]) => {
-                const text = taxTreatmentText(t, "deduction", fmt)
-                return (
-                  <Row
-                    key={id}
-                    label={componentName(id)}
-                    note={text.detail}
-                    value={text.label}
-                    toVerify={t.toVerify}
-                  />
-                )
-              })}
-            </ul>
-          </div>
-        )}
-
-        <div>
-          <RuleHeading>Filing deadlines</RuleHeading>
-          <ul className="space-y-1 text-sm">
-            {pack.filingDeadlines.map((d) => (
-              <Row key={d.name} label={d.name} value={d.due} />
-            ))}
-          </ul>
-        </div>
-
-        <div>
-          <RuleHeading>Statutory reports</RuleHeading>
-          <ul className="flex flex-wrap gap-1.5">
-            {pack.statutoryReports.map((r) => (
-              <li key={r}>
-                <Pill tone="neutral">{r}</Pill>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {changes.length > 0 && previous && (
-          <div className="sm:col-span-2">
-            <RuleHeading>What moved since {previous.version}</RuleHeading>
-            <ul className="space-y-1 text-sm">
-              {changes.map((c) => (
-                <Row
-                  key={c.label}
-                  label={c.label}
-                  value={`${c.before} → ${c.after}`}
-                />
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div className="sm:col-span-2">
-          <RuleHeading>Updates</RuleHeading>
-          <ol className="space-y-2 border-l pl-3">
-            {[...pack.updates]
-              .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))
-              .map((u) => (
-                <li key={u.title} className="text-sm">
-                  <span className="flex flex-wrap items-baseline gap-2">
-                    <span className="font-medium">{u.title}</span>
-                    <span className="tabular text-xs text-muted-foreground">
-                      from {formatDate(u.effectiveFrom)}
-                    </span>
-                  </span>
-                  <span className="block text-muted-foreground">
-                    {u.summary}
-                  </span>
-                </li>
-              ))}
-          </ol>
-        </div>
-      </div>
-
-      <p className="mt-5 border-t pt-3 text-xs text-muted-foreground">
-        Nothing on this page can be edited. These are the country&rsquo;s rules,
-        and they change when the pack is updated.
-      </p>
-    </Panel>
-  )
-}
-
 
 /* ── 4. Approvals ────────────────────────────────────────────────────── */
 

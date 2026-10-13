@@ -60,7 +60,10 @@ import {
   CHANGE_REQUESTS,
   COMPENSATION_VERSIONS,
   COUNTRY_RULE_PACKS,
+  COUNTRY_SETUPS,
+  FILING_RECORDS,
   LEGAL_ENTITIES,
+  PACK_ACKNOWLEDGEMENTS,
   PAY_COMPONENTS,
   PAY_GROUPS,
 } from "./data/pay"
@@ -92,7 +95,13 @@ import type {
   CompensationChangeRequest,
   CompensationVersion,
   CountryRulePack,
+  CountrySetup,
+  CoverageChoice,
+  CoverageDecision,
+  FilingRecord,
   LegalEntity,
+  PackAcknowledgement,
+  PackIssueReport,
   PayComponent,
   PayGroup,
 } from "./pay/types"
@@ -159,6 +168,11 @@ interface State {
   payGroups: PayGroup[]
   payComponents: PayComponent[]
   countryRulePacks: CountryRulePack[]
+  countrySetups: CountrySetup[]
+  packAcknowledgements: PackAcknowledgement[]
+  filingRecords: FilingRecord[]
+  packIssueReports: PackIssueReport[]
+  coverageDecisions: CoverageDecision[]
   compensationVersions: CompensationVersion[]
   changeRequests: CompensationChangeRequest[]
   assignmentsAbroad: AssignmentAbroad[]
@@ -211,6 +225,11 @@ export const INITIAL: State = {
   payGroups: PAY_GROUPS,
   payComponents: PAY_COMPONENTS,
   countryRulePacks: COUNTRY_RULE_PACKS,
+  countrySetups: COUNTRY_SETUPS,
+  packAcknowledgements: PACK_ACKNOWLEDGEMENTS,
+  filingRecords: FILING_RECORDS,
+  packIssueReports: [],
+  coverageDecisions: [],
   compensationVersions: COMPENSATION_VERSIONS,
   changeRequests: CHANGE_REQUESTS,
   assignmentsAbroad: ASSIGNMENTS_ABROAD,
@@ -240,7 +259,7 @@ const STORAGE_KEY = "zelos-hr-session"
  * this week's types is how you get a crash three screens away from the
  * change that caused it.
  */
-export const STORAGE_VERSION = 9
+export const STORAGE_VERSION = 10
 
 /**
  * Keeps only the restored slices that still look like the ones we seed.
@@ -386,6 +405,20 @@ interface StoreValue extends State {
   cancelScheduledVersion: (versionId: string, reason: string) => void
   savePayGroup: (group: PayGroup) => void
   savePayComponent: (component: PayComponent) => void
+
+  /* Country rules: the company's side. The rules themselves never change here. */
+  saveCountrySetup: (setup: CountrySetup) => void
+  /** Confirms a version was seen before a run uses it. Not approval of the law. */
+  acknowledgePack: (country: string, version: string) => void
+  /** Records a deadline filed or paid, or a receipt attached, for one period. */
+  recordFiling: (
+    record: Pick<FilingRecord, "country" | "deadlineId" | "period"> &
+      Partial<Pick<FilingRecord, "filed" | "paid" | "receiptName">>
+  ) => void
+  reportPackIssue: (
+    report: Omit<PackIssueReport, "id" | "by" | "at">
+  ) => void
+  chooseCoverage: (country: string, choice: CoverageChoice) => void
   saveApprovalSettings: (patch: Partial<ApprovalSettings>) => void
 
   /**
@@ -1408,6 +1441,106 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               )
             : [...s.payComponents, component],
         }))
+      },
+
+      saveCountrySetup: (setup) => {
+        setState((s) => ({
+          ...s,
+          countrySetups: s.countrySetups.some(
+            (c) => c.country === setup.country
+          )
+            ? s.countrySetups.map((c) =>
+                c.country === setup.country ? setup : c
+              )
+            : [...s.countrySetups, setup],
+        }))
+        log({
+          employeeId: null,
+          action: `Updated the company's setup for ${setup.country}`,
+        })
+      },
+
+      acknowledgePack: (country, version) => {
+        setState((s) =>
+          s.packAcknowledgements.some(
+            (a) => a.country === country && a.version === version
+          )
+            ? s
+            : {
+                ...s,
+                packAcknowledgements: [
+                  ...s.packAcknowledgements,
+                  { country, version, by: actorId, at: nowIso() },
+                ],
+              }
+        )
+        log({
+          employeeId: null,
+          action: `Acknowledged ${country} rule pack ${version}`,
+        })
+      },
+
+      recordFiling: (patch) => {
+        setState((s) => {
+          const existing = s.filingRecords.find(
+            (f) =>
+              f.country === patch.country &&
+              f.deadlineId === patch.deadlineId &&
+              f.period === patch.period
+          )
+          const next: FilingRecord = {
+            ...(existing ?? {
+              id: uid("fr"),
+              country: patch.country,
+              deadlineId: patch.deadlineId,
+              period: patch.period,
+            }),
+            ...patch,
+          }
+          return {
+            ...s,
+            filingRecords: existing
+              ? s.filingRecords.map((f) => (f.id === existing.id ? next : f))
+              : [...s.filingRecords, next],
+          }
+        })
+        const what = patch.paid
+          ? `Marked paid (${patch.paid.ref})`
+          : patch.filed
+            ? `Marked filed (${patch.filed.ref})`
+            : `Attached receipt ${patch.receiptName ?? ""}`.trim()
+        log({
+          employeeId: null,
+          action: `${what}: ${patch.country} ${patch.deadlineId}, ${patch.period}`,
+        })
+      },
+
+      reportPackIssue: (report) => {
+        setState((s) => ({
+          ...s,
+          packIssueReports: [
+            ...s.packIssueReports,
+            { ...report, id: uid("pi"), by: actorId, at: nowIso() },
+          ],
+        }))
+        log({
+          employeeId: null,
+          action: `Reported an issue with ${report.country} rule pack ${report.version}: ${report.field}`,
+        })
+      },
+
+      chooseCoverage: (country, choice) => {
+        setState((s) => ({
+          ...s,
+          coverageDecisions: [
+            ...s.coverageDecisions.filter((d) => d.country !== country),
+            { country, choice, by: actorId, at: nowIso() },
+          ],
+        }))
+        log({
+          employeeId: null,
+          action: `Chose how ${country} is paid: ${choice.replace(/_/g, " ")}`,
+        })
       },
 
       saveApprovalSettings: (patch) => {

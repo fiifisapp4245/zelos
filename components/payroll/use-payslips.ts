@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { useStore } from "@/lib/store"
+import { packFor } from "@/lib/pay/rule-packs"
 import { currentVersion } from "@/lib/pay/derive"
 import { isStated, payslipFor } from "@/lib/pay/payslips"
 import { linesForRun } from "@/lib/pay/run-lines"
@@ -49,9 +50,11 @@ export function usePayslips(employeeId: string) {
     return mine
       .map(({ run, line }, i) => {
         const group = store.payGroups.find((g) => g.id === run.payGroupId)
-        const pack =
-          store.countryRulePacks.find((p) => p.country === group?.country) ??
-          null
+        // The version the run was calculated under, not the first one
+        // listed: a 2025 payslip has to say 2025.1.
+        const pack = group
+          ? packFor(store.countryRulePacks, group.country, run.periodEnd)
+          : null
         const year = run.periodStart.slice(0, 4)
         const priorLines = mine
           .slice(0, i + 1)

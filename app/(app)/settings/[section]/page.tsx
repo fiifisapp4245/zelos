@@ -22,11 +22,11 @@ import { findSetting } from "@/lib/data/settings"
 import { SETTINGS_CONTENT } from "@/lib/data/settings-content"
 import { SettingBlocks } from "./blocks"
 import {
-  CountryRulesPanel,
   PayApprovalsPanel,
   PayComponentsPanel,
   PayGroupsPanel,
 } from "@/components/pay/settings-panels"
+import { CountryRulesPanel } from "@/components/pay/country-rules"
 import { CompanyInformation } from "./company-information"
 import type { PermissionRole } from "@/lib/types"
 
@@ -44,7 +44,12 @@ export default function SettingDetailPage() {
   )
   const blocks = SETTINGS_CONTENT[section]
 
-  if (!has(viewer, "hr_admin")) {
+  // Country rules is where filings are recorded, which is the Payroll
+  // Officer's job; the rest of Company settings stays HR Admin's.
+  const payrollMayOpen =
+    section === "statutory-settings" && has(viewer, "payroll")
+
+  if (!has(viewer, "hr_admin") && !payrollMayOpen) {
     return (
       <PageShell
         crumbs={[{ label: "Company settings" }, { label: item.label }]}

@@ -6,6 +6,9 @@ import type {
   CompensationChangeRequest,
   CompensationVersion,
   CountryRulePack,
+  CountrySetup,
+  FilingRecord,
+  PackAcknowledgement,
   LegalEntity,
   PayComponent,
   PayGroup,
@@ -103,7 +106,17 @@ const GHANA_RULES: CountryRulePack = {
       name: "Tier 3 provident fund",
       remittedTo: "The employee's chosen trustee",
       note: "Voluntary on both sides. What anyone puts in is a pay component, not a rate set here.",
+      needsProvider: true,
     },
+  ],
+  payees: [
+    { id: "gra", name: "Ghana Revenue Authority" },
+    { id: "ssnit", name: "SSNIT" },
+    { id: "tier2-trustee", name: "Tier 2 trustee" },
+  ],
+  registrations: [
+    { id: "gra-tin", label: "GRA TIN", payeeId: "gra" },
+    { id: "ssnit-employer", label: "SSNIT employer number", payeeId: "ssnit" },
   ],
   // Monthly bands, applied in order to taxable pay after the social
   // security deduction. Placeholder figures, as above.
@@ -152,21 +165,43 @@ const GHANA_RULES: CountryRulePack = {
   ],
   filingDeadlines: [
     {
+      id: "paye-return",
       name: "PAYE monthly return",
+      payeeId: "gra",
+      kind: "return",
+      report: "PAYE monthly return (GRA)",
       due: "15th of the following month",
       dueDayOfMonth: 15,
     },
     {
+      id: "ssnit-contributions",
+      allocationId: "tier1",
       name: "SSNIT contributions",
+      payeeId: "ssnit",
+      kind: "remittance",
+      report: "SSNIT contribution schedule",
       due: "14th of the following month",
       dueDayOfMonth: 14,
     },
     {
+      id: "tier2-remittance",
+      allocationId: "tier2",
       name: "Tier 2 remittance",
+      payeeId: "tier2-trustee",
+      kind: "remittance",
+      report: "Tier 2 trustee schedule",
       due: "14th of the following month",
       dueDayOfMonth: 14,
     },
-    { name: "Annual employer return", due: "30 April", annualOn: "04-30" },
+    {
+      id: "annual-return",
+      name: "Annual employer return",
+      payeeId: "gra",
+      kind: "return",
+      report: "Annual employer return",
+      due: "30 April",
+      annualOn: "04-30",
+    },
   ],
   updates: [
     {
@@ -230,6 +265,37 @@ const GHANA_RULES_2025: CountryRulePack = {
 }
 
 /**
+ * Next year's rules, published ahead of the date they take effect so HR
+ * can review them before the first run under them.
+ *
+ * PLACEHOLDER: these are not GRA's 2027 figures, which are not published.
+ * They exist so the update, its review and its impact can be seen working.
+ */
+const GHANA_RULES_2027: CountryRulePack = {
+  ...GHANA_RULES,
+  version: "2027.1",
+  effectiveFrom: "2027-01-01",
+  taxBandsToVerify: "GRA's 2027 figures, once published",
+  taxBands: [
+    { upTo: 540, ratePercent: 0 },
+    { upTo: 110, ratePercent: 5 },
+    { upTo: 130, ratePercent: 10 },
+    { upTo: 3300, ratePercent: 17.5 },
+    { upTo: 16000, ratePercent: 25 },
+    { upTo: 30520, ratePercent: 30 },
+    { upTo: null, ratePercent: 35 },
+  ],
+  updates: [
+    {
+      title: "Rule pack 2027.1 published",
+      effectiveFrom: "2027-01-01",
+      summary:
+        "Bands for the 2027 year of assessment: a higher tax-free amount and a wider 17.5% band. Placeholder figures until GRA publishes.",
+    },
+  ],
+}
+
+/**
  * Every version of every country's rules, in one list. Nothing reads
  * this by position — use packFor(), which picks by country and date.
  *
@@ -238,6 +304,113 @@ const GHANA_RULES_2025: CountryRulePack = {
 export const COUNTRY_RULE_PACKS: CountryRulePack[] = [
   GHANA_RULES,
   GHANA_RULES_2025,
+  GHANA_RULES_2027,
+]
+
+/**
+ * The company's answers for each country it pays in. The trustee is here,
+ * not in Ghana's rules: it is this company's appointment, and another
+ * company paying in Ghana appoints its own.
+ */
+export const COUNTRY_SETUPS: CountrySetup[] = [
+  {
+    country: "Ghana",
+    registrations: {
+      "gra-tin": "C0009827451",
+      "ssnit-employer": "E0012345678",
+    },
+    providers: { tier2: "Petra Trust" },
+    remittanceRefs: {
+      gra: "GRA Taxpayer Portal · C0009827451",
+      ssnit: "SSNIT e-Payment · E0012345678",
+      "tier2-trustee": "Petra Trust collection account 0012 4471 22",
+    },
+    filingOwnerId: "maame",
+  },
+]
+
+/** Versions somebody has confirmed seeing. 2027.1 is still waiting. */
+export const PACK_ACKNOWLEDGEMENTS: PackAcknowledgement[] = [
+  {
+    country: "Ghana",
+    version: "2025.1",
+    by: "fiifi",
+    at: "2024-12-12T10:04:00",
+  },
+  {
+    country: "Ghana",
+    version: "2026.1",
+    by: "fiifi",
+    at: "2025-12-15T09:31:00",
+  },
+]
+
+/**
+ * The months before August, filed and paid on time — so the one thing
+ * left undone, August's Tier 2 remittance, is the one that shows.
+ */
+const SETTLED_MONTHS: FilingRecord[] = ["2026-06", "2026-07"].flatMap(
+  (period) => {
+    const [y, m] = period.split("-").map(Number)
+    const next = `${m === 12 ? y + 1 : y}-${String((m % 12) + 1).padStart(2, "0")}`
+    const done = (day: string, ref: string) => ({
+      on: `${next}-${day}`,
+      ref: `${ref}-${period.replace("-", "")}`,
+      by: "maame",
+    })
+    return [
+      {
+        id: `fr-paye-${period}`,
+        country: "Ghana",
+        deadlineId: "paye-return",
+        period,
+        filed: done("13", "GRA-PAYE"),
+      },
+      {
+        id: `fr-ssnit-${period}`,
+        country: "Ghana",
+        deadlineId: "ssnit-contributions",
+        period,
+        filed: done("10", "SSNIT-SCH"),
+        paid: done("11", "SSNIT-PAY"),
+      },
+      {
+        id: `fr-tier2-${period}`,
+        country: "Ghana",
+        deadlineId: "tier2-remittance",
+        period,
+        paid: done("12", "PETRA"),
+      },
+    ]
+  }
+)
+
+/** August's obligations, mostly dealt with; September's are still to come. */
+export const FILING_RECORDS: FilingRecord[] = [
+  ...SETTLED_MONTHS,
+  {
+    id: "fr-annual-2025",
+    country: "Ghana",
+    deadlineId: "annual-return",
+    period: "2025",
+    filed: { on: "2026-04-22", ref: "GRA-ANN-2025-0912", by: "fiifi" },
+  },
+  {
+    id: "fr-paye-2026-08",
+    country: "Ghana",
+    deadlineId: "paye-return",
+    period: "2026-08",
+    filed: { on: "2026-09-12", ref: "GRA-PAYE-0826-4471", by: "maame" },
+    receiptName: "paye-aug-2026-acknowledgement.pdf",
+  },
+  {
+    id: "fr-ssnit-2026-08",
+    country: "Ghana",
+    deadlineId: "ssnit-contributions",
+    period: "2026-08",
+    filed: { on: "2026-09-10", ref: "SSNIT-SCH-0826", by: "maame" },
+    paid: { on: "2026-09-11", ref: "SSNIT-PAY-0826-118", by: "maame" },
+  },
 ]
 
 function group(
@@ -265,7 +438,6 @@ export const PAY_GROUPS: PayGroup[] = [
     paymentChannels: ["bank_transfer", "mobile_money"],
     varianceThresholdPercent: 10,
     prorationMethod: "thirtieths",
-    remittanceProviders: { tier2: "Petra Trust" },
   }),
   group({
     id: "pg-ng-monthly",
@@ -278,7 +450,6 @@ export const PAY_GROUPS: PayGroup[] = [
     paymentChannels: ["bank_transfer"],
     varianceThresholdPercent: 12,
     prorationMethod: "calendar_days",
-    remittanceProviders: {},
   }),
   group({
     id: "pg-contractors",
@@ -291,7 +462,6 @@ export const PAY_GROUPS: PayGroup[] = [
     paymentChannels: ["international_transfer"],
     varianceThresholdPercent: 20,
     prorationMethod: "calendar_days",
-    remittanceProviders: {},
     contractorGroup: true,
   }),
 ]

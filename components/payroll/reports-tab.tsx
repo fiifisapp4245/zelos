@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { BarChart3, CalendarClock, Download, Upload } from "lucide-react"
 import { toast } from "sonner"
 
@@ -16,6 +17,7 @@ import {
 import { Amount, RevealProvider, RevealToggle } from "@/components/pay/money"
 import { usePayroll } from "./use-payroll"
 import { useStore } from "@/lib/store"
+import { packFor } from "@/lib/pay/rule-packs"
 import { registerCsv } from "@/lib/pay/payments"
 import {
   costByDepartment,
@@ -164,9 +166,7 @@ export function ReportsTab() {
               .filter((g) => groupId === "all" || g.id === groupId)
               .map((group) => {
                 const pack =
-                  store.countryRulePacks.find(
-                    (p) => p.country === group.country
-                  ) ?? null
+                  packFor(store.countryRulePacks, group.country, TODAY_ISO)
                 const { reports, external } = statutoryFor(group, pack)
                 return (
                   <li key={group.id} className="px-5 py-3.5">
@@ -390,8 +390,10 @@ export function ReportsTab() {
         {groups
           .filter((g) => groupId === "all" || g.id === groupId)
           .map((group) => {
-            const pack = store.countryRulePacks.find(
-              (p) => p.country === group.country
+            const pack = packFor(
+              store.countryRulePacks,
+              group.country,
+              TODAY_ISO
             )
             if (!pack) return null
             const dates = nextFilingDates(pack, TODAY_ISO)
@@ -400,6 +402,13 @@ export function ReportsTab() {
                 key={group.id}
                 title={`Filing deadlines · ${group.name}`}
                 description="Soonest first, worked out from the country rules."
+                actions={
+                  <Button asChild size="sm" variant="outline" className="h-9">
+                    <Link href="/settings/statutory-settings">
+                      Record filings
+                    </Link>
+                  </Button>
+                }
                 bodyClassName="p-0"
               >
                 <ul className="divide-y">

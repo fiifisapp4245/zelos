@@ -40,6 +40,7 @@ import {
   VersionStatusPill,
 } from "./money"
 import { useStore } from "@/lib/store"
+import { packFor } from "@/lib/pay/rule-packs"
 import { canProposeFor, canSeePay } from "@/lib/pay/access"
 import {
   currentVersion,
@@ -112,8 +113,7 @@ export function EmployeeCompensation({ employeeId }: { employeeId: string }) {
   const group = store.payGroups.find((g) => g.id === current.payGroupId)
   const entity = store.legalEntities.find((e) => e.id === current.entityId)
   const pack =
-    store.countryRulePacks.find((p) => p.country === current.workCountry) ??
-    null
+    packFor(store.countryRulePacks, current.workCountry, TODAY_ISO)
   const cost = employerCost(current, pack, store.payComponents)
   const recurring = current.components
     .map((value) => ({

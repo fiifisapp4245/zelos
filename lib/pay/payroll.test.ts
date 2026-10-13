@@ -54,6 +54,8 @@ const PACK: CountryRulePack = {
   ],
   contributionAllocations: [],
   voluntarySchemes: [],
+  payees: [],
+  registrations: [],
   taxBands: [
     { upTo: 500, ratePercent: 0 },
     { upTo: 2000, ratePercent: 10 },
@@ -480,6 +482,18 @@ describe("readiness", () => {
     expect(blockingChecks(checks).map((c) => c.id)).toEqual([
       "attendance-closed",
     ])
+  })
+
+  it("warns, without blocking, when the rules in use were never acknowledged", () => {
+    const checks = readiness(run, {
+      ...clean,
+      unacknowledgedPack: { country: "Ghana", version: "2027.1" },
+    })
+    const check = checks.find((c) => c.id === "rule-pack-acknowledged")!
+    expect(check.status).not.toBe("pass")
+    expect(check.severity).toBe("warning")
+    expect(check.detail).toContain("Ghana rules 2027.1")
+    expect(blockingChecks(checks)).toHaveLength(0)
   })
 
   it("links at the period in question rather than the module", () => {

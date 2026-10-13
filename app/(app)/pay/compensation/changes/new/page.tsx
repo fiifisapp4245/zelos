@@ -23,6 +23,7 @@ import {
 import { Amount, RevealProvider, RevealToggle } from "@/components/pay/money"
 import { usePay } from "@/components/pay/use-pay"
 import { useStore } from "@/lib/store"
+import { packFor } from "@/lib/pay/rule-packs"
 import {
   applyChange,
   employerCost,
@@ -103,9 +104,7 @@ function ChangePay() {
       .filter((r) => r.current && r.currency)
       .map((r) => {
         const pack =
-          store.countryRulePacks.find(
-            (p) => p.country === r.current!.workCountry
-          ) ?? null
+          packFor(store.countryRulePacks, r.current!.workCountry, TODAY_ISO)
         const before = employerCost(r.current!, pack, store.payComponents)
         const after = employerCost(
           { ...r.current!, baseAmount: r.newAmount },

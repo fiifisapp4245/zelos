@@ -12,6 +12,8 @@ import {
   previousRunOf,
   type RunSource,
 } from "@/lib/pay/run-lines"
+import { acknowledgementOf } from "@/lib/pay/compliance"
+import { packFor } from "@/lib/pay/rule-packs"
 import { reconcileItems, isReconciled } from "@/lib/leave/reconcile"
 import { dayRecordsFor } from "@/lib/attendance/derive"
 import { ATTENDANCE_POLICY } from "@/lib/data/attendance-log"
@@ -137,8 +139,25 @@ export function useReadiness(run: PayrollRun) {
       acknowledgements: store.readinessAcknowledgements.filter(
         (a) => a.runId === run.id
       ),
+      unacknowledgedPack: unacknowledged(),
     }
 
     return readiness(run, checkSource)
+
+    // The rules this run will calculate under, if nobody has confirmed
+    // seeing them. Uploaded and contractor groups use no pack here.
+    function unacknowledged() {
+      const group = store.payGroups.find((g) => g.id === run.payGroupId)
+      if (!group || group.calculationMode !== "native") return null
+      const pack = packFor(store.countryRulePacks, group.country, run.periodEnd)
+      if (!pack) return null
+      return acknowledgementOf(
+        store.packAcknowledgements,
+        pack.country,
+        pack.version
+      )
+        ? null
+        : { country: pack.country, version: pack.version }
+    }
   }, [run, source, store])
 }

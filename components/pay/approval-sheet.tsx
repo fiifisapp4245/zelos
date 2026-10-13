@@ -24,6 +24,7 @@ import {
   RevealToggle,
 } from "./money"
 import { useStore } from "@/lib/store"
+import { packFor } from "@/lib/pay/rule-packs"
 import {
   applyChange,
   canApprove,
@@ -92,8 +93,10 @@ export function ApprovalSheet({
       .filter((r) => r.currency)
       .map((r) => {
         const version = r.current!
-        const pack = store.countryRulePacks.find(
-          (p) => p.country === version.workCountry
+        const pack = packFor(
+          store.countryRulePacks,
+          version.workCountry,
+          TODAY_ISO
         )
         const before = employerCost(version, pack ?? null, store.payComponents)
         const after = employerCost(

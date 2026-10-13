@@ -377,6 +377,12 @@ export interface ReadinessSource {
   missingDestinations: string[]
   /** People in this run with no compensation version in force. */
   missingCompensation: string[]
+  /**
+   * The country rules this run calculates under, where nobody has yet
+   * confirmed seeing that version. Null when it was acknowledged, or the
+   * run is not calculated here.
+   */
+  unacknowledgedPack?: { country: string; version: string } | null
   acknowledgements: {
     checkId: string
     by: string
@@ -464,6 +470,15 @@ export function readiness(
           ? `/employees/${source.missingDestinations[0]}`
           : "/employees",
     },
+    {
+      id: "rule-pack-acknowledged",
+      label: "The country rules in use have been reviewed",
+      severity: "warning",
+      detail: source.unacknowledgedPack
+        ? `This run uses ${source.unacknowledgedPack.country} rules ${source.unacknowledgedPack.version}, which nobody has acknowledged. Review what changed before paying under it.`
+        : "Somebody has reviewed and acknowledged the rule pack this run uses.",
+      link: "/settings/statutory-settings",
+    },
   ]
 
   const failing: Record<string, boolean> = {
@@ -472,6 +487,7 @@ export function readiness(
     "leave-reconciled": source.unexplainedNames.length > 0,
     "payment-changes": source.pendingPaymentChanges.length > 0,
     "payment-details": source.missingDestinations.length > 0,
+    "rule-pack-acknowledged": Boolean(source.unacknowledgedPack),
   }
 
   return raw.map((check) => {

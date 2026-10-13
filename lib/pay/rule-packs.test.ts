@@ -22,6 +22,8 @@ const base: CountryRulePack = {
   employerContributionRules: [],
   contributionAllocations: [],
   voluntarySchemes: [],
+  payees: [],
+  registrations: [],
   taxBands: [],
   statutoryReports: [],
   filingDeadlines: [],
@@ -281,8 +283,7 @@ describe("switching country on Pay components", () => {
     paymentChannels: [],
     varianceThresholdPercent: 10,
     prorationMethod: "thirtieths",
-    remittanceProviders: {},
-    calculationMode: "native",
+      calculationMode: "native",
   })
 
   it("offers each country somebody is paid in, once, and no contractors", () => {

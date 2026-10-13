@@ -57,13 +57,6 @@ export interface PayGroup {
   varianceThresholdPercent: number
   /** How a part-period is worked out for joiners and leavers. */
   prorationMethod: ProrationMethod
-  /**
-   * The provider this group remits to, for each of its country's
-   * allocations the company chooses for itself — allocation id → name.
-   * Ghana's Tier 2 trustee lives here, not in the country's rules,
-   * because each company appoints its own.
-   */
-  remittanceProviders: Record<string, string>
   calculationMode: CalculationMode
   contractorGroup?: boolean
 }
@@ -121,7 +114,7 @@ export interface EmployerContributionRule {
 
 /**
  * Who receives an allocation: an authority the law names, or a provider
- * each company appoints for itself and records on its pay group.
+ * each company appoints for itself and records in its country setup.
  */
 export type Remittee =
   | { kind: "authority"; name: string }
@@ -152,6 +145,21 @@ export interface VoluntaryScheme {
   name: string
   remittedTo: string
   note: string
+  /** The company names a provider for it, in its country setup. */
+  needsProvider?: boolean
+}
+
+/** Somebody statutory money or returns go to: an authority, or a trustee. */
+export interface StatutoryPayee {
+  id: string
+  name: string
+}
+
+/** A number the company is registered under, as the country labels it. */
+export interface RegistrationField {
+  id: string
+  label: string
+  payeeId: string
 }
 
 export interface RulePackUpdate {
@@ -161,7 +169,18 @@ export interface RulePackUpdate {
 }
 
 export interface FilingDeadline {
+  id: string
   name: string
+  payeeId: string
+  /**
+   * A return is done once it is filed; a remittance once it is paid.
+   * Which one decides what "done" means on the compliance calendar.
+   */
+  kind: "return" | "remittance"
+  /** The statutory report Zelos produces for it, by name. */
+  report?: string
+  /** The contribution allocation a remittance pays over, where it is one. */
+  allocationId?: string
   /** The rule in words, as the authority states it. */
   due: string
   /** Day of the month it falls on, where it is monthly. */
@@ -186,6 +205,10 @@ export interface CountryRulePack {
   contributionAllocations: ContributionAllocation[]
   /** Recognised but optional. Nothing is deducted for these by default. */
   voluntarySchemes: VoluntaryScheme[]
+  /** Who the returns and remittances below go to. */
+  payees: StatutoryPayee[]
+  /** The numbers a company paying here has to be registered under. */
+  registrations: RegistrationField[]
   /** Applied in order to taxable pay, per pay period. */
   taxBands: TaxBand[]
   /** Set while the bands await confirmation: what to check them against. */
@@ -193,6 +216,72 @@ export interface CountryRulePack {
   statutoryReports: string[]
   filingDeadlines: FilingDeadline[]
   updates: RulePackUpdate[]
+}
+
+/* ── The company's side of a country ─────────────────────────────────── */
+
+/**
+ * What one company decides for a country it pays in. The country's rules
+ * say what has to exist — which registrations, which schemes need a
+ * provider, who gets paid — and this records the company's answers.
+ * Statutory rates never live here.
+ */
+export interface CountrySetup {
+  country: string
+  /** Registration field id → the company's number. */
+  registrations: Record<string, string>
+  /** Allocation or scheme id → the provider the company appointed. */
+  providers: Record<string, string>
+  /** Payee id → the account or payment reference money goes to. */
+  remittanceRefs: Record<string, string>
+  /** Who files and pays; reminders go to them. Employee id. */
+  filingOwnerId: string | null
+}
+
+/**
+ * Somebody confirming they have seen a pack version before it is used.
+ * Not approval of the law — the law does not need ours — but proof that
+ * a change reached a person before the first run under it.
+ */
+export interface PackAcknowledgement {
+  country: string
+  version: string
+  by: string
+  at: string
+}
+
+/** One deadline for one period, as the company has dealt with it. */
+export interface FilingRecord {
+  id: string
+  country: string
+  deadlineId: string
+  /** YYYY-MM for a monthly deadline, YYYY for an annual one. */
+  period: string
+  filed?: { on: string; ref: string; by: string }
+  paid?: { on: string; ref: string; by: string }
+  /** File name only: the prototype keeps no file bodies. */
+  receiptName?: string
+}
+
+/** Somebody telling Zelos a value in a pack looks wrong. */
+export interface PackIssueReport {
+  id: string
+  country: string
+  version: string
+  field: string
+  comment: string
+  by: string
+  at: string
+}
+
+/** How a country Zelos has no rules for gets paid. */
+export type CoverageChoice = "upload" | "customer_pack" | "request_coverage"
+
+export interface CoverageDecision {
+  country: string
+  choice: CoverageChoice
+  by: string
+  at: string
 }
 
 /* ── Components ──────────────────────────────────────────────────────── */

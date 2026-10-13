@@ -157,19 +157,11 @@ export function differences(
 /**
  * Who receives an allocation, in the country's terms. A company's own
  * choice is described by its role — the country's rules never name a
- * company's provider; providerFor() finds the one a pay group recorded.
+ * company's provider; the company records its own in its country setup.
  */
 export function remitteeName(remittee: Remittee): string {
   if (remittee.kind === "authority") return remittee.name
   return `the company's chosen ${remittee.role}`
-}
-
-/** The provider a pay group has recorded for an allocation, if any. */
-export function providerFor(
-  group: PayGroup,
-  allocationId: string
-): string | null {
-  return group.remittanceProviders[allocationId]?.trim() || null
 }
 
 /**

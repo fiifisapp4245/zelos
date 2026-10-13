@@ -52,7 +52,6 @@ const GH_GROUP: PayGroup = {
   paymentChannels: ["bank_transfer"],
   varianceThresholdPercent: 10,
   prorationMethod: "thirtieths",
-  remittanceProviders: {},
   calculationMode: "native",
 }
 const NG_GROUP: PayGroup = {
@@ -99,6 +98,8 @@ const RULE_PACK: CountryRulePack = {
   ],
   contributionAllocations: [],
   voluntarySchemes: [],
+  payees: [],
+  registrations: [],
   taxBands: [
     { upTo: 490, ratePercent: 0 },
     { upTo: null, ratePercent: 25 },
