@@ -37,7 +37,10 @@ import {
   coveredCountries,
   differences,
   packFor,
+  paidCountries,
   remitteeName,
+  taxTreatmentText,
+  treatmentFor,
   versionsFor,
 } from "@/lib/pay/rule-packs"
 import { useStore } from "@/lib/store"
@@ -491,6 +494,23 @@ function PayGroupSheet({
 
 /* ── 2. Pay components ───────────────────────────────────────────────── */
 
+/**
+ * Money in the currency a country is paid in: its pay group's, or its
+ * entity's where no group pays there yet. Rule packs hold amounts, not
+ * currencies, so the country's own currency is looked up rather than
+ * assumed.
+ */
+function countryMoney(
+  store: ReturnType<typeof useStore>,
+  country: string
+): (amount: number) => string {
+  const currency =
+    store.payGroups.find((g) => g.country === country)?.currency ??
+    store.legalEntities.find((e) => e.country === country)?.currency
+  return (amount) =>
+    currency ? money(amount, currency) : amount.toLocaleString("en-GB")
+}
+
 const CATEGORY_LABEL: Record<ComponentCategory, string> = {
   earning: "Earning",
   allowance: "Allowance",
@@ -508,11 +528,10 @@ export function PayComponentsPanel() {
   // Only countries somebody is actually paid in. A column per country
   // would grow with every pay group until the table stopped being
   // readable; one country at a time, chosen here, does not.
-  const countries = [
-    ...new Set(store.payGroups.map((g) => g.country).filter((c) => c !== "—")),
-  ].sort((a, b) => a.localeCompare(b))
+  const countries = paidCountries(store.payGroups)
   const [country, setCountry] = React.useState(countries[0] ?? "")
   const pack = packFor(store.countryRulePacks, country, TODAY_ISO)
+  const fmt = countryMoney(store, country)
 
   return (
     <div className="space-y-4">
@@ -555,7 +574,7 @@ export function PayComponentsPanel() {
                   "Category",
                   "Calculation",
                   "Recurrence",
-                  "Taxable",
+                  "Tax",
                   "Social security",
                   "",
                 ].map((h) => (
@@ -570,7 +589,15 @@ export function PayComponentsPanel() {
             </thead>
             <tbody className="divide-y">
               {store.payComponents.map((c) => {
-                const treatment = pack?.componentTreatments[c.id]
+                const treatment = treatmentFor(
+                  store.countryRulePacks,
+                  country,
+                  c.id,
+                  TODAY_ISO
+                )
+                const text = treatment
+                  ? taxTreatmentText(treatment, c.category, fmt)
+                  : null
                 return (
                   <tr
                     key={c.id}
@@ -589,13 +616,16 @@ export function PayComponentsPanel() {
                       {c.recurrence === "recurring" ? "Recurring" : "One-off"}
                     </td>
                     <td className="px-4">
-                      {treatment ? (
+                      {treatment && text ? (
                         <span>
-                          {treatment.taxable ? "Taxable" : "Not taxable"}
-                          {treatment.cap !== undefined && (
+                          {text.label}
+                          {text.detail && (
                             <span className="block text-xs text-muted-foreground">
-                              up to {treatment.cap} per period
+                              {text.detail}
                             </span>
+                          )}
+                          {treatment.toVerify && (
+                            <ToVerify against={treatment.toVerify} />
                           )}
                         </span>
                       ) : (
@@ -635,7 +665,9 @@ export function PayComponentsPanel() {
       <p className="text-xs text-muted-foreground">
         Treatment is read-only, and shown for {country || "the selected country"}
         . Nobody types a tax rate into Zelos — the country rule pack decides
-        what is taxable and what social security applies to. The same component
+        what is taxable and what social security applies to. A deduction is
+        pre-tax when it comes off pay before tax is worked out, and post-tax
+        when it comes out of pay already taxed. The same component
         can be taxed differently in another country, which is why this is a
         switch rather than a column.
       </p>
@@ -643,6 +675,7 @@ export function PayComponentsPanel() {
       {editing !== undefined && (
         <ComponentSheet
           component={editing}
+          country={country}
           onClose={() => setEditing(undefined)}
         />
       )}
@@ -660,16 +693,24 @@ const BLANK_COMPONENT: PayComponent = {
 
 function ComponentSheet({
   component,
+  country,
   onClose,
 }: {
   component: PayComponent | null
+  /** The country chosen on the table, whose treatment is shown. */
+  country: string
   onClose: () => void
 }) {
   const store = useStore()
   const [draft, setDraft] = React.useState<PayComponent>(
     component ?? BLANK_COMPONENT
   )
-  const treatment = store.countryRulePacks[0]?.componentTreatments[draft.id]
+  const treatment = treatmentFor(
+    store.countryRulePacks,
+    country,
+    draft.id,
+    TODAY_ISO
+  )
 
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
@@ -771,10 +812,17 @@ function ComponentSheet({
           </div>
 
           <div className="rounded-xl border bg-muted/40 p-3 text-sm">
-            <p className="font-medium">Country treatment</p>
+            <p className="font-medium">Treatment in {country}</p>
             <p className="mt-0.5 text-muted-foreground">
               {treatment
-                ? `${treatment.taxable ? "Taxable" : "Not taxable"} · social security ${treatment.socialSecurity ? "included" : "excluded"}${treatment.cap !== undefined ? ` · capped at ${treatment.cap}` : ""}`
+                ? (() => {
+                    const text = taxTreatmentText(
+                      treatment,
+                      draft.category,
+                      countryMoney(store, country)
+                    )
+                    return `${text.label}${text.detail ? ` (${text.detail.toLowerCase()})` : ""} · social security ${treatment.socialSecurity ? "included" : "excluded"}`
+                  })()
                 : "A new component is treated once the country rule pack covers it. Treatment is never entered by hand."}
             </p>
           </div>
@@ -920,8 +968,12 @@ function CountryPack({ country }: { country: string }) {
   // own tax actually wants to see.
   const bands = bandThresholds(pack)
 
+  const fmt = countryMoney(store, country)
   const caps = Object.entries(pack.componentTreatments).filter(
     ([, t]) => t.cap !== undefined
+  )
+  const preTax = Object.entries(pack.componentTreatments).filter(
+    ([, t]) => t.preTax
   )
 
   return (
@@ -1061,13 +1113,13 @@ function CountryPack({ country }: { country: string }) {
                   <tr key={i}>
                     <td className="tabular py-1.5 pr-4">
                       {b.to === null
-                        ? `Above ${money(b.from, "GHS")}`
-                        : `${money(b.from, "GHS")} – ${money(b.to, "GHS")}`}
+                        ? `Above ${fmt(b.from)}`
+                        : `${fmt(b.from)} – ${fmt(b.to)}`}
                     </td>
                     <td className="tabular py-1.5 pr-4 text-muted-foreground">
                       {b.to === null
                         ? "The rest"
-                        : money(b.to - b.from, "GHS")}
+                        : fmt(b.to - b.from)}
                     </td>
                     <td className="tabular py-1.5 pr-4">{b.ratePercent}%</td>
                   </tr>
@@ -1076,7 +1128,7 @@ function CountryPack({ country }: { country: string }) {
             </table>
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">
-            The first {money(bands[0]?.to ?? 0, "GHS")} is taxed at nothing.
+            The first {fmt(bands[0]?.to ?? 0)} is taxed at nothing.
             Bands apply to pay after the employee contribution is taken off.
           </p>
         </div>
@@ -1089,15 +1141,31 @@ function CountryPack({ country }: { country: string }) {
                 <Row
                   key={id}
                   label={componentName(id)}
-                  note={
-                    t.taxable
-                      ? "Taxed on anything above the cap"
-                      : "Outside taxable pay up to the cap"
-                  }
-                  value={`${money(t.cap!, "GHS")} per period`}
+                  note={taxTreatmentText(t, "allowance", fmt).label}
+                  value={fmt(t.cap!)}
                   toVerify={t.toVerify}
                 />
               ))}
+            </ul>
+          </div>
+        )}
+
+        {preTax.length > 0 && (
+          <div className="sm:col-span-2">
+            <RuleHeading>Deductions taken before tax</RuleHeading>
+            <ul className="space-y-1 text-sm">
+              {preTax.map(([id, t]) => {
+                const text = taxTreatmentText(t, "deduction", fmt)
+                return (
+                  <Row
+                    key={id}
+                    label={componentName(id)}
+                    note={text.detail}
+                    value={text.label}
+                    toVerify={t.toVerify}
+                  />
+                )
+              })}
             </ul>
           </div>
         )}

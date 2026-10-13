@@ -54,7 +54,7 @@ const GHANA_RULES: CountryRulePack = {
   componentTreatments: {
     "pc-base": { taxable: true, socialSecurity: true },
     "pc-transport": {
-      taxable: false,
+      taxable: true,
       socialSecurity: false,
       cap: 300,
       toVerify: VERIFY_CAP,
@@ -68,14 +68,23 @@ const GHANA_RULES: CountryRulePack = {
     },
     "pc-bonus": { taxable: true, socialSecurity: false },
     "pc-loan": { taxable: false, socialSecurity: false },
-    "pc-ssnit-employer": { taxable: false, socialSecurity: true },
-    "pc-tier2": { taxable: false, socialSecurity: true },
-    "pc-mobile-data": { taxable: false, socialSecurity: false },
+    "pc-mobile-data": {
+      taxable: false,
+      socialSecurity: false,
+      toVerify: "GRA guidance on whether it is a taxable allowance",
+    },
     "pc-on-call": { taxable: true, socialSecurity: false },
     "pc-responsibility": { taxable: true, socialSecurity: false },
     "pc-long-service": { taxable: true, socialSecurity: false },
     "pc-welfare": { taxable: false, socialSecurity: false },
-    "pc-tier3": { taxable: false, socialSecurity: false },
+    // Voluntary pension is relieved up to a limit; anything above it is
+    // still deducted, but out of pay that has already been taxed.
+    "pc-tier3": {
+      taxable: false,
+      socialSecurity: false,
+      preTax: { upToPercentOfBase: 16.5 },
+      toVerify: "the Tier 3 relief limit in GRA guidance",
+    },
   },
   // Who pays: 18.5% of basic between them. Where it goes is below, in
   // contributionAllocations — the two are different splits of one pot.
@@ -321,20 +330,6 @@ export const PAY_COMPONENTS: PayComponent[] = [
     name: "Staff loan repayment",
     category: "deduction",
     calculation: "fixed",
-    recurrence: "recurring",
-  },
-  {
-    id: "pc-ssnit-employer",
-    name: "SSNIT Tier 1 (employer)",
-    category: "employer_contribution",
-    calculation: "percent_of_base",
-    recurrence: "recurring",
-  },
-  {
-    id: "pc-tier2",
-    name: "Tier 2 (employer)",
-    category: "employer_contribution",
-    calculation: "percent_of_base",
     recurrence: "recurring",
   },
   // Company policy, carried over from the allowance and deduction lists

@@ -71,10 +71,21 @@ export interface PayGroup {
 /* ── Country rules ───────────────────────────────────────────────────── */
 
 export interface ComponentTreatment {
+  /**
+   * Whether the payment is taxed. With a cap, it is exempt up to the cap
+   * and taxed above it — a cap on something not taxed would mean nothing,
+   * and the pack is tested never to hold one.
+   */
   taxable: boolean
   socialSecurity: boolean
-  /** Treated up to this amount per period; the excess falls outside. */
+  /** Exempt up to this amount per period; the excess is taxed. */
   cap?: number
+  /**
+   * Deductions only: taken off taxable pay before tax is worked out,
+   * limited to this share of base where the relief is limited. Absent
+   * means the deduction comes out of pay already taxed.
+   */
+  preTax?: { upToPercentOfBase?: number }
   /** Set while the cap awaits confirmation: what to check it against. */
   toVerify?: string
 }

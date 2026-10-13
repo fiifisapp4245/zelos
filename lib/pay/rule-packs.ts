@@ -1,4 +1,10 @@
-import type { CountryRulePack, PayGroup, Remittee } from "./types"
+import type {
+  ComponentCategory,
+  ComponentTreatment,
+  CountryRulePack,
+  PayGroup,
+  Remittee,
+} from "./types"
 
 /**
  * Which rules were in force, and when.
@@ -182,4 +188,53 @@ export function allocationGap(pack: CountryRulePack): number {
     0
   )
   return Math.round((paid - sent) * 1000) / 1000
+}
+
+/** The countries somebody is paid in, read from the pay groups. */
+export function paidCountries(groups: PayGroup[]): string[] {
+  return [...new Set(groups.map((g) => g.country).filter((c) => c !== "—"))]
+    .sort((a, b) => a.localeCompare(b))
+}
+
+/**
+ * How a component is treated in a country on a date. Null where the
+ * country has no rules then, or its rules do not name the component.
+ */
+export function treatmentFor(
+  packs: CountryRulePack[],
+  country: string,
+  componentId: string,
+  onIso: string
+): ComponentTreatment | null {
+  return packFor(packs, country, onIso)?.componentTreatments[componentId] ?? null
+}
+
+/**
+ * How a component is taxed, in the words both Pay components and Country
+ * rules use — one function, so the two pages cannot describe the same
+ * rule differently. A deduction is described by when it comes off; any
+ * other component by whether it is taxed.
+ */
+export function taxTreatmentText(
+  treatment: ComponentTreatment,
+  category: ComponentCategory,
+  money: (amount: number) => string
+): { label: string; detail?: string } {
+  if (category === "deduction") {
+    if (!treatment.preTax) return { label: "Post-tax" }
+    const limit = treatment.preTax.upToPercentOfBase
+    return {
+      label: "Pre-tax",
+      detail:
+        limit === undefined
+          ? undefined
+          : `Up to ${limit}% of base; post-tax above`,
+    }
+  }
+  if (!treatment.taxable) return { label: "Not taxable" }
+  if (treatment.cap !== undefined)
+    return {
+      label: `Exempt up to ${money(treatment.cap)} per period, taxable above`,
+    }
+  return { label: "Taxable" }
 }

@@ -198,7 +198,12 @@ export function calculateLine(
       )
       .reduce((n, d) => n + d.amount, 0)
 
-    const taxable = Math.max(0, taxableOf(earnings, pack) - social)
+    const taxable = Math.max(
+      0,
+      taxableOf(earnings, pack) -
+        social -
+        preTaxRelief(deductions, version.baseAmount, pack)
+    )
     deductions.push({
       componentId: "pc-paye",
       label: "PAYE",
@@ -241,6 +246,36 @@ function taxableOf(earnings: LineItem[], pack: CountryRulePack | null) {
         : e.amount)
     )
   }, 0)
+}
+
+/**
+ * What the pre-tax deductions take off taxable pay: each component in
+ * full, or up to the share of base the country relieves — per component,
+ * so a one-off top-up beside the regular one does not double the limit.
+ * The deduction itself is still taken in full; only the relief is capped.
+ */
+function preTaxRelief(
+  deductions: LineItem[],
+  base: number,
+  pack: CountryRulePack
+) {
+  const byComponent = new Map<string, number>()
+  for (const d of deductions)
+    if (pack.componentTreatments[d.componentId]?.preTax)
+      byComponent.set(
+        d.componentId,
+        (byComponent.get(d.componentId) ?? 0) + d.amount
+      )
+
+  let relief = 0
+  for (const [id, amount] of byComponent) {
+    const limit = pack.componentTreatments[id].preTax!.upToPercentOfBase
+    relief += Math.min(
+      amount,
+      limit === undefined ? Infinity : (base * limit) / 100
+    )
+  }
+  return relief
 }
 
 /** One allocation's share of what was collected, and who receives it. */

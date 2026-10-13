@@ -5,10 +5,13 @@ import {
   coveredCountries,
   differences,
   packFor,
+  paidCountries,
+  taxTreatmentText,
+  treatmentFor,
   versionsFor,
 } from "./rule-packs"
 import { COUNTRY_RULE_PACKS, PAY_COMPONENTS } from "../data/pay"
-import type { CountryRulePack } from "./types"
+import type { CountryRulePack, PayGroup } from "./types"
 
 const base: CountryRulePack = {
   country: "Testland",
@@ -179,5 +182,141 @@ describe("what changed between versions", () => {
     expect(differences(before, after, name)).toEqual([
       { label: "Social security", before: "5%", after: "5.5%" },
     ])
+  })
+})
+
+describe("how a component's tax treatment is worded", () => {
+  const ghs = (n: number) => `GHS ${n}`
+
+  it("words a cap as exempt up to it and taxed above, with currency", () => {
+    expect(
+      taxTreatmentText(
+        { taxable: true, socialSecurity: false, cap: 300 },
+        "allowance",
+        ghs
+      ).label
+    ).toBe("Exempt up to GHS 300 per period, taxable above")
+  })
+
+  it("words a deduction by when it comes off, not whether it is taxed", () => {
+    expect(
+      taxTreatmentText(
+        { taxable: false, socialSecurity: false },
+        "deduction",
+        ghs
+      )
+    ).toEqual({ label: "Post-tax" })
+    expect(
+      taxTreatmentText(
+        {
+          taxable: false,
+          socialSecurity: false,
+          preTax: { upToPercentOfBase: 16.5 },
+        },
+        "deduction",
+        ghs
+      )
+    ).toEqual({
+      label: "Pre-tax",
+      detail: "Up to 16.5% of base; post-tax above",
+    })
+  })
+})
+
+describe("Ghana's component treatments", () => {
+  const ghana = packFor(COUNTRY_RULE_PACKS, "Ghana", "2026-09-30")!
+
+  it("never caps something it does not tax, which would mean nothing", () => {
+    for (const pack of COUNTRY_RULE_PACKS)
+      for (const [id, t] of Object.entries(pack.componentTreatments))
+        expect({ id, capOnUntaxed: t.cap !== undefined && !t.taxable }).toEqual(
+          { id, capOnUntaxed: false }
+        )
+  })
+
+  it("names only components the library holds", () => {
+    const library = new Set(PAY_COMPONENTS.map((c) => c.id))
+    for (const id of Object.keys(ghana.componentTreatments))
+      if (id !== "pc-base") expect(library).toContain(id)
+  })
+
+  it("keeps statutory contributions out of the component library", () => {
+    // They are the pack's to state and the engine's to work out. A
+    // component beside them is a second, editable answer to the same
+    // question — the thing F10 removed from settings.
+    for (const c of PAY_COMPONENTS)
+      expect(c.name).not.toMatch(/SSNIT|Tier [12]\b/)
+  })
+
+  it("relieves Tier 3 from tax up to a limit, and says to check it", () => {
+    const tier3 = ghana.componentTreatments["pc-tier3"]
+    expect(tier3.preTax?.upToPercentOfBase).toBe(16.5)
+    expect(tier3.toVerify).toBeTruthy()
+  })
+
+  it("marks mobile data's treatment for checking", () => {
+    expect(ghana.componentTreatments["pc-mobile-data"].toVerify).toBeTruthy()
+  })
+})
+
+describe("switching country on Pay components", () => {
+  // A second country with rules of its own, which the seed data does not
+  // have yet: the switch has to read it, not fall back to Ghana.
+  const testland: CountryRulePack = {
+    ...base,
+    country: "Testland",
+    componentTreatments: {
+      "pc-transport": { taxable: true, socialSecurity: true },
+    },
+  }
+  const packs = [...COUNTRY_RULE_PACKS, testland]
+  const group = (id: string, country: string): PayGroup => ({
+    id,
+    name: id,
+    entityId: "ent",
+    country,
+    currency: "GHS",
+    frequency: "monthly",
+    payDayRule: "",
+    paymentChannels: [],
+    varianceThresholdPercent: 10,
+    prorationMethod: "thirtieths",
+    remittanceProviders: {},
+    calculationMode: "native",
+  })
+
+  it("offers each country somebody is paid in, once, and no contractors", () => {
+    expect(
+      paidCountries([
+        group("a", "Testland"),
+        group("b", "Ghana"),
+        group("c", "Ghana"),
+        group("d", "—"),
+      ])
+    ).toEqual(["Ghana", "Testland"])
+  })
+
+  it("shows the chosen country's treatment, not the first pack's", () => {
+    const inGhana = treatmentFor(packs, "Ghana", "pc-transport", "2026-09-30")
+    const inTestland = treatmentFor(
+      packs,
+      "Testland",
+      "pc-transport",
+      "2026-09-30"
+    )
+    expect(inGhana?.cap).toBe(300)
+    expect(inTestland).toEqual({ taxable: true, socialSecurity: true })
+  })
+
+  it("has nothing to show for a component the country does not name", () => {
+    expect(
+      treatmentFor(packs, "Testland", "pc-fuel-card", "2026-09-30")
+    ).toBeNull()
+  })
+
+  it("has nothing to show for a country with no rules", () => {
+    expect(
+      treatmentFor(packs, "Nigeria", "pc-transport", "2026-09-30")
+    ).toBeNull()
   })
 })

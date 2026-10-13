@@ -638,3 +638,70 @@ describe("Ghana pension contributions: who pays, and where it goes", () => {
 function round2(n: number) {
   return Math.round(n * 100) / 100
 }
+
+describe("Ghana tax treatment of capped allowances and pre-tax deductions", () => {
+  const ghana = packFor(COUNTRY_RULE_PACKS, "Ghana", "2026-09-30")!
+  const components: PayComponent[] = [
+    ...COMPONENTS,
+    {
+      id: "pc-tier3",
+      name: "Tier 3 top-up",
+      category: "deduction",
+      calculation: "fixed",
+      recurrence: "recurring",
+    },
+  ]
+  const paye = (v: CompensationVersion) =>
+    calculateLine(v, ghana, [], [], PERIOD, context({ components }))
+      .deductions.find((d) => d.componentId === "pc-paye")!.amount
+  const at = (taxable: number) => taxOn(taxable, ghana)
+  const employee = (base: number) => round2((base * 5.5) / 100)
+
+  it("taxes transport above the cap, and only above it", () => {
+    const tax = paye(
+      version({
+        baseAmount: 5000,
+        components: [{ componentId: "pc-transport", amount: 450 }],
+      })
+    )
+    expect(tax).toBe(at(5000 - employee(5000) + 150))
+  })
+
+  it("takes Tier 3 off taxable pay, up to 16.5% of base", () => {
+    // 1,000 asked on a 5,000 basic: 825 is relieved, 175 is not.
+    const tax = paye(
+      version({
+        baseAmount: 5000,
+        components: [{ componentId: "pc-tier3", amount: 1000 }],
+      })
+    )
+    expect(tax).toBe(at(5000 - employee(5000) - 825))
+  })
+
+  it("still deducts the whole Tier 3 amount, relieved or not", () => {
+    const line = calculateLine(
+      version({
+        baseAmount: 5000,
+        components: [{ componentId: "pc-tier3", amount: 1000 }],
+      }),
+      ghana,
+      [],
+      [],
+      PERIOD,
+      context({ components })
+    )
+    expect(
+      line.deductions.find((d) => d.componentId === "pc-tier3")?.amount
+    ).toBe(1000)
+  })
+
+  it("leaves a loan repayment out of the tax sum: it is post-tax", () => {
+    const tax = paye(
+      version({
+        baseAmount: 5000,
+        components: [{ componentId: "pc-loan", amount: 1000 }],
+      })
+    )
+    expect(tax).toBe(at(5000 - employee(5000)))
+  })
+})
