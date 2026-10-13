@@ -36,7 +36,7 @@ function fingerprint(): Record<string, string[]> {
 
 describe("persisted state and its version", () => {
   it("is at the version that matches the shape recorded here", () => {
-    expect(STORAGE_VERSION).toBe(7)
+    expect(STORAGE_VERSION).toBe(8)
   })
 
   it("carries the fields the pay screens read", () => {
@@ -47,6 +47,8 @@ describe("persisted state and its version", () => {
     expect(shape.countryRulePacks).toContain("voluntarySchemes")
     expect(shape.payGroups).toContain("prorationMethod")
     expect(shape.countryRulePacks).toContain("employeeContributionRules")
+    expect(shape.countryRulePacks).toContain("contributionAllocations")
+    expect(shape.payGroups).toContain("remittanceProviders")
   })
 
   it("has not changed shape without the version changing", () => {

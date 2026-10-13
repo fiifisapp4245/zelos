@@ -85,17 +85,34 @@ describe("the rule pack carries what the tables used to show", () => {
   it("states the employee contribution the SSNIT table stated", () => {
     const employee = ghana.employeeContributionRules[0]
     expect(employee.percentOfBase).toBe(5.5)
-    expect(employee.remittedTo).toBe("SSNIT")
   })
 
-  it("states both employer tiers, and who receives each", () => {
-    const byId = Object.fromEntries(
-      ghana.employerContributionRules.map((r) => [r.id, r])
+  it("charges the employer 13% in all, not 13% plus Tier 2", () => {
+    const employer = ghana.employerContributionRules.reduce(
+      (n, r) => n + r.percentOfBase,
+      0
     )
-    expect(byId["ssnit-tier1"].percentOfBase).toBe(13)
-    expect(byId["ssnit-tier1"].remittedTo).toBe("SSNIT")
+    expect(employer).toBe(13)
+  })
+
+  it("sends the 18.5% to SSNIT and the Tier 2 trustee, 13.5 and 5", () => {
+    const byId = Object.fromEntries(
+      ghana.contributionAllocations.map((a) => [a.id, a])
+    )
+    expect(byId["tier1"].percentOfBase).toBe(13.5)
+    expect(byId["tier1"].remittedTo).toEqual({
+      kind: "authority",
+      name: "SSNIT",
+    })
     expect(byId["tier2"].percentOfBase).toBe(5)
-    expect(byId["tier2"].remittedTo).toBe("Petra Trust")
+  })
+
+  it("leaves the Tier 2 trustee to the company, not the country", () => {
+    const tier2 = ghana.contributionAllocations.find((a) => a.id === "tier2")!
+    expect(tier2.remittedTo.kind).toBe("company_choice")
+    // A trustee is one company's appointment; naming it in the country's
+    // rules would hand it to every company paying in Ghana.
+    expect(JSON.stringify(ghana)).not.toContain("Petra")
   })
 
   it("keeps Tier 3 as a scheme without a rate, because it is voluntary", () => {

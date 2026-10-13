@@ -57,6 +57,13 @@ export interface PayGroup {
   varianceThresholdPercent: number
   /** How a part-period is worked out for joiners and leavers. */
   prorationMethod: ProrationMethod
+  /**
+   * The provider this group remits to, for each of its country's
+   * allocations the company chooses for itself — allocation id → name.
+   * Ghana's Tier 2 trustee lives here, not in the country's rules,
+   * because each company appoints its own.
+   */
+  remittanceProviders: Record<string, string>
   calculationMode: CalculationMode
   contractorGroup?: boolean
 }
@@ -68,16 +75,21 @@ export interface ComponentTreatment {
   socialSecurity: boolean
   /** Treated up to this amount per period; the excess falls outside. */
   cap?: number
+  /** Set while the cap awaits confirmation: what to check it against. */
+  toVerify?: string
 }
 
-/** What the employee pays out of their own gross, by the country's rules. */
+/**
+ * What the employee pays out of their own gross, by the country's rules.
+ * Who pays, not where it goes — that is the pack's allocations.
+ */
 export interface EmployeeContributionRule {
   id: string
   name: string
   percentOfBase: number
-  /** The scheme or trustee the money goes to, for the remittance file. */
-  remittedTo: string
   note: string
+  /** Set while the figure awaits confirmation: what to check it against. */
+  toVerify?: string
 }
 
 /** A slice of taxable pay and the rate that applies to it. */
@@ -92,9 +104,31 @@ export interface EmployerContributionRule {
   name: string
   /** Percent of the base the employer pays on top of gross. */
   percentOfBase: number
-  /** The scheme or trustee the money goes to, for the remittance file. */
-  remittedTo: string
   note: string
+  toVerify?: string
+}
+
+/**
+ * Who receives an allocation: an authority the law names, or a provider
+ * each company appoints for itself and records on its pay group.
+ */
+export type Remittee =
+  | { kind: "authority"; name: string }
+  | { kind: "company_choice"; role: string }
+
+/**
+ * Where contribution money goes, as opposed to who pays it. The two do
+ * not line up: Ghana's employee 5.5% and employer 13% are one 18.5% pot,
+ * split 13.5% to SSNIT and 5% to the Tier 2 trustee. Reading the payer
+ * rules as destinations is how an employer ends up charged 13% + 5%.
+ */
+export interface ContributionAllocation {
+  id: string
+  name: string
+  percentOfBase: number
+  remittedTo: Remittee
+  note: string
+  toVerify?: string
 }
 
 /**
@@ -133,10 +167,18 @@ export interface CountryRulePack {
   componentTreatments: Record<string, ComponentTreatment>
   employerContributionRules: EmployerContributionRule[]
   employeeContributionRules: EmployeeContributionRule[]
+  /**
+   * Where the contributions above are sent. Together they add up to the
+   * employee and employer rates combined; empty where each payer's share
+   * goes to one place and there is nothing to split.
+   */
+  contributionAllocations: ContributionAllocation[]
   /** Recognised but optional. Nothing is deducted for these by default. */
   voluntarySchemes: VoluntaryScheme[]
   /** Applied in order to taxable pay, per pay period. */
   taxBands: TaxBand[]
+  /** Set while the bands await confirmation: what to check them against. */
+  taxBandsToVerify?: string
   statutoryReports: string[]
   filingDeadlines: FilingDeadline[]
   updates: RulePackUpdate[]

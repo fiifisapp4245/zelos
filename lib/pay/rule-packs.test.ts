@@ -7,7 +7,7 @@ import {
   packFor,
   versionsFor,
 } from "./rule-packs"
-import { COUNTRY_RULE_PACKS } from "../data/pay"
+import { COUNTRY_RULE_PACKS, PAY_COMPONENTS } from "../data/pay"
 import type { CountryRulePack } from "./types"
 
 const base: CountryRulePack = {
@@ -17,6 +17,7 @@ const base: CountryRulePack = {
   componentTreatments: {},
   employeeContributionRules: [],
   employerContributionRules: [],
+  contributionAllocations: [],
   voluntarySchemes: [],
   taxBands: [],
   statutoryReports: [],
@@ -124,11 +125,13 @@ describe("reading bands as thresholds", () => {
 })
 
 describe("what changed between versions", () => {
+  const name = (id: string) =>
+    PAY_COMPONENTS.find((c) => c.id === id)?.name ?? id
   const ghana2026 = packFor(COUNTRY_RULE_PACKS, "Ghana", "2026-09-30")!
   const ghana2025 = packFor(COUNTRY_RULE_PACKS, "Ghana", "2025-08-31")!
 
   it("reports the tax-free amount moving from 402 to 490", () => {
-    const moved = differences(ghana2025, ghana2026)
+    const moved = differences(ghana2025, ghana2026, name)
     expect(moved).toContainEqual({
       label: "Tax-free amount",
       before: "402",
@@ -137,12 +140,22 @@ describe("what changed between versions", () => {
   })
 
   it("reports the transport cap moving", () => {
-    const moved = differences(ghana2025, ghana2026)
-    expect(moved.some((m) => m.label.includes("pc-transport"))).toBe(true)
+    const moved = differences(ghana2025, ghana2026, name)
+    expect(moved).toContainEqual({
+      label: "Transport allowance cap",
+      before: "250",
+      after: "300",
+    })
+  })
+
+  it("names components as people know them, never by internal id", () => {
+    const moved = differences(ghana2025, ghana2026, name)
+    expect(moved.map((m) => m.label)).toContain("Fuel card cap")
+    expect(moved.some((m) => m.label.includes("pc-"))).toBe(false)
   })
 
   it("says nothing changed when nothing did", () => {
-    expect(differences(ghana2026, ghana2026)).toEqual([])
+    expect(differences(ghana2026, ghana2026, name)).toEqual([])
   })
 
   it("reports a contribution rate moving", () => {
@@ -153,7 +166,6 @@ describe("what changed between versions", () => {
           id: "ss",
           name: "Social security",
           percentOfBase: 5,
-          remittedTo: "The fund",
           note: "",
         },
       ],
@@ -164,7 +176,7 @@ describe("what changed between versions", () => {
         { ...before.employeeContributionRules[0], percentOfBase: 5.5 },
       ],
     }
-    expect(differences(before, after)).toEqual([
+    expect(differences(before, after, name)).toEqual([
       { label: "Social security", before: "5%", after: "5.5%" },
     ])
   })

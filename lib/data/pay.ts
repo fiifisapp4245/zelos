@@ -40,18 +40,32 @@ export const LEGAL_ENTITIES: LegalEntity[] = [
  * PLACEHOLDER RATES. The percentages and thresholds below stand in for the
  * real ones pending legal validation with a Ghanaian payroll practitioner.
  * They live here as data precisely so that correcting them is an edit to a
- * fixture and not a change to any calculation. Nothing in the UI describes
- * them as provisional; that is a note for whoever maintains this file.
+ * fixture and not a change to any calculation. Each figure still awaiting
+ * that check carries a toVerify note, which Country rules shows beside it;
+ * remove the note once the figure is confirmed.
  */
+const VERIFY_SSNIT = "current SSNIT guidance"
+const VERIFY_GRA = "GRA's published figures for 2026"
+const VERIFY_CAP = "GRA guidance; it may be company policy, not law"
 const GHANA_RULES: CountryRulePack = {
   country: "Ghana",
   version: "2026.1",
   effectiveFrom: "2026-01-01",
   componentTreatments: {
     "pc-base": { taxable: true, socialSecurity: true },
-    "pc-transport": { taxable: false, socialSecurity: false, cap: 300 },
+    "pc-transport": {
+      taxable: false,
+      socialSecurity: false,
+      cap: 300,
+      toVerify: VERIFY_CAP,
+    },
     "pc-housing": { taxable: true, socialSecurity: false },
-    "pc-fuel-card": { taxable: true, socialSecurity: false, cap: 500 },
+    "pc-fuel-card": {
+      taxable: true,
+      socialSecurity: false,
+      cap: 500,
+      toVerify: VERIFY_CAP,
+    },
     "pc-bonus": { taxable: true, socialSecurity: false },
     "pc-loan": { taxable: false, socialSecurity: false },
     "pc-ssnit-employer": { taxable: false, socialSecurity: true },
@@ -63,13 +77,15 @@ const GHANA_RULES: CountryRulePack = {
     "pc-welfare": { taxable: false, socialSecurity: false },
     "pc-tier3": { taxable: false, socialSecurity: false },
   },
+  // Who pays: 18.5% of basic between them. Where it goes is below, in
+  // contributionAllocations — the two are different splits of one pot.
   employeeContributionRules: [
     {
       id: "ssnit-employee",
-      name: "SSNIT Tier 1 & 2 (employee)",
+      name: "Pension contribution (employee)",
       percentOfBase: 5.5,
-      remittedTo: "SSNIT",
       note: "Deducted from gross before PAYE is worked out.",
+      toVerify: VERIFY_SSNIT,
     },
   ],
   voluntarySchemes: [
@@ -82,6 +98,7 @@ const GHANA_RULES: CountryRulePack = {
   ],
   // Monthly bands, applied in order to taxable pay after the social
   // security deduction. Placeholder figures, as above.
+  taxBandsToVerify: VERIFY_GRA,
   taxBands: [
     { upTo: 490, ratePercent: 0 },
     { upTo: 110, ratePercent: 5 },
@@ -93,18 +110,29 @@ const GHANA_RULES: CountryRulePack = {
   ],
   employerContributionRules: [
     {
-      id: "ssnit-tier1",
-      name: "SSNIT Tier 1",
+      id: "ssnit-employer",
+      name: "Pension contribution (employer)",
       percentOfBase: 13,
-      remittedTo: "SSNIT",
-      note: "Employer share of the first-tier social security contribution.",
+      note: "Paid on top of gross. The employer's whole share — Tier 2 is not on top of it.",
+      toVerify: VERIFY_SSNIT,
+    },
+  ],
+  contributionAllocations: [
+    {
+      id: "tier1",
+      name: "Tier 1 (SSNIT)",
+      percentOfBase: 13.5,
+      remittedTo: { kind: "authority", name: "SSNIT" },
+      note: "The basic national scheme. SSNIT passes 2.5 points of it to the National Health Insurance Fund.",
+      toVerify: VERIFY_SSNIT,
     },
     {
       id: "tier2",
       name: "Tier 2 occupational scheme",
       percentOfBase: 5,
-      remittedTo: "Petra Trust",
-      note: "Paid to the employee's chosen trustee.",
+      remittedTo: { kind: "company_choice", role: "Tier 2 trustee" },
+      note: "Privately managed. Each company appoints its own trustee.",
+      toVerify: VERIFY_SSNIT,
     },
   ],
   statutoryReports: [
@@ -164,9 +192,16 @@ const GHANA_RULES_2025: CountryRulePack = {
   effectiveFrom: "2025-01-01",
   componentTreatments: {
     ...GHANA_RULES.componentTreatments,
-    "pc-transport": { taxable: false, socialSecurity: false, cap: 250 },
-    "pc-fuel-card": { taxable: true, socialSecurity: false, cap: 400 },
+    "pc-transport": {
+      ...GHANA_RULES.componentTreatments["pc-transport"],
+      cap: 250,
+    },
+    "pc-fuel-card": {
+      ...GHANA_RULES.componentTreatments["pc-fuel-card"],
+      cap: 400,
+    },
   },
+  taxBandsToVerify: "GRA's published figures for 2025",
   taxBands: [
     { upTo: 402, ratePercent: 0 },
     { upTo: 110, ratePercent: 5 },
@@ -221,6 +256,7 @@ export const PAY_GROUPS: PayGroup[] = [
     paymentChannels: ["bank_transfer", "mobile_money"],
     varianceThresholdPercent: 10,
     prorationMethod: "thirtieths",
+    remittanceProviders: { tier2: "Petra Trust" },
   }),
   group({
     id: "pg-ng-monthly",
@@ -233,6 +269,7 @@ export const PAY_GROUPS: PayGroup[] = [
     paymentChannels: ["bank_transfer"],
     varianceThresholdPercent: 12,
     prorationMethod: "calendar_days",
+    remittanceProviders: {},
   }),
   group({
     id: "pg-contractors",
@@ -245,6 +282,7 @@ export const PAY_GROUPS: PayGroup[] = [
     paymentChannels: ["international_transfer"],
     varianceThresholdPercent: 20,
     prorationMethod: "calendar_days",
+    remittanceProviders: {},
     contractorGroup: true,
   }),
 ]

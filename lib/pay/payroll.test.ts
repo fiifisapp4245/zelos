@@ -8,6 +8,7 @@ import {
   lineFromExternal,
   marginalRate,
   readiness,
+  remittancesFor,
   runTotals,
   taxOn,
   totalDeductions,
@@ -16,6 +17,8 @@ import {
   type LineContext,
   type ReadinessSource,
 } from "./payroll"
+import { COUNTRY_RULE_PACKS } from "../data/pay"
+import { allocationGap, packFor } from "./rule-packs"
 import type {
   CompensationVersion,
   CountryRulePack,
@@ -38,7 +41,6 @@ const PACK: CountryRulePack = {
       id: "ssnit-employee",
       name: "SSNIT (employee)",
       percentOfBase: 5.5,
-      remittedTo: "SSNIT",
       note: "",
     },
   ],
@@ -47,10 +49,10 @@ const PACK: CountryRulePack = {
       id: "ssnit-employer",
       name: "SSNIT (employer)",
       percentOfBase: 13,
-      remittedTo: "SSNIT",
       note: "",
     },
   ],
+  contributionAllocations: [],
   voluntarySchemes: [],
   taxBands: [
     { upTo: 500, ratePercent: 0 },
@@ -577,3 +579,62 @@ describe("validateExternalImport", () => {
     expect(errors.some((e) => e.employeeId === "akos")).toBe(true)
   })
 })
+
+describe("Ghana pension contributions: who pays, and where it goes", () => {
+  // Values to verify against current SSNIT guidance; the arithmetic is
+  // what this pins, so a corrected rate changes the figures, not the test.
+  const ghana = packFor(COUNTRY_RULE_PACKS, "Ghana", "2026-09-30")!
+  const line = calculateLine(
+    version({ baseAmount: 5000 }),
+    ghana,
+    [],
+    [],
+    PERIOD,
+    context()
+  )
+  const sum = (items: { amount: number }[]) =>
+    items.reduce((n, i) => n + i.amount, 0)
+
+  it("takes 275 from the employee on a basic of 5,000", () => {
+    const employee = line.deductions.filter((d) =>
+      ghana.employeeContributionRules.some((r) => r.id === d.componentId)
+    )
+    expect(sum(employee)).toBe(275)
+  })
+
+  it("charges the employer 650, not 650 plus Tier 2", () => {
+    expect(sum(line.employerContributions)).toBe(650)
+  })
+
+  it("sends 675 to Tier 1 and 250 to Tier 2", () => {
+    expect(remittancesFor(5000, ghana)).toEqual([
+      { allocationId: "tier1", name: "Tier 1 (SSNIT)", amount: 675 },
+      {
+        allocationId: "tier2",
+        name: "Tier 2 occupational scheme",
+        amount: 250,
+      },
+    ])
+  })
+
+  it("sends exactly what was collected, even where a pesewa rounds", () => {
+    const base = 3333.33
+    const collected = round2(
+      round2((base * 5.5) / 100) + round2((base * 13) / 100)
+    )
+    expect(round2(sum(remittancesFor(base, ghana)))).toBe(collected)
+  })
+
+  it("holds both Ghana versions to a split that adds up", () => {
+    for (const pack of COUNTRY_RULE_PACKS.filter((p) => p.country === "Ghana"))
+      expect(allocationGap(pack)).toBe(0)
+  })
+
+  it("has nothing to split where the pack names no allocations", () => {
+    expect(remittancesFor(5000, PACK)).toEqual([])
+  })
+})
+
+function round2(n: number) {
+  return Math.round(n * 100) / 100
+}

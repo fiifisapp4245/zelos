@@ -1,4 +1,4 @@
-import type { CountryRulePack } from "./types"
+import type { CountryRulePack, PayGroup, Remittee } from "./types"
 
 /**
  * Which rules were in force, and when.
@@ -84,7 +84,9 @@ export interface PackDifference {
 
 export function differences(
   previous: CountryRulePack,
-  current: CountryRulePack
+  current: CountryRulePack,
+  /** A component's display name; packs key treatments by internal id. */
+  componentName: (id: string) => string
 ): PackDifference[] {
   const out: PackDifference[] = []
 
@@ -112,6 +114,18 @@ export function differences(
       })
   }
 
+  for (const allocation of current.contributionAllocations) {
+    const was = previous.contributionAllocations.find(
+      (a) => a.id === allocation.id
+    )
+    if (was && was.percentOfBase !== allocation.percentOfBase)
+      out.push({
+        label: allocation.name,
+        before: `${was.percentOfBase}%`,
+        after: `${allocation.percentOfBase}%`,
+      })
+  }
+
   const freeBefore = previous.taxBands.find((b) => b.ratePercent === 0)?.upTo
   const freeAfter = current.taxBands.find((b) => b.ratePercent === 0)?.upTo
   if (freeBefore !== freeAfter && freeBefore != null && freeAfter != null)
@@ -125,11 +139,47 @@ export function differences(
     const was = previous.componentTreatments[id]
     if (was && was.cap !== treatment.cap)
       out.push({
-        label: `${id} cap`,
+        label: `${componentName(id)} cap`,
         before: was.cap === undefined ? "none" : String(was.cap),
         after: treatment.cap === undefined ? "none" : String(treatment.cap),
       })
   }
 
   return out
+}
+
+/**
+ * Who receives an allocation, in the country's terms. A company's own
+ * choice is described by its role — the country's rules never name a
+ * company's provider; providerFor() finds the one a pay group recorded.
+ */
+export function remitteeName(remittee: Remittee): string {
+  if (remittee.kind === "authority") return remittee.name
+  return `the company's chosen ${remittee.role}`
+}
+
+/** The provider a pay group has recorded for an allocation, if any. */
+export function providerFor(
+  group: PayGroup,
+  allocationId: string
+): string | null {
+  return group.remittanceProviders[allocationId]?.trim() || null
+}
+
+/**
+ * The points between who pays and where it goes. Zero when the pack is
+ * consistent; anything else means money is collected that nobody is
+ * sent, or sent that nobody paid.
+ */
+export function allocationGap(pack: CountryRulePack): number {
+  if (pack.contributionAllocations.length === 0) return 0
+  const paid = [
+    ...pack.employeeContributionRules,
+    ...pack.employerContributionRules,
+  ].reduce((n, r) => n + r.percentOfBase, 0)
+  const sent = pack.contributionAllocations.reduce(
+    (n, a) => n + a.percentOfBase,
+    0
+  )
+  return Math.round((paid - sent) * 1000) / 1000
 }

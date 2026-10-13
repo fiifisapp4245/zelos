@@ -243,6 +243,44 @@ function taxableOf(earnings: LineItem[], pack: CountryRulePack | null) {
   }, 0)
 }
 
+/** One allocation's share of what was collected, and who receives it. */
+export interface Remittance {
+  allocationId: string
+  name: string
+  amount: number
+}
+
+/**
+ * Splits what the employee and employer paid between the places the law
+ * sends it. Worked from the amounts actually collected, not the base
+ * again, so the remittances always add up to the money taken: the last
+ * allocation absorbs the rounding, as a loan's last installment does.
+ *
+ * Empty where the pack has nothing to split.
+ */
+export function remittancesFor(
+  socialBase: number,
+  pack: CountryRulePack
+): Remittance[] {
+  const allocations = pack.contributionAllocations
+  if (allocations.length === 0) return []
+
+  const collected = [
+    ...pack.employeeContributionRules,
+    ...pack.employerContributionRules,
+  ].reduce((n, r) => n + round((socialBase * r.percentOfBase) / 100), 0)
+
+  let allocated = 0
+  return allocations.map((a, i) => {
+    const amount =
+      i === allocations.length - 1
+        ? round(collected - allocated)
+        : round((socialBase * a.percentOfBase) / 100)
+    allocated += amount
+    return { allocationId: a.id, name: a.name, amount }
+  })
+}
+
 export function totalDeductions(line: PayrollLine) {
   return round(line.deductions.reduce((n, d) => n + d.amount, 0))
 }

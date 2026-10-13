@@ -240,7 +240,7 @@ const STORAGE_KEY = "zelos-hr-session"
  * this week's types is how you get a crash three screens away from the
  * change that caused it.
  */
-export const STORAGE_VERSION = 7
+export const STORAGE_VERSION = 8
 
 /**
  * Keeps only the restored slices that still look like the ones we seed.

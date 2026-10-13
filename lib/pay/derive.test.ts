@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
 
+import { COUNTRY_RULE_PACKS } from "../data/pay"
+import { packFor } from "./rule-packs"
 import {
   applyChange,
   calculationModeFor,
@@ -50,6 +52,7 @@ const GH_GROUP: PayGroup = {
   paymentChannels: ["bank_transfer"],
   varianceThresholdPercent: 10,
   prorationMethod: "thirtieths",
+  remittanceProviders: {},
   calculationMode: "native",
 }
 const NG_GROUP: PayGroup = {
@@ -83,7 +86,6 @@ const RULE_PACK: CountryRulePack = {
       id: "ssnit",
       name: "SSNIT employer",
       percentOfBase: 13,
-      remittedTo: "SSNIT",
       note: "",
     },
   ],
@@ -92,10 +94,10 @@ const RULE_PACK: CountryRulePack = {
       id: "ssnit-employee",
       name: "SSNIT employee",
       percentOfBase: 5.5,
-      remittedTo: "SSNIT",
       note: "",
     },
   ],
+  contributionAllocations: [],
   voluntarySchemes: [],
   taxBands: [
     { upTo: 490, ratePercent: 0 },
@@ -316,6 +318,12 @@ describe("employerCost", () => {
     expect(c.monthly.employerContributions).toBe(1040)
     expect(c.monthly.total).toBe(9340)
     expect(c.annual.total).toBe(112080)
+  })
+
+  it("costs Ghana's employer share at 13% of basic, with Tier 2 inside it", () => {
+    const ghana = packFor(COUNTRY_RULE_PACKS, "Ghana", "2026-09-30")
+    const c = employerCost(version({ baseAmount: 5000 }), ghana, COMPONENTS)
+    expect(c.monthly.employerContributions).toBe(650)
   })
 
   it("leaves the employee's own deductions out of the cost", () => {

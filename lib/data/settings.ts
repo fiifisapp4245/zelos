@@ -209,7 +209,7 @@ export const SETTINGS: SettingCategory[] = [
         slug: "statutory-settings",
         label: "Country rules",
         blurb:
-          "SSNIT Tier 1 and 2 rates, Tier 3 handling and the PAYE bands applied at disbursement.",
+          "Statutory contributions, tax bands and filing rules for each country you pay in.",
       },
       {
         slug: "pay-schedule",

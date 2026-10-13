@@ -149,6 +149,7 @@ exports[`persisted state and its version > has not changed shape without the ver
   ],
   "countryRulePacks": [
     "componentTreatments",
+    "contributionAllocations",
     "country",
     "effectiveFrom",
     "employeeContributionRules",
@@ -156,6 +157,7 @@ exports[`persisted state and its version > has not changed shape without the ver
     "filingDeadlines",
     "statutoryReports",
     "taxBands",
+    "taxBandsToVerify",
     "updates",
     "version",
     "voluntarySchemes",
@@ -349,6 +351,7 @@ exports[`persisted state and its version > has not changed shape without the ver
     "payDayRule",
     "paymentChannels",
     "prorationMethod",
+    "remittanceProviders",
     "varianceThresholdPercent",
   ],
   "payPeriods": [
