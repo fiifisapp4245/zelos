@@ -33,6 +33,7 @@ import { CountryLabel } from "@/components/pay/money"
 import { ModeBadge, RUN_STATUS_LABEL, RunStatusPill } from "./status"
 import { usePayroll } from "./use-payroll"
 import { useStore } from "@/lib/store"
+import { cn } from "@/lib/utils"
 import { FREQUENCY_LABEL } from "@/lib/pay/derive"
 import type { PayrollRun, RunStatus } from "@/lib/pay/types"
 import { TODAY_ISO, formatDate, fullName } from "@/lib/format"
@@ -190,7 +191,7 @@ export function RunsTab() {
                 />
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[980px] text-sm">
                     <caption className="sr-only">
                       Payroll runs. Each row opens the run.
                     </caption>
@@ -210,7 +211,10 @@ export function RunsTab() {
                           <th
                             key={h}
                             scope="col"
-                            className="px-4 py-2.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase first:pl-5 last:pr-5"
+                            className={cn(
+                              "px-4 py-2.5 text-[11px] font-medium tracking-wide whitespace-nowrap text-muted-foreground uppercase first:pl-5 last:pr-5",
+                              h === "" && "sticky-actions"
+                            )}
                           >
                             {h}
                           </th>
@@ -268,18 +272,18 @@ export function RunsTab() {
                             <td className="px-4 text-muted-foreground">
                               {group && FREQUENCY_LABEL[group.frequency]}
                             </td>
-                            <td className="tabular px-4 text-muted-foreground">
+                            <td className="tabular px-4 whitespace-nowrap text-muted-foreground">
                               {formatDate(run.periodStart)} –{" "}
                               {formatDate(run.periodEnd)}
                             </td>
-                            <td className="tabular px-4">
+                            <td className="tabular px-4 whitespace-nowrap">
                               {formatDate(run.payDate)}
                             </td>
                             <td className="tabular px-4">{headcount}</td>
                             <td className="px-4">
                               <RunStatusPill status={run.status} />
                             </td>
-                            <td className="py-3 pr-5 text-right">
+                            <td className="sticky-actions py-3 pr-5 pl-4 text-right">
                               <Button
                                 variant={action.mine ? "default" : "outline"}
                                 size="sm"

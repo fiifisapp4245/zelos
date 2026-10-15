@@ -107,6 +107,7 @@ import type {
 } from "./pay/types"
 import { applyDecision } from "./approvals/selectors"
 import { applyChange } from "./pay/derive"
+import { periodLabel } from "./pay/compliance"
 import type { ApprovalItem, DecisionAction } from "./approvals/types"
 import type {
   Alert,
@@ -259,7 +260,7 @@ const STORAGE_KEY = "zelos-hr-session"
  * this week's types is how you get a crash three screens away from the
  * change that caused it.
  */
-export const STORAGE_VERSION = 10
+export const STORAGE_VERSION = 11
 
 /**
  * Keeps only the restored slices that still look like the ones we seed.
@@ -267,14 +268,19 @@ export const STORAGE_VERSION = 10
  * Bumping the version above is the intended way to retire old data, and
  * it is one line somebody will one day forget — which white-screens the
  * whole app several screens from the change that caused it. So a slice
- * whose records are missing a field the seeded records carry is dropped
- * in favour of the seed, rather than being spread over types that no
- * longer describe it.
+ * whose records are missing a field every seeded record carries is
+ * dropped in favour of the seed, rather than being spread over types
+ * that no longer describe it.
+ *
+ * Every seeded record, not the first: a field only some of them carry is
+ * optional. Reading the first alone made an audit entry without a field,
+ * or a remittance paid but never filed, look like stale data — and a
+ * refresh quietly discarded the whole log.
  *
  * Losing a session's edits is a small, visible cost. Loading a page that
  * cannot render is not.
  */
-function reconcile(saved: State): Partial<State> {
+export function reconcile(saved: State): Partial<State> {
   const kept: Record<string, unknown> = {}
 
   for (const [key, savedValue] of Object.entries(saved)) {
@@ -295,7 +301,9 @@ function reconcile(saved: State): Partial<State> {
       continue
     }
 
-    const expected = Object.keys(sample as object)
+    const expected = Object.keys(sample as object).filter((field) =>
+      seeded.every((record) => field in (record as object))
+    )
     const intact = savedValue.every(
       (record) =>
         record &&
@@ -415,9 +423,7 @@ interface StoreValue extends State {
     record: Pick<FilingRecord, "country" | "deadlineId" | "period"> &
       Partial<Pick<FilingRecord, "filed" | "paid" | "receiptName">>
   ) => void
-  reportPackIssue: (
-    report: Omit<PackIssueReport, "id" | "by" | "at">
-  ) => void
+  reportPackIssue: (report: Omit<PackIssueReport, "id" | "by" | "at">) => void
   chooseCoverage: (country: string, choice: CoverageChoice) => void
   saveApprovalSettings: (patch: Partial<ApprovalSettings>) => void
 
@@ -1509,9 +1515,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           : patch.filed
             ? `Marked filed (${patch.filed.ref})`
             : `Attached receipt ${patch.receiptName ?? ""}`.trim()
+        // Named as the screen names it, not by id: an audit line reads
+        // "Ghana PAYE monthly return, Aug 2026".
+        const deadline = state.countryRulePacks
+          .flatMap((p) => p.filingDeadlines)
+          .find((d) => d.id === patch.deadlineId)
         log({
           employeeId: null,
-          action: `${what}: ${patch.country} ${patch.deadlineId}, ${patch.period}`,
+          action: `${what}: ${patch.country} ${deadline?.name ?? patch.deadlineId}, ${periodLabel(patch.period)}`,
         })
       },
 
@@ -1643,6 +1654,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                       by: actorId,
                       action: "Adjustment added",
                       note: draft.note,
+                      employeeId: draft.employeeId,
                     },
                   ],
                 }

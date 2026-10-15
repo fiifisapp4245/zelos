@@ -31,6 +31,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Amount, RevealProvider, RevealToggle } from "@/components/pay/money"
 import {
   FLAG_LABEL,
+  lineActivity,
   totalDeductions,
   totalEmployerContributions,
 } from "@/lib/pay/payroll"
@@ -190,7 +191,7 @@ export function LineSheet({
                 Activity
               </h3>
               <ol className="space-y-1.5 border-l pl-3 text-xs">
-                {run.events.map((e, i) => (
+                {lineActivity(run, line.employeeId).map((e, i) => (
                   <li key={i}>
                     <span className="font-medium">{e.action}</span> ·{" "}
                     {fullName(store.employeeById(e.by))} ·{" "}

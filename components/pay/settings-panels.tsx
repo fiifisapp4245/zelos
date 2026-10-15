@@ -39,6 +39,7 @@ import {
   treatmentFor,
 } from "@/lib/pay/rule-packs"
 import { useStore } from "@/lib/store"
+import { cn } from "@/lib/utils"
 import {
   CALCULATION_MODE_COPY,
   FREQUENCY_LABEL,
@@ -500,7 +501,7 @@ export function PayComponentsPanel() {
         }
       >
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="border-b bg-muted/40 text-left">
                 {[
@@ -514,7 +515,10 @@ export function PayComponentsPanel() {
                 ].map((h) => (
                   <th
                     key={h}
-                    className="px-4 py-2.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase first:pl-5 last:pr-5"
+                    className={cn(
+                      "px-4 py-2.5 text-[11px] font-medium tracking-wide whitespace-nowrap text-muted-foreground uppercase first:pl-5 last:pr-5",
+                      h === "" && "sticky-actions"
+                    )}
                   >
                     {h}
                   </th>
@@ -563,10 +567,8 @@ export function PayComponentsPanel() {
                           )}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">
-                          {pack
-                            ? "Not in the pack"
-                            : `No rules for ${country}`}
+                        <span className="whitespace-nowrap text-muted-foreground">
+                          {pack ? "Not in the pack" : `No rules for ${country}`}
                         </span>
                       )}
                     </td>
@@ -577,7 +579,7 @@ export function PayComponentsPanel() {
                           : "Excluded"
                         : "—"}
                     </td>
-                    <td className="py-3 pr-5 text-right">
+                    <td className="sticky-actions py-3 pr-5 pl-2 text-right">
                       <RowActions
                         label={`Actions for ${c.name}`}
                         actions={[
@@ -597,13 +599,13 @@ export function PayComponentsPanel() {
       </Panel>
 
       <p className="text-xs text-muted-foreground">
-        Treatment is read-only, and shown for {country || "the selected country"}
-        . Nobody types a tax rate into Zelos — the country rule pack decides
-        what is taxable and what social security applies to. A deduction is
-        pre-tax when it comes off pay before tax is worked out, and post-tax
-        when it comes out of pay already taxed. The same component
-        can be taxed differently in another country, which is why this is a
-        switch rather than a column.
+        Treatment is read-only, and shown for{" "}
+        {country || "the selected country"}. Nobody types a tax rate into Zelos
+        — the country rule pack decides what is taxable and what social security
+        applies to. A deduction is pre-tax when it comes off pay before tax is
+        worked out, and post-tax when it comes out of pay already taxed. The
+        same component can be taxed differently in another country, which is why
+        this is a switch rather than a column.
       </p>
 
       {editing !== undefined && (

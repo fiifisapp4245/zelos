@@ -1,6 +1,7 @@
 import { addDays } from "../time"
 import { currentVersion } from "./derive"
-import { calculateLine, remittancesFor } from "./payroll"
+import { previewLine } from "./calculator"
+import { remittancesFor } from "./payroll"
 import { packFor, versionsFor } from "./rule-packs"
 import type {
   CompensationVersion,
@@ -83,18 +84,11 @@ export function packImpact(input: {
   components: PayComponent[]
 }): GroupImpact[] {
   const { next, packs, groups, versions, components } = input
-  const previous = packFor(
-    packs,
-    next.country,
-    addDays(next.effectiveFrom, -1)
-  )
+  const previous = packFor(packs, next.country, addDays(next.effectiveFrom, -1))
   const on = next.effectiveFrom
-  const period = { start: on, end: on }
 
   return groups
-    .filter(
-      (g) => g.country === next.country && g.calculationMode === "native"
-    )
+    .filter((g) => g.country === next.country && g.calculationMode === "native")
     .map((group) => {
       const people = [...new Set(versions.map((v) => v.employeeId))]
         .map((id) => currentVersion(versions, id, on))
@@ -103,14 +97,10 @@ export function packImpact(input: {
             v !== null && v.payGroupId === group.id
         )
 
+      // The calculator's own entry point, so this preview and Test a
+      // calculation are the same arithmetic by construction.
       const line = (v: CompensationVersion, pack: CountryRulePack | null) =>
-        calculateLine(v, pack, [], [], period, {
-          runId: "impact",
-          components,
-          previousNet: null,
-          paymentChannel: "bank_transfer",
-          paymentDestinationMasked: null,
-        })
+        previewLine(v, pack, components)
 
       const before = emptyTotals()
       const after = emptyTotals()
@@ -232,7 +222,9 @@ export function complianceCalendar(input: {
       ) ?? null
     const status = statusOf(deadline, record, dueOn, todayIso)
     const done =
-      deadline.kind === "return" ? Boolean(record?.filed) : Boolean(record?.paid)
+      deadline.kind === "return"
+        ? Boolean(record?.filed)
+        : Boolean(record?.paid)
     const remindOn = addDays(dueOn, -REMIND_DAYS_BEFORE)
     return {
       key: `${deadline.id}:${period}`,
@@ -265,6 +257,17 @@ export function statusOf(
   if (todayIso > dueOn) return "overdue"
   if (record?.filed) return "filed"
   return "due"
+}
+
+/** "Aug 2026" for a monthly period, "Year 2025" for an annual one. */
+export function periodLabel(period: string) {
+  if (period.length === 4) return `Year ${period}`
+  const [y, m] = period.split("-").map(Number)
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-GB", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  })
 }
 
 function shiftMonth(yyyyMm: string, by: number) {

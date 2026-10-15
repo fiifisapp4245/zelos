@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { INITIAL, STORAGE_VERSION } from "./store"
+import { INITIAL, STORAGE_VERSION, reconcile } from "./store"
 
 /**
  * The persisted shape, pinned to the version that describes it.
@@ -36,7 +36,7 @@ function fingerprint(): Record<string, string[]> {
 
 describe("persisted state and its version", () => {
   it("is at the version that matches the shape recorded here", () => {
-    expect(STORAGE_VERSION).toBe(10)
+    expect(STORAGE_VERSION).toBe(11)
   })
 
   it("carries the fields the pay screens read", () => {
@@ -55,5 +55,50 @@ describe("persisted state and its version", () => {
   it("has not changed shape without the version changing", () => {
     // Update both together, in one commit, or not at all.
     expect(fingerprint()).toMatchSnapshot()
+  })
+})
+
+describe("restoring a session", () => {
+  it("keeps records that leave out a field only some seeded records carry", () => {
+    const saved = {
+      ...INITIAL,
+      // A company-level entry: no employee field, no before or after.
+      auditLog: [
+        {
+          id: "a-new",
+          employeeId: null,
+          actorId: "fiifi",
+          action: "Acknowledged Ghana rule pack 2027.1",
+          at: "2026-09-18T10:00:00",
+        },
+        ...INITIAL.auditLog,
+      ],
+      // A remittance marked paid that was never filed.
+      filingRecords: [
+        ...INITIAL.filingRecords,
+        {
+          id: "fr-new",
+          country: "Ghana",
+          deadlineId: "tier2-remittance",
+          period: "2026-08",
+          paid: { on: "2026-09-18", ref: "PETRA-1", by: "maame" },
+        },
+      ],
+    }
+    const kept = reconcile(saved)
+    expect(kept.auditLog?.[0].id).toBe("a-new")
+    expect(kept.filingRecords?.some((f) => f.id === "fr-new")).toBe(true)
+  })
+
+  it("still drops a slice whose records lack a field every seed carries", () => {
+    const saved = {
+      ...INITIAL,
+      payGroups: INITIAL.payGroups.map((g) => {
+        const { prorationMethod, ...rest } = g
+        void prorationMethod
+        return rest
+      }),
+    } as unknown as typeof INITIAL
+    expect(reconcile(saved).payGroups).toBe(INITIAL.payGroups)
   })
 })

@@ -269,3 +269,19 @@ export const OFFBOARD_REASON_LABEL: Record<OffboardingReason, string> = {
 
 /** Statutory retirement age in the launch jurisdiction. */
 export const RETIREMENT_AGE = 60
+
+/**
+ * An action read after the actor's name: "Fiifi Boakye acknowledged
+ * Ghana rule pack 2027.1". Only the first letter drops, and not even that
+ * for an acronym — lowering the whole string turned Ghana into "ghana"
+ * and PAYE into "paye".
+ */
+export function asClause(action: string) {
+  const [first, second] = action
+  if (
+    !first ||
+    (second && second === second.toUpperCase() && /[A-Z]/.test(second))
+  )
+    return action
+  return first.toLowerCase() + action.slice(1)
+}

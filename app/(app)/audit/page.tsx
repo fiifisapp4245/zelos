@@ -15,7 +15,7 @@ import {
 import { FilterSearch } from "@/components/common/filter-bar"
 import { useStore } from "@/lib/store"
 import { has } from "@/lib/rbac"
-import { formatDateTime, fullName } from "@/lib/format"
+import { asClause, formatDateTime, fullName } from "@/lib/format"
 
 export default function AuditPage() {
   const store = useStore()
@@ -100,7 +100,7 @@ export default function AuditPage() {
                     <p className="text-sm">
                       <span className="font-medium">{fullName(actor)}</span>{" "}
                       <span className="text-muted-foreground">
-                        {a.action.toLowerCase()}
+                        {asClause(a.action)}
                       </span>
                       {person && (
                         <>

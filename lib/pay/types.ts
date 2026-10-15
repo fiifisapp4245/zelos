@@ -117,8 +117,7 @@ export interface EmployerContributionRule {
  * each company appoints for itself and records in its country setup.
  */
 export type Remittee =
-  | { kind: "authority"; name: string }
-  | { kind: "company_choice"; role: string }
+  { kind: "authority"; name: string } | { kind: "company_choice"; role: string }
 
 /**
  * Where contribution money goes, as opposed to who pays it. The two do
@@ -435,6 +434,12 @@ export interface PayrollEvent {
   by: string
   action: string
   note?: string
+  /**
+   * The person the event is about, where it is about one — an adjustment
+   * to their line. Absent for the run's own steps. A line shows only its
+   * own person's events, so nobody's line carries somebody else's note.
+   */
+  employeeId?: string
 }
 
 /** The rate used to state one currency in another, fixed when approved. */

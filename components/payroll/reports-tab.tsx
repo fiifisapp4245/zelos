@@ -18,6 +18,7 @@ import { Amount, RevealProvider, RevealToggle } from "@/components/pay/money"
 import { usePayroll } from "./use-payroll"
 import { useStore } from "@/lib/store"
 import { packFor } from "@/lib/pay/rule-packs"
+import { complianceCalendar, periodLabel } from "@/lib/pay/compliance"
 import { registerCsv } from "@/lib/pay/payments"
 import {
   costByDepartment,
@@ -165,8 +166,11 @@ export function ReportsTab() {
             {groups
               .filter((g) => groupId === "all" || g.id === groupId)
               .map((group) => {
-                const pack =
-                  packFor(store.countryRulePacks, group.country, TODAY_ISO)
+                const pack = packFor(
+                  store.countryRulePacks,
+                  group.country,
+                  TODAY_ISO
+                )
                 const { reports, external } = statutoryFor(group, pack)
                 return (
                   <li key={group.id} className="px-5 py-3.5">
@@ -397,21 +401,49 @@ export function ReportsTab() {
             )
             if (!pack) return null
             const dates = nextFilingDates(pack, TODAY_ISO)
+            // Late ones first: a card of upcoming dates that leaves out
+            // the one already missed is the wrong way round.
+            const overdue = complianceCalendar({
+              pack,
+              filings: store.filingRecords,
+              todayIso: TODAY_ISO,
+            }).filter((r) => r.status === "overdue")
             return (
               <Panel
                 key={group.id}
                 title={`Filing deadlines · ${group.name}`}
-                description="Soonest first, worked out from the country rules."
+                description="Anything overdue, then soonest first, worked out from the country rules."
                 actions={
                   <Button asChild size="sm" variant="outline" className="h-9">
-                    <Link href="/settings/statutory-settings">
-                      Record filings
-                    </Link>
+                    <Link href="/pay/payroll?tab=filings">Record filings</Link>
                   </Button>
                 }
                 bodyClassName="p-0"
               >
                 <ul className="divide-y">
+                  {overdue.map((o) => (
+                    <li
+                      key={o.key}
+                      className="flex flex-wrap items-center gap-3 px-5 py-2.5 text-sm"
+                    >
+                      <CalendarClock
+                        className="size-4 shrink-0 text-destructive"
+                        aria-hidden
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium">
+                          {o.deadline.name}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          For {periodLabel(o.period)}, escalated to HR Admin
+                        </span>
+                      </span>
+                      <span className="tabular text-right text-xs">
+                        <span className="block">{formatDate(o.dueOn)}</span>
+                        <Pill tone="danger">Overdue</Pill>
+                      </span>
+                    </li>
+                  ))}
                   {dates.map((d) => (
                     <li
                       key={d.name}

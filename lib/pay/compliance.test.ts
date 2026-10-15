@@ -16,13 +16,13 @@ import {
   PAY_COMPONENTS,
   PAY_GROUPS,
 } from "../data/pay"
-import { packFor } from "./rule-packs"
-import type { FilingDeadline, PayrollLine } from "./types"
+import { calculatorVersion, explain, previewLine } from "./calculator"
+import { differences, packFor } from "./rule-packs"
+import type { CountryRulePack, FilingDeadline, PayrollLine } from "./types"
 
 const TODAY = "2026-09-18"
 const ghana = packFor(COUNTRY_RULE_PACKS, "Ghana", TODAY)!
-const deadline = (id: string) =>
-  ghana.filingDeadlines.find((d) => d.id === id)!
+const deadline = (id: string) => ghana.filingDeadlines.find((d) => d.id === id)!
 
 describe("versions published ahead of time", () => {
   it("finds Ghana 2027.1 as upcoming, and nothing for a country without rules", () => {
@@ -190,5 +190,129 @@ describe("statutory report contents", () => {
     expect(toCsv([["Mensah, Kofi", 'say "hi"']])).toBe(
       '"Mensah, Kofi","say ""hi"""'
     )
+  })
+})
+
+describe("the review lists everything that moved", () => {
+  const next = COUNTRY_RULE_PACKS.find((p) => p.version === "2027.1")!
+  const name = (id: string) =>
+    PAY_COMPONENTS.find((c) => c.id === id)?.name ?? id
+  const moved = differences(ghana, next, name)
+
+  it("lists the wider 17.5% band beside the tax-free amount", () => {
+    expect(moved).toContainEqual({
+      label: "Tax-free amount",
+      before: "490",
+      after: "540",
+    })
+    expect(moved).toContainEqual({
+      label: "Width of the 17.5% band",
+      before: "3166.67",
+      after: "3300",
+    })
+  })
+
+  it("lists nothing that did not move", () => {
+    expect(moved).toHaveLength(2)
+  })
+
+  it("lists a deadline, a pre-tax limit and a band rate when they move", () => {
+    const changed: CountryRulePack = {
+      ...ghana,
+      taxBands: ghana.taxBands.map((b, i) =>
+        i === 1 ? { ...b, ratePercent: 6 } : b
+      ),
+      componentTreatments: {
+        ...ghana.componentTreatments,
+        "pc-tier3": {
+          ...ghana.componentTreatments["pc-tier3"],
+          preTax: { upToPercentOfBase: 20 },
+        },
+      },
+      filingDeadlines: ghana.filingDeadlines.map((d) =>
+        d.id === "paye-return"
+          ? { ...d, due: "10th of the following month" }
+          : d
+      ),
+    }
+    const labels = differences(ghana, changed, name).map((m) => m.label)
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        "Rate of band 2",
+        "Tier 3 top-up pre-tax limit",
+        "PAYE monthly return due",
+      ])
+    )
+  })
+})
+
+describe("the impact preview and Test a calculation agree", () => {
+  const next = COUNTRY_RULE_PACKS.find((p) => p.version === "2027.1")!
+  const group = PAY_GROUPS.find((g) => g.id === "pg-gh-monthly")!
+  const person = COMPENSATION_VERSIONS.find(
+    (v) =>
+      v.payGroupId === group.id &&
+      v.status === "effective" &&
+      v.components.length > 0
+  )!
+
+  it("gives one person the same tax, net and cost either way", () => {
+    const [impact] = packImpact({
+      next,
+      packs: COUNTRY_RULE_PACKS,
+      groups: PAY_GROUPS,
+      versions: [person],
+      components: PAY_COMPONENTS,
+    })
+    const typed = previewLine(
+      calculatorVersion(
+        {
+          group,
+          baseAmount: person.baseAmount,
+          components: person.components,
+        },
+        next.effectiveFrom
+      ),
+      next,
+      PAY_COMPONENTS
+    )
+    const tax = typed.deductions.find((d) => d.componentId === "pc-paye")!
+    expect(impact.people).toBe(1)
+    expect(impact.after.net).toBe(typed.net)
+    expect(impact.after.tax).toBe(tax.amount)
+    expect(impact.after.gross).toBe(typed.gross)
+    expect(impact.after.employerCost).toBe(
+      explain(
+        calculatorVersion(
+          {
+            group,
+            baseAmount: person.baseAmount,
+            components: person.components,
+          },
+          next.effectiveFrom
+        ),
+        next,
+        PAY_COMPONENTS
+      ).employerCost
+    )
+  })
+
+  it("explains the tax band by band, adding up to the PAYE charged", () => {
+    const e = explain(
+      calculatorVersion(
+        { group, baseAmount: 5000, components: [] },
+        ghana.effectiveFrom
+      ),
+      ghana,
+      PAY_COMPONENTS
+    )
+    expect(e.taxable).toBe(5000 - 275)
+    expect(Math.round(e.bands.reduce((n, b) => n + b.tax, 0) * 100) / 100).toBe(
+      e.tax
+    )
+    expect(
+      e.line.deductions.find((d) => d.componentId === "pc-paye")!.amount
+    ).toBe(e.tax)
+    expect(e.bands.map((b) => b.ratePercent)).toEqual([0, 5, 10, 17.5, 25])
   })
 })

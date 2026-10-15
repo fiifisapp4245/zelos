@@ -188,7 +188,11 @@ export function Panel({
             )}
           </div>
           {actions && (
-            <div className="flex shrink-0 items-center gap-2">{actions}</div>
+            // Never wider than the panel: on a narrow screen the actions
+            // wrap under the title rather than pushing the page sideways.
+            <div className="flex max-w-full min-w-0 flex-wrap items-center gap-2">
+              {actions}
+            </div>
           )}
         </header>
       )}

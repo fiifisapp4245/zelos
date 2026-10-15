@@ -77,10 +77,12 @@ export function coveredCountries(packs: CountryRulePack[]): string[] {
 }
 
 /**
- * What changed between one version and the one before it, in the terms a
- * payroll officer would ask: did the bands move, did a rate move, did a
- * cap move. Derived rather than written down, so it cannot drift from
- * the numbers it describes.
+ * What changed between one version and the one before it — every field
+ * that moved, not a summary of the ones somebody thought to mention. A
+ * band that widens moves tax as surely as the tax-free amount does, and
+ * a review that lists one without the other cannot be checked against
+ * its own impact figure. Derived rather than written down, so it cannot
+ * drift from the numbers it describes.
  */
 export interface PackDifference {
   label: string
@@ -95,63 +97,92 @@ export function differences(
   componentName: (id: string) => string
 ): PackDifference[] {
   const out: PackDifference[] = []
-
-  for (const rule of current.employeeContributionRules) {
-    const was = previous.employeeContributionRules.find(
-      (r) => r.id === rule.id
-    )
-    if (was && was.percentOfBase !== rule.percentOfBase)
-      out.push({
-        label: rule.name,
-        before: `${was.percentOfBase}%`,
-        after: `${rule.percentOfBase}%`,
-      })
+  const push = (label: string, before: unknown, after: unknown) => {
+    const b = shown(before)
+    const a = shown(after)
+    if (a !== b) out.push({ label, before: b, after: a })
   }
 
-  for (const rule of current.employerContributionRules) {
-    const was = previous.employerContributionRules.find(
-      (r) => r.id === rule.id
+  type Rated = { id: string; name: string; percentOfBase: number }
+  const rated: [Rated[], Rated[]][] = [
+    [previous.employeeContributionRules, current.employeeContributionRules],
+    [previous.employerContributionRules, current.employerContributionRules],
+    [previous.contributionAllocations, current.contributionAllocations],
+  ]
+  for (const [was, now] of rated)
+    for (const id of idsOf(was, now)) {
+      const b = was.find((r) => r.id === id)
+      const a = now.find((r) => r.id === id)
+      push(
+        (a ?? b)!.name,
+        b ? `${b.percentOfBase}%` : "none",
+        a ? `${a.percentOfBase}%` : "none"
+      )
+    }
+
+  // Bands by position: the first is the tax-free amount, the rest by the
+  // rate they charge, which is how a payroll officer names them.
+  const bandCount = Math.max(previous.taxBands.length, current.taxBands.length)
+  for (let i = 0; i < bandCount; i += 1) {
+    const b = previous.taxBands[i]
+    const a = current.taxBands[i]
+    const name =
+      i === 0 && (a ?? b)?.ratePercent === 0
+        ? "Tax-free amount"
+        : `Width of the ${(a ?? b)!.ratePercent}% band`
+    push(
+      name,
+      b ? (b.upTo ?? "the rest") : "none",
+      a ? (a.upTo ?? "the rest") : "none"
     )
-    if (was && was.percentOfBase !== rule.percentOfBase)
-      out.push({
-        label: rule.name,
-        before: `${was.percentOfBase}%`,
-        after: `${rule.percentOfBase}%`,
-      })
+    if (a && b && a.ratePercent !== b.ratePercent)
+      push(`Rate of band ${i + 1}`, `${b.ratePercent}%`, `${a.ratePercent}%`)
   }
 
-  for (const allocation of current.contributionAllocations) {
-    const was = previous.contributionAllocations.find(
-      (a) => a.id === allocation.id
+  for (const id of idsOf(
+    Object.keys(previous.componentTreatments).map((k) => ({ id: k })),
+    Object.keys(current.componentTreatments).map((k) => ({ id: k }))
+  )) {
+    const b = previous.componentTreatments[id]
+    const a = current.componentTreatments[id]
+    const name = componentName(id)
+    if (!a || !b) {
+      push(`${name} treatment`, b ? "set" : "none", a ? "set" : "none")
+      continue
+    }
+    push(`${name} cap`, b.cap ?? "none", a.cap ?? "none")
+    push(`${name} taxable`, b.taxable ? "yes" : "no", a.taxable ? "yes" : "no")
+    push(
+      `${name} counts for social security`,
+      b.socialSecurity ? "yes" : "no",
+      a.socialSecurity ? "yes" : "no"
     )
-    if (was && was.percentOfBase !== allocation.percentOfBase)
-      out.push({
-        label: allocation.name,
-        before: `${was.percentOfBase}%`,
-        after: `${allocation.percentOfBase}%`,
-      })
+    push(
+      `${name} pre-tax limit`,
+      b.preTax ? (b.preTax.upToPercentOfBase ?? "no limit") : "post-tax",
+      a.preTax ? (a.preTax.upToPercentOfBase ?? "no limit") : "post-tax"
+    )
   }
 
-  const freeBefore = previous.taxBands.find((b) => b.ratePercent === 0)?.upTo
-  const freeAfter = current.taxBands.find((b) => b.ratePercent === 0)?.upTo
-  if (freeBefore !== freeAfter && freeBefore != null && freeAfter != null)
-    out.push({
-      label: "Tax-free amount",
-      before: String(freeBefore),
-      after: String(freeAfter),
-    })
-
-  for (const [id, treatment] of Object.entries(current.componentTreatments)) {
-    const was = previous.componentTreatments[id]
-    if (was && was.cap !== treatment.cap)
-      out.push({
-        label: `${componentName(id)} cap`,
-        before: was.cap === undefined ? "none" : String(was.cap),
-        after: treatment.cap === undefined ? "none" : String(treatment.cap),
-      })
+  for (const id of idsOf(previous.filingDeadlines, current.filingDeadlines)) {
+    const b = previous.filingDeadlines.find((d) => d.id === id)
+    const a = current.filingDeadlines.find((d) => d.id === id)
+    push(`${(a ?? b)!.name} due`, b?.due ?? "none", a?.due ?? "none")
   }
 
   return out
+}
+
+function idsOf(
+  a: readonly { id: string }[],
+  b: readonly { id: string }[]
+): string[] {
+  return [...new Set([...a.map((x) => x.id), ...b.map((x) => x.id)])]
+}
+
+function shown(v: unknown): string {
+  if (typeof v === "number") return String(Math.round(v * 100) / 100)
+  return String(v)
 }
 
 /**
@@ -184,8 +215,9 @@ export function allocationGap(pack: CountryRulePack): number {
 
 /** The countries somebody is paid in, read from the pay groups. */
 export function paidCountries(groups: PayGroup[]): string[] {
-  return [...new Set(groups.map((g) => g.country).filter((c) => c !== "—"))]
-    .sort((a, b) => a.localeCompare(b))
+  return [
+    ...new Set(groups.map((g) => g.country).filter((c) => c !== "—")),
+  ].sort((a, b) => a.localeCompare(b))
 }
 
 /**
@@ -198,7 +230,9 @@ export function treatmentFor(
   componentId: string,
   onIso: string
 ): ComponentTreatment | null {
-  return packFor(packs, country, onIso)?.componentTreatments[componentId] ?? null
+  return (
+    packFor(packs, country, onIso)?.componentTreatments[componentId] ?? null
+  )
 }
 
 /**

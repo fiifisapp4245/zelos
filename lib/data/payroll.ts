@@ -100,6 +100,7 @@ export const PAYROLL_RUNS: PayrollRun[] = [
         by: "maame",
         action: "Adjustment added",
         note: "Salary advance recovery for Kwabena Osei.",
+        employeeId: "kwabena",
       },
       { at: "2026-09-17T10:30:00", by: "maame", action: "Recalculated" },
       {
@@ -352,7 +353,7 @@ export const ONE_OFF_PAYMENTS: OneOffPayment[] = [
   {
     id: "oo-003",
     employeeId: "selorm",
-    componentId: "pc-transport",
+    componentId: "pc-on-call",
     amount: 800,
     basis: "gross",
     payFromDate: "2026-09-01",
@@ -366,7 +367,7 @@ export const ONE_OFF_PAYMENTS: OneOffPayment[] = [
   {
     id: "oo-004",
     employeeId: "adjoa",
-    componentId: "pc-bonus",
+    componentId: "pc-long-service",
     amount: 1500,
     basis: "gross",
     payFromDate: "2026-10-01",

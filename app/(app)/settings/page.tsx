@@ -2,13 +2,11 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Lock, Search, SlidersHorizontal } from "lucide-react"
+import { Search, SlidersHorizontal } from "lucide-react"
 
 import { PageShell } from "@/components/shell/page-shell"
 import { EmptyState, Panel } from "@/components/common"
 import { Button } from "@/components/ui/button"
-import { useStore } from "@/lib/store"
-import { has } from "@/lib/rbac"
 import { findSetting } from "@/lib/data/settings"
 import {
   SETTINGS_NAV_GROUPS,
@@ -17,22 +15,7 @@ import {
 import { cn } from "@/lib/utils"
 
 export default function CompanySettingsPage() {
-  const { viewer } = useStore()
   const [query, setQuery] = React.useState("")
-
-  if (!has(viewer, "hr_admin")) {
-    return (
-      <PageShell crumbs={[{ label: "Company settings" }, { label: "Summary" }]}>
-        <Panel>
-          <EmptyState
-            icon={Lock}
-            title="Company settings are restricted"
-            description="Only HR Admins and the Company Owner can open this area. It controls how Zelos HR behaves for everyone in the organisation."
-          />
-        </Panel>
-      </PageShell>
-    )
-  }
 
   const q = query.trim().toLowerCase()
 

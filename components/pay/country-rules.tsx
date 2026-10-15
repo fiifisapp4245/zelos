@@ -1,9 +1,11 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import {
   AlertTriangle,
   BellRing,
+  CalendarClock,
   Calculator,
   Download,
   Flag,
@@ -11,7 +13,6 @@ import {
 import { toast } from "sonner"
 
 import { Panel, Pill } from "@/components/common"
-import { RowActions } from "@/components/common/row-actions"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -53,24 +54,18 @@ import {
 } from "@/lib/pay/rule-packs"
 import {
   acknowledgementOf,
-  complianceCalendar,
   packImpact,
   REMIND_DAYS_BEFORE,
-  reportRows,
-  toCsv,
   upcomingVersions,
-  type CalendarRow,
-  type FilingStatus,
   type ImpactTotals,
 } from "@/lib/pay/compliance"
-import { calculateLine, remittancesFor } from "@/lib/pay/payroll"
-import { linesForRun } from "@/lib/pay/run-lines"
+import { calculatorVersion, explain } from "@/lib/pay/calculator"
 import { addDays } from "@/lib/time"
-import { usePayroll } from "@/components/payroll/use-payroll"
+import { useFilingSummary } from "@/components/payroll/filings-tab"
+import { CALCULATION_MODE_COPY } from "@/lib/pay/derive"
 import { useStore } from "@/lib/store"
 import { TODAY_ISO, formatDate, fullName } from "@/lib/format"
 import type {
-  CompensationVersion,
   CountryRulePack,
   CountrySetup,
   CoverageChoice,
@@ -93,7 +88,6 @@ export function countryMoney(
     currency ? money(amount, currency) : amount.toLocaleString("en-GB")
 }
 
-
 /* ── 3. Country rules ────────────────────────────────────────────────── */
 
 export function CountryRulesPanel() {
@@ -110,7 +104,7 @@ export function CountryRulesPanel() {
           <PackUpdates country={country} />
           <CountryPack country={country} />
           <YourSetup country={country} />
-          <ComplianceCalendar country={country} />
+          <FilingsSummary country={country} />
         </section>
       ))}
 
@@ -222,8 +216,13 @@ function CountryPack({ country }: { country: string }) {
       description={`Version ${pack.version} · in force from ${formatDate(pack.effectiveFrom)}`}
       actions={
         <div className="flex flex-wrap items-center gap-2">
+          <Pill tone="primary">{CALCULATION_MODE_COPY.native.label}</Pill>
           <Pill tone={current ? "success" : future ? "info" : "neutral"}>
-            {current ? "In force" : future ? "Not yet in force" : "Past version"}
+            {current
+              ? "In force"
+              : future
+                ? "Not yet in force"
+                : "Past version"}
           </Pill>
           {versions.length > 1 && (
             <Select value={pack.version} onValueChange={setVersionId}>
@@ -310,8 +309,8 @@ function CountryPack({ country }: { country: string }) {
             </ul>
             {gap === 0 ? (
               <p className="mt-1.5 text-xs text-muted-foreground">
-                The same {payerTotal}%, split by destination rather than by
-                who pays it.
+                The same {payerTotal}%, split by destination rather than by who
+                pays it.
               </p>
             ) : (
               <p className="mt-1.5 flex items-start gap-1.5 text-xs text-destructive">
@@ -370,9 +369,7 @@ function CountryPack({ country }: { country: string }) {
                         : `${fmt(b.from)} – ${fmt(b.to)}`}
                     </td>
                     <td className="tabular py-1.5 pr-4 text-muted-foreground">
-                      {b.to === null
-                        ? "The rest"
-                        : fmt(b.to - b.from)}
+                      {b.to === null ? "The rest" : fmt(b.to - b.from)}
                     </td>
                     <td className="tabular py-1.5 pr-4">{b.ratePercent}%</td>
                   </tr>
@@ -381,8 +378,8 @@ function CountryPack({ country }: { country: string }) {
             </table>
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">
-            The first {fmt(bands[0]?.to ?? 0)} is taxed at nothing.
-            Bands apply to pay after the employee contribution is taken off.
+            The first {fmt(bands[0]?.to ?? 0)} is taxed at nothing. Bands apply
+            to pay after the employee contribution is taken off.
           </p>
         </div>
 
@@ -510,8 +507,6 @@ function CountryPack({ country }: { country: string }) {
   )
 }
 
-
-
 /* ── Who may do what ─────────────────────────────────────────────────── */
 
 /**
@@ -536,9 +531,7 @@ function usePermissions() {
 /** A banner per version published but not yet in force. */
 function PackUpdates({ country }: { country: string }) {
   const store = useStore()
-  const [reviewing, setReviewing] = React.useState<CountryRulePack | null>(
-    null
-  )
+  const [reviewing, setReviewing] = React.useState<CountryRulePack | null>(null)
   const upcoming = upcomingVersions(store.countryRulePacks, country, TODAY_ISO)
   if (upcoming.length === 0) return null
 
@@ -637,8 +630,8 @@ function ReviewSheet({
           <SheetDescription>
             Takes effect {formatDate(next.effectiveFrom)}
             {previous ? `, replacing ${previous.version}` : ""}. Acknowledging
-            it says you have seen the change. It does not approve the law,
-            which needs nobody&rsquo;s approval.
+            it says you have seen the change. It does not approve the law, which
+            needs nobody&rsquo;s approval.
           </SheetDescription>
         </SheetHeader>
 
@@ -757,11 +750,10 @@ function ReviewSheet({
               ))}
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              Everybody each group would pay on{" "}
-              {formatDate(next.effectiveFrom)}, on their regular package,
-              calculated under both versions by the payroll engine. One-off
-              payments and adjustments are left out, so this is the rules&rsquo;
-              effect alone.
+              Everybody each group would pay on {formatDate(next.effectiveFrom)}
+              , on their regular package, calculated under both versions by the
+              payroll engine. One-off payments and adjustments are left out, so
+              this is the rules&rsquo; effect alone.
             </p>
           </div>
         </div>
@@ -776,9 +768,7 @@ function ReviewSheet({
             <Button
               onClick={() => {
                 store.acknowledgePack(next.country, next.version)
-                toast.success(
-                  `${next.country} ${next.version} acknowledged`
-                )
+                toast.success(`${next.country} ${next.version} acknowledged`)
                 onClose()
               }}
             >
@@ -1002,343 +992,53 @@ function YourSetup({ country }: { country: string }) {
   )
 }
 
-/* ── Compliance calendar ─────────────────────────────────────────────── */
-
-
-const STATUS_PILL: Record<
-  FilingStatus,
-  { tone: "neutral" | "success" | "danger" | "info"; label: string }
-> = {
-  due: { tone: "neutral", label: "Due" },
-  filed: { tone: "info", label: "Filed" },
-  paid: { tone: "success", label: "Paid" },
-  overdue: { tone: "danger", label: "Overdue" },
-}
-
-function periodLabel(period: string) {
-  if (period.length === 4) return `Year ${period}`
-  const [y, m] = period.split("-").map(Number)
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-GB", {
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  })
-}
+/* ── Filings, in summary ─────────────────────────────────────────────── */
 
 /**
- * Every return and remittance the country's rules set, per period, with
- * what the company has done about each. The deadlines come from the pack;
- * the filed and paid records are the company's.
+ * Where the country's filings stand. Recording them is payroll's work and
+ * happens under Payroll; HR Admin sees here whether anything is late.
  */
-function ComplianceCalendar({ country }: { country: string }) {
-  const store = useStore()
-  const { canFile } = usePermissions()
-  const { source } = usePayroll()
-  const pack = packFor(store.countryRulePacks, country, TODAY_ISO)
-  const [marking, setMarking] = React.useState<{
-    row: CalendarRow
-    as: "filed" | "paid"
-  } | null>(null)
-  const receiptFor = React.useRef<CalendarRow | null>(null)
-  const fileInput = React.useRef<HTMLInputElement>(null)
-  if (!pack) return null
-
-  const setup = store.countrySetups.find((c) => c.country === country)
-  const owner = setup?.filingOwnerId
-    ? fullName(store.employeeById(setup.filingOwnerId))
-    : null
-  const rows = complianceCalendar({
-    pack,
-    filings: store.filingRecords,
-    todayIso: TODAY_ISO,
-  })
-  const overdue = rows.filter((r) => r.status === "overdue").length
-
-  function download(row: CalendarRow) {
-    const groups = store.payGroups.filter(
-      (g) => g.country === country && g.calculationMode === "native"
-    )
-    const runs = store.payrollRuns.filter(
-      (r) =>
-        r.kind === "regular" &&
-        groups.some((g) => g.id === r.payGroupId) &&
-        r.periodStart.startsWith(row.period)
-    )
-    const lines = runs.flatMap((run) =>
-      linesForRun(run, source).lines.map((line) => {
-        const employee = store.employeeById(line.employeeId)
-        return {
-          line,
-          base:
-            line.earnings.find((e) => e.componentId === "pc-base")?.amount ?? 0,
-          person: {
-            name: fullName(employee),
-            tin: employee?.compensation.tin ?? "—",
-            ssnitNumber: employee?.compensation.ssnitNumber ?? "—",
-          },
-        }
-      })
-    )
-    if (lines.length === 0) {
-      toast.error(
-        `No ${country} run for ${periodLabel(row.period)} yet, so there is nothing to report.`
-      )
-      return
-    }
-    const csv = toCsv(reportRows(row.deadline, pack!, lines))
-    const blob = new Blob([csv], { type: "text/csv" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${row.deadline.id}-${row.period}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+function FilingsSummary({ country }: { country: string }) {
+  const summary = useFilingSummary(country)
+  if (!summary) return null
+  const { overdue, nextDue } = summary
 
   return (
-    <Panel
-      title={`Filings and remittances · ${country}`}
-      description={
-        owner
-          ? `${owner} files these and is reminded ${REMIND_DAYS_BEFORE} days before each is due.`
-          : "Nobody is responsible for filing yet. Choose somebody in your setup above."
+    <div
+      className={
+        overdue.length > 0
+          ? "flex flex-wrap items-center gap-3 rounded-xl border border-destructive/30 bg-danger-muted px-4 py-3"
+          : "flex flex-wrap items-center gap-3 rounded-xl border bg-card px-4 py-3"
       }
-      actions={
-        overdue > 0 ? (
-          <Pill tone="danger">
-            {overdue} overdue · escalated to HR Admin
-          </Pill>
-        ) : null
-      }
-      bodyClassName="p-0"
     >
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/40 text-left">
-              {["Obligation", "Period", "Due", "Status", "Record", ""].map(
-                (h) => (
-                  <th
-                    key={h}
-                    scope="col"
-                    className="px-4 py-2.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase first:pl-5 last:pr-5"
-                  >
-                    {h}
-                  </th>
-                )
-              )}
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {rows.map((row) => {
-              const pill = STATUS_PILL[row.status]
-              const payee = pack.payees.find(
-                (p) => p.id === row.deadline.payeeId
-              )
-              return (
-                <tr key={row.key}>
-                  <td className="py-3 pl-5">
-                    <span className="font-medium">{row.deadline.name}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {row.deadline.kind === "return"
-                        ? "Return"
-                        : "Remittance"}{" "}
-                      to {payee?.name ?? "—"}
-                    </span>
-                  </td>
-                  <td className="px-4 whitespace-nowrap">
-                    {periodLabel(row.period)}
-                  </td>
-                  <td className="tabular px-4 whitespace-nowrap">
-                    {formatDate(row.dueOn)}
-                  </td>
-                  <td className="px-4">
-                    <Pill tone={pill.tone}>{pill.label}</Pill>
-                    {row.escalated ? (
-                      <span className="mt-0.5 block text-xs text-destructive">
-                        Escalated to HR Admin
-                      </span>
-                    ) : row.reminded && owner ? (
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {owner} reminded {formatDate(row.remindOn)}
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="px-4 text-xs text-muted-foreground">
-                    {row.record?.filed && (
-                      <span className="block">
-                        Filed {formatDate(row.record.filed.on)} ·{" "}
-                        {row.record.filed.ref}
-                      </span>
-                    )}
-                    {row.record?.paid && (
-                      <span className="block">
-                        Paid {formatDate(row.record.paid.on)} ·{" "}
-                        {row.record.paid.ref}
-                      </span>
-                    )}
-                    {row.record?.receiptName && (
-                      <span className="block">
-                        Receipt: {row.record.receiptName}
-                      </span>
-                    )}
-                    {!row.record && "—"}
-                  </td>
-                  <td className="py-3 pr-5 text-right">
-                    <RowActions
-                      label={`Actions for ${row.deadline.name}, ${periodLabel(row.period)}`}
-                      actions={[
-                        Boolean(row.deadline.report) && {
-                          label: `Download ${row.deadline.report}`,
-                          icon: Download,
-                          onSelect: () => download(row),
-                        },
-                        canFile &&
-                          !row.record?.filed && {
-                            label: "Mark filed",
-                            onSelect: () => setMarking({ row, as: "filed" }),
-                          },
-                        canFile &&
-                          row.deadline.kind === "remittance" &&
-                          !row.record?.paid && {
-                            label: "Mark paid",
-                            onSelect: () => setMarking({ row, as: "paid" }),
-                          },
-                        canFile && {
-                          label: row.record?.receiptName
-                            ? "Replace receipt"
-                            : "Attach receipt",
-                          onSelect: () => {
-                            receiptFor.current = row
-                            fileInput.current?.click()
-                          },
-                        },
-                      ]}
-                    />
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <input
-        ref={fileInput}
-        type="file"
-        className="hidden"
-        aria-hidden
-        tabIndex={-1}
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          const row = receiptFor.current
-          e.target.value = ""
-          if (!file || !row) return
-          store.recordFiling({
-            country,
-            deadlineId: row.deadline.id,
-            period: row.period,
-            receiptName: file.name,
-          })
-          toast.success(`Receipt attached to ${row.deadline.name}`)
-        }}
-      />
-
-      {marking && (
-        <MarkDialog
-          row={marking.row}
-          as={marking.as}
-          onClose={() => setMarking(null)}
-          onSave={(on, ref) => {
-            store.recordFiling({
-              country,
-              deadlineId: marking.row.deadline.id,
-              period: marking.row.period,
-              [marking.as]: { on, ref, by: store.viewer.employeeId },
-            })
-            toast.success(
-              `${marking.row.deadline.name} marked ${marking.as}`
-            )
-            setMarking(null)
-          }}
-        />
-      )}
-    </Panel>
-  )
-}
-
-function MarkDialog({
-  row,
-  as,
-  onClose,
-  onSave,
-}: {
-  row: CalendarRow
-  as: "filed" | "paid"
-  onClose: () => void
-  onSave: (on: string, ref: string) => void
-}) {
-  const [on, setOn] = React.useState(TODAY_ISO)
-  const [ref, setRef] = React.useState("")
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            Mark {row.deadline.name} {as}
-          </DialogTitle>
-          <DialogDescription>
-            For {periodLabel(row.period)}, due {formatDate(row.dueOn)}. The
-            reference is what the authority gave you, so the record can be
-            matched to their acknowledgement.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="mark-on" className="mb-1.5 block">
-              Date {as}
-            </Label>
-            <Input
-              id="mark-on"
-              type="date"
-              value={on}
-              max={TODAY_ISO}
-              onChange={(e) => setOn(e.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="mark-ref" className="mb-1.5 block">
-              Reference
-            </Label>
-            <Input
-              id="mark-ref"
-              value={ref}
-              onChange={(e) => setRef(e.target.value)}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            disabled={!on || ref.trim() === ""}
-            onClick={() => onSave(on, ref.trim())}
-          >
-            Mark {as}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <CalendarClock className="size-4 shrink-0 text-muted-foreground" />
+      <p className="min-w-0 flex-1 text-sm">
+        <span className="font-medium">
+          Filings and remittances · {country}.
+        </span>{" "}
+        <span className="text-muted-foreground">
+          {overdue.length > 0
+            ? `${overdue.length} overdue: ${overdue.map((r) => r.deadline.name).join(", ")}. `
+            : "Nothing overdue. "}
+          {nextDue
+            ? `Next: ${nextDue.deadline.name}, due ${formatDate(nextDue.dueOn)}.`
+            : ""}
+        </span>
+      </p>
+      <Button asChild size="sm" variant="outline" className="h-9">
+        <Link href="/pay/payroll?tab=filings">Open filings</Link>
+      </Button>
+    </div>
   )
 }
 
 /* ── Test a calculation ──────────────────────────────────────────────── */
 
 /**
- * A payslip worked out by the real engine for a salary somebody types in,
- * under any version of the country's rules. For checking a payslip or
- * answering a question about one, without running payroll.
+ * A payslip worked out by the real engine for figures somebody types in,
+ * under any version of the country's rules, laid out in the order it is
+ * worked out. For checking a payslip or answering a question about one,
+ * without running payroll. The impact preview calls the same function.
  */
 function TestCalculationSheet({
   country,
@@ -1351,167 +1051,243 @@ function TestCalculationSheet({
 }) {
   const store = useStore()
   const versions = versionsFor(store.countryRulePacks, country)
+  const groups = store.payGroups.filter((g) => g.country === country)
+  const [groupId, setGroupId] = React.useState(groups[0]?.id ?? "")
   const [version, setVersion] = React.useState(initialVersion)
   const [base, setBase] = React.useState("5000")
-  const [amounts, setAmounts] = React.useState<Record<string, string>>({})
+  const [values, setValues] = React.useState<Record<string, string>>({})
   const pack = versions.find((v) => v.version === version) ?? versions[0]
-  const fmt = countryMoney(store, country)
-  const currency =
-    store.payGroups.find((g) => g.country === country)?.currency ??
-    store.legalEntities.find((e) => e.country === country)?.currency ??
-    ""
+  const group = groups.find((g) => g.id === groupId) ?? groups[0]
 
-  // Fixed-amount components the pack has a view on: what somebody here
-  // could actually be paid or have deducted.
-  const components = store.payComponents.filter(
-    (c) => c.calculation === "fixed" && pack?.componentTreatments[c.id]
+  // The whole library, as a package can hold it: an amount for a fixed
+  // component, a rate for one worked off base. Employer contributions are
+  // the country's, not something typed in.
+  const library = store.payComponents.filter(
+    (c) => c.category !== "employer_contribution"
   )
-  const baseAmount = Math.max(0, Number(base) || 0)
+  const fmt = (n: number) =>
+    group ? money(n, group.currency) : n.toLocaleString("en-GB")
 
-  const version_: CompensationVersion = {
-    id: "test",
-    employeeId: "test",
-    versionNumber: 1,
-    effectiveFrom: pack?.effectiveFrom ?? TODAY_ISO,
-    entityId: "",
-    workCountry: country,
-    taxResidency: country,
-    workerType: "employee",
-    payGroupId: "",
-    payBasis: "salaried",
-    baseAmount,
-    currency,
-    frequency: "monthly",
-    components: components
-      .map((c) => ({ componentId: c.id, amount: Number(amounts[c.id]) || 0 }))
-      .filter((v) => v.amount > 0),
-    reason: "",
-    proposedBy: "",
-    proposedAt: "",
-    approvedBy: null,
-    approvedAt: null,
-    status: "effective",
-    supersedesVersionId: null,
-    changeRequestId: null,
-  }
-  const line = pack
-    ? calculateLine(
-        version_,
-        pack,
-        [],
-        [],
-        { start: pack.effectiveFrom, end: pack.effectiveFrom },
-        {
-          runId: "test",
-          components: store.payComponents,
-          previousNet: null,
-          paymentChannel: "bank_transfer",
-          paymentDestinationMasked: null,
-        }
-      )
-    : null
-  const employer = line
-    ? line.employerContributions.reduce((n, c) => n + c.amount, 0)
-    : 0
+  const explanation =
+    pack && group
+      ? explain(
+          calculatorVersion(
+            {
+              group,
+              baseAmount: Number(base) || 0,
+              components: library.map((c) =>
+                c.calculation === "percent_of_base"
+                  ? { componentId: c.id, rate: Number(values[c.id]) || 0 }
+                  : { componentId: c.id, amount: Number(values[c.id]) || 0 }
+              ),
+            },
+            pack.effectiveFrom
+          ),
+          pack,
+          store.payComponents
+        )
+      : null
 
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="right"
-        className="flex flex-col gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-[560px]"
+        className="flex flex-col gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-[600px]"
       >
         <SheetHeader>
           <SheetTitle>Test a calculation · {country}</SheetTitle>
           <SheetDescription>
-            One month&rsquo;s pay, worked out by the payroll engine under the
+            One period&rsquo;s pay, worked out by the payroll engine under the
             version you choose. Nothing is saved and nobody is paid.
           </SheetDescription>
         </SheetHeader>
 
         <div className="space-y-5 px-4 pb-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="test-base" className="mb-1.5 block">
-                Basic salary, per month
-              </Label>
-              <Input
-                id="test-base"
-                type="number"
-                min={0}
-                value={base}
-                onChange={(e) => setBase(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="mb-1.5 block">Rules</Label>
-              <Select value={version} onValueChange={setVersion}>
-                <SelectTrigger className="h-9 w-full" aria-label="Rules">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {versions.map((v) => (
-                    <SelectItem key={v.version} value={v.version}>
-                      {v.version} · from {formatDate(v.effectiveFrom)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            {components.map((c) => (
-              <div key={c.id}>
-                <Label htmlFor={`test-${c.id}`} className="mb-1.5 block">
-                  {c.name}
+          {groups.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No pay group pays in {country} yet, so there is nothing to
+              calculate for.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <Label className="mb-1.5 block">Pay group</Label>
+                <Select value={group?.id ?? ""} onValueChange={setGroupId}>
+                  <SelectTrigger className="h-9 w-full" aria-label="Pay group">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groups.map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="mb-1.5 block">Rules</Label>
+                <Select value={version} onValueChange={setVersion}>
+                  <SelectTrigger className="h-9 w-full" aria-label="Rules">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {versions.map((v) => (
+                      <SelectItem key={v.version} value={v.version}>
+                        {v.version} · from {formatDate(v.effectiveFrom)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="test-base" className="mb-1.5 block">
+                  Basic salary
                 </Label>
                 <Input
-                  id={`test-${c.id}`}
+                  id="test-base"
                   type="number"
                   min={0}
-                  placeholder="0"
-                  value={amounts[c.id] ?? ""}
-                  onChange={(e) =>
-                    setAmounts((a) => ({ ...a, [c.id]: e.target.value }))
-                  }
+                  value={base}
+                  onChange={(e) => setBase(e.target.value)}
                 />
               </div>
-            ))}
-          </div>
-
-          {line && pack && (
-            <div className="space-y-4 rounded-xl border p-4">
-              <BreakdownList title="Earnings" items={line.earnings} fmt={fmt} />
-              <BreakdownList
-                title="Deductions"
-                items={line.deductions}
-                fmt={fmt}
-              />
-              <div className="flex justify-between border-t pt-3 text-sm font-semibold">
-                <span>Net pay</span>
-                <span className="tabular">{fmt(line.net)}</span>
-              </div>
-              <BreakdownList
-                title="Employer pays on top"
-                items={line.employerContributions}
-                fmt={fmt}
-              />
-              <div className="flex justify-between text-sm">
-                <span>Cost to the employer</span>
-                <span className="tabular">{fmt(line.gross + employer)}</span>
-              </div>
-              {pack.contributionAllocations.length > 0 && (
-                <BreakdownList
-                  title="Where the contributions go"
-                  items={remittancesFor(baseAmount, pack).map((r) => ({
-                    componentId: r.allocationId,
-                    label: r.name,
-                    amount: r.amount,
-                  }))}
-                  fmt={fmt}
-                />
-              )}
             </div>
+          )}
+
+          {groups.length > 0 && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {library.map((c) => (
+                <div key={c.id}>
+                  <Label htmlFor={`test-${c.id}`} className="mb-1.5 block">
+                    {c.name}
+                    <span className="ml-1 font-normal text-muted-foreground">
+                      {c.calculation === "percent_of_base"
+                        ? "· % of base"
+                        : c.category === "deduction"
+                          ? "· deduction"
+                          : ""}
+                    </span>
+                  </Label>
+                  <Input
+                    id={`test-${c.id}`}
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    value={values[c.id] ?? ""}
+                    onChange={(e) =>
+                      setValues((v) => ({ ...v, [c.id]: e.target.value }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {explanation && pack && (
+            <ol className="space-y-4 rounded-xl border p-4 text-sm">
+              <Step title="1 · Earnings">
+                <Items items={explanation.earnings} fmt={fmt} />
+                <Total label="Gross pay" value={fmt(explanation.gross)} />
+              </Step>
+
+              {explanation.preTax.length > 0 && (
+                <Step title="2 · Deductions before tax">
+                  {explanation.preTax.map((d) => (
+                    <Line
+                      key={d.componentId}
+                      label={d.label}
+                      note={
+                        d.relief < d.amount
+                          ? `${fmt(d.relief)} of it is relieved from tax; the rest is not`
+                          : "All of it is relieved from tax"
+                      }
+                      value={fmt(d.amount)}
+                    />
+                  ))}
+                </Step>
+              )}
+
+              <Step title="3 · Employee pension">
+                <Items items={explanation.employeeContributions} fmt={fmt} />
+              </Step>
+
+              <Step title="4 · Taxable income">
+                <Line label="Gross pay" value={fmt(explanation.gross)} />
+                {explanation.untaxed > 0 && (
+                  <Line
+                    label="Less pay the country does not tax"
+                    note="Exempt components, and allowances up to their caps"
+                    value={`− ${fmt(explanation.untaxed)}`}
+                  />
+                )}
+                {explanation.employeeContributions.map((d) => (
+                  <Line
+                    key={d.componentId}
+                    label={`Less ${d.label.toLowerCase()}`}
+                    value={`− ${fmt(d.amount)}`}
+                  />
+                ))}
+                {explanation.preTax.map((d) => (
+                  <Line
+                    key={d.componentId}
+                    label={`Less ${d.label.toLowerCase()} relief`}
+                    value={`− ${fmt(d.relief)}`}
+                  />
+                ))}
+                <Total
+                  label="Taxable income"
+                  value={fmt(explanation.taxable)}
+                />
+              </Step>
+
+              <Step title="5 · Tax, band by band">
+                {explanation.bands.length === 0 ? (
+                  <p className="text-muted-foreground">Nothing is taxable.</p>
+                ) : (
+                  explanation.bands.map((b, i) => (
+                    <Line
+                      key={i}
+                      label={`${fmt(b.taxed)} at ${b.ratePercent}%`}
+                      note={
+                        b.to === null
+                          ? `Above ${fmt(b.from)}`
+                          : `Band ${fmt(b.from)} – ${fmt(b.to)}`
+                      }
+                      value={fmt(b.tax)}
+                    />
+                  ))
+                )}
+                <Total label="PAYE" value={fmt(explanation.tax)} />
+              </Step>
+
+              {explanation.postTax.length > 0 && (
+                <Step title="6 · Deductions after tax">
+                  <Items items={explanation.postTax} fmt={fmt} />
+                </Step>
+              )}
+
+              <Step title="7 · Net pay">
+                <Total label="Net pay" value={fmt(explanation.net)} strong />
+              </Step>
+
+              <Step title="8 · What the employer adds">
+                <Items items={explanation.employerContributions} fmt={fmt} />
+                <Total
+                  label="Cost to the employer"
+                  value={fmt(explanation.employerCost)}
+                />
+                {explanation.remittances.length > 0 && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Contributions are sent{" "}
+                    {explanation.remittances
+                      .map((r) => `${fmt(r.amount)} to ${r.name}`)
+                      .join(" and ")}
+                    .
+                  </p>
+                )}
+              </Step>
+            </ol>
           )}
         </div>
       </SheetContent>
@@ -1519,30 +1295,84 @@ function TestCalculationSheet({
   )
 }
 
-function BreakdownList({
+function Step({
   title,
+  children,
+}: {
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <li>
+      <RuleHeading>{title}</RuleHeading>
+      <div className="space-y-1">{children}</div>
+    </li>
+  )
+}
+
+function Line({
+  label,
+  note,
+  value,
+}: {
+  label: string
+  note?: string
+  value: string
+}) {
+  return (
+    <div className="flex justify-between gap-3">
+      <span className="min-w-0">
+        {label}
+        {note && (
+          <span className="block text-xs text-muted-foreground">{note}</span>
+        )}
+      </span>
+      <span className="tabular shrink-0 text-muted-foreground">{value}</span>
+    </div>
+  )
+}
+
+function Total({
+  label,
+  value,
+  strong,
+}: {
+  label: string
+  value: string
+  strong?: boolean
+}) {
+  return (
+    <div
+      className={
+        strong
+          ? "flex justify-between gap-3 text-base font-semibold"
+          : "flex justify-between gap-3 border-t pt-1 font-medium"
+      }
+    >
+      <span>{label}</span>
+      <span className="tabular">{value}</span>
+    </div>
+  )
+}
+
+function Items({
   items,
   fmt,
 }: {
-  title: string
   items: { componentId: string; label: string; amount: number }[]
   fmt: (n: number) => string
 }) {
-  if (items.length === 0) return null
+  if (items.length === 0) return <p className="text-muted-foreground">None.</p>
   return (
-    <div>
-      <RuleHeading>{title}</RuleHeading>
-      <ul className="space-y-1 text-sm">
-        {items.map((i) => (
-          <li key={i.componentId + i.label} className="flex justify-between">
-            <span>{i.label}</span>
-            <span className="tabular text-muted-foreground">
-              {fmt(i.amount)}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <>
+      {items.map((i) => (
+        <Line
+          key={i.componentId + i.label}
+          label={i.label}
+          value={fmt(i.amount)}
+        />
+      ))}
+    </>
   )
 }
 
@@ -1592,7 +1422,10 @@ function ReportIssueDialog({
           <div>
             <Label className="mb-1.5 block">What looks wrong</Label>
             <Select value={field} onValueChange={setField}>
-              <SelectTrigger className="h-9 w-full" aria-label="What looks wrong">
+              <SelectTrigger
+                className="h-9 w-full"
+                aria-label="What looks wrong"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1690,7 +1523,9 @@ function CoverageChoicePanel({ country }: { country: string }) {
     <Panel
       title={<CountryLabel country={country} />}
       description="Zelos has no rules for this country, so it cannot calculate pay here yet. Choose how it is handled."
-      actions={<Pill tone="neutral">Uploaded results</Pill>}
+      actions={
+        <Pill tone="neutral">{CALCULATION_MODE_COPY.external.label}</Pill>
+      }
       bodyClassName="px-5 py-4"
     >
       <div className="grid gap-3 sm:grid-cols-3" role="radiogroup">

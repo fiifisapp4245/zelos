@@ -184,3 +184,13 @@ export const MIN_AGGREGATION_GROUP = 5
 export function canShowAggregate(groupSize: number) {
   return groupSize >= MIN_AGGREGATION_GROUP
 }
+
+/**
+ * Company settings, every page of it. One rule in one place, read by the
+ * layout every settings route renders through, so no single page can
+ * forget to check — which is how a page used to open by URL for a role
+ * the sidebar never offered it to.
+ */
+export function canOpenCompanySettings(viewer: Viewer) {
+  return has(viewer, "hr_admin")
+}

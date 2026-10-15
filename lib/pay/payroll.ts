@@ -61,17 +61,82 @@ export function marginalRate(taxable: number, pack: CountryRulePack) {
   return 0
 }
 
-export function taxOn(taxable: number, pack: CountryRulePack) {
+/** One band a person's taxable pay reached, and the tax it produced. */
+export interface BandUse {
+  from: number
+  /** Null on the open-ended top band. */
+  to: number | null
+  ratePercent: number
+  /** How much of the taxable pay fell in this band. */
+  taxed: number
+  tax: number
+}
+
+/** The bands taxable pay reaches, in order, with what each one took. */
+export function bandsUsed(taxable: number, pack: CountryRulePack): BandUse[] {
   let remaining = Math.max(0, taxable)
-  let tax = 0
+  let floor = 0
+  const used: BandUse[] = []
   for (const band of pack.taxBands) {
     if (remaining <= 0) break
     const width = band.upTo ?? remaining
     const slice = Math.min(remaining, width)
-    tax += (slice * band.ratePercent) / 100
+    used.push({
+      from: floor,
+      to: band.upTo === null ? null : floor + band.upTo,
+      ratePercent: band.ratePercent,
+      taxed: round(slice),
+      tax: (slice * band.ratePercent) / 100,
+    })
+    floor += width
     remaining -= slice
   }
-  return round(tax)
+  return used
+}
+
+export function taxOn(taxable: number, pack: CountryRulePack) {
+  return round(bandsUsed(taxable, pack).reduce((n, b) => n + b.tax, 0))
+}
+
+/**
+ * How income tax is reached, step by step: what the country treats as
+ * taxable, less the employee's own contributions and any deduction it
+ * relieves, run through the bands. The run pays the tax this returns,
+ * and Test a calculation shows these same steps, so the explanation is
+ * the calculation rather than a description of it.
+ */
+export interface TaxWorkings {
+  taxableEarnings: number
+  employeeContributions: number
+  preTaxRelief: number
+  taxable: number
+  bands: BandUse[]
+  tax: number
+}
+
+export function taxWorkings(
+  earnings: LineItem[],
+  deductions: LineItem[],
+  base: number,
+  pack: CountryRulePack
+): TaxWorkings {
+  const taxableEarnings = taxableOf(earnings, pack)
+  const employeeContributions = deductions
+    .filter((d) =>
+      pack.employeeContributionRules.some((r) => r.id === d.componentId)
+    )
+    .reduce((n, d) => n + d.amount, 0)
+  const relief = preTaxRelief(deductions, base, pack)
+  const taxable = Math.max(0, taxableEarnings - employeeContributions - relief)
+  const bands = bandsUsed(taxable, pack)
+  return {
+    taxableEarnings: round(taxableEarnings),
+    employeeContributions: round(employeeContributions),
+    preTaxRelief: round(relief),
+    taxable: round(taxable),
+    bands: bands.map((b) => ({ ...b, tax: round(b.tax) })),
+    tax: round(bands.reduce((n, b) => n + b.tax, 0)),
+  }
 }
 
 /**
@@ -92,6 +157,11 @@ export function calculateLine(
 ): PayrollLine {
   const named = (id: string, fallback: string) =>
     context.components.find((c) => c.id === id)?.name ?? fallback
+
+  // Only this person's. Callers filter too, but a line that carries
+  // somebody else's adjustment pays the wrong person, so the line itself
+  // refuses to.
+  adjustments = adjustments.filter((a) => a.employeeId === version.employeeId)
 
   const earnings: LineItem[] = [
     {
@@ -192,22 +262,10 @@ export function calculateLine(
       })
     }
 
-    const social = deductions
-      .filter((d) =>
-        pack.employeeContributionRules.some((r) => r.id === d.componentId)
-      )
-      .reduce((n, d) => n + d.amount, 0)
-
-    const taxable = Math.max(
-      0,
-      taxableOf(earnings, pack) -
-        social -
-        preTaxRelief(deductions, version.baseAmount, pack)
-    )
     deductions.push({
       componentId: "pc-paye",
       label: "PAYE",
-      amount: taxOn(taxable, pack),
+      amount: taxWorkings(earnings, deductions, version.baseAmount, pack).tax,
     })
   }
 
@@ -357,6 +415,21 @@ export function lineFromExternal(
     paymentDestinationMasked: context.paymentDestinationMasked,
     flags: [],
   }
+}
+
+/**
+ * What a person's line shows of the run's history: the events about
+ * them, and the run's own steps. Never an event about somebody else —
+ * a note on another person's adjustment is their business, not this
+ * line's.
+ */
+export function lineActivity(
+  run: PayrollRun,
+  employeeId: string
+): PayrollRun["events"] {
+  return run.events.filter(
+    (e) => e.employeeId === undefined || e.employeeId === employeeId
+  )
 }
 
 /* ── Readiness ───────────────────────────────────────────────────────── */

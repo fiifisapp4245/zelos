@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   Check,
   Globe,
-  Lock,
   ShieldCheck,
   SlidersHorizontal,
 } from "lucide-react"
@@ -17,7 +16,7 @@ import { SettingsNav } from "@/components/shell/settings-nav"
 import { SETTINGS_NAV_GROUPS } from "@/lib/nav/settings-nav"
 import { EmptyState, Panel, Pill } from "@/components/common"
 import { useStore } from "@/lib/store"
-import { MIN_AGGREGATION_GROUP, ROLE_LABEL, has } from "@/lib/rbac"
+import { MIN_AGGREGATION_GROUP, ROLE_LABEL } from "@/lib/rbac"
 import { findSetting } from "@/lib/data/settings"
 import { SETTINGS_CONTENT } from "@/lib/data/settings-content"
 import { SettingBlocks } from "./blocks"
@@ -32,7 +31,6 @@ import type { PermissionRole } from "@/lib/types"
 
 export default function SettingDetailPage() {
   const { section } = useParams<{ section: string }>()
-  const { viewer } = useStore()
   const found = findSetting(section)
 
   if (!found) notFound()
@@ -43,27 +41,6 @@ export default function SettingDetailPage() {
     g.items.some((i) => i.href === `/settings/${section}`)
   )
   const blocks = SETTINGS_CONTENT[section]
-
-  // Country rules is where filings are recorded, which is the Payroll
-  // Officer's job; the rest of Company settings stays HR Admin's.
-  const payrollMayOpen =
-    section === "statutory-settings" && has(viewer, "payroll")
-
-  if (!has(viewer, "hr_admin") && !payrollMayOpen) {
-    return (
-      <PageShell
-        crumbs={[{ label: "Company settings" }, { label: item.label }]}
-      >
-        <Panel>
-          <EmptyState
-            icon={Lock}
-            title="Company settings are restricted"
-            description="Only HR Admins and the Company Owner can open this area."
-          />
-        </Panel>
-      </PageShell>
-    )
-  }
 
   return (
     <PageShell
@@ -162,8 +139,7 @@ function LocalizationPanel() {
           payGroups
             .filter((g) => g.country === country)
             .map(
-              (g) =>
-                legalEntities.find((e) => e.id === g.entityId)?.name ?? "—"
+              (g) => legalEntities.find((e) => e.id === g.entityId)?.name ?? "—"
             )
         ),
       ],

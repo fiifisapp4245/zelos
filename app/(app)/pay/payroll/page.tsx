@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Wallet } from "lucide-react"
 
 import { PageShell } from "@/components/shell/page-shell"
@@ -12,10 +12,19 @@ import { RunsTab } from "@/components/payroll/runs-tab"
 import { OneOffsTab } from "@/components/payroll/one-offs-tab"
 import { PaymentsTab } from "@/components/payroll/payments-tab"
 import { ReportsTab } from "@/components/payroll/reports-tab"
+import { FilingsTab } from "@/components/payroll/filings-tab"
 import { MyPay } from "@/components/payroll/my-pay"
 import { WidgetSkeleton } from "@/components/home/skeletons"
 import { usePayroll } from "@/components/payroll/use-payroll"
 import { useStore } from "@/lib/store"
+
+const TABS = [
+  { value: "runs", label: "Runs" },
+  { value: "one-offs", label: "One-off payments" },
+  { value: "payments", label: "Payments" },
+  { value: "filings", label: "Filings" },
+  { value: "reports", label: "Reports" },
+]
 
 export default function PayrollPage() {
   return (
@@ -30,7 +39,18 @@ function Payroll() {
   const params = useSearchParams()
   const demo = params.get("demo")
   const { canOpenPayroll, isPreparer, isApprover } = usePayroll()
-  const [tab, setTab] = React.useState("runs")
+  const router = useRouter()
+  const pathname = usePathname()
+  // The tab is in the address, so "Open filings" elsewhere lands on it
+  // and a refresh keeps it.
+  const tab = TABS.some((t) => t.value === params.get("tab"))
+    ? params.get("tab")!
+    : "runs"
+  const setTab = (value: string) => {
+    const next = new URLSearchParams(params.toString())
+    next.set("tab", value)
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false })
+  }
 
   // An employee or a line manager has no run to prepare, so this route
   // is their own pay rather than a locked door.
@@ -83,14 +103,7 @@ function Payroll() {
 
       <Tabs value={tab} onValueChange={setTab} className="gap-0">
         <div className="mb-4">
-          <SegmentedTabs
-            tabs={[
-              { value: "runs", label: "Runs" },
-              { value: "one-offs", label: "One-off payments" },
-              { value: "payments", label: "Payments" },
-              { value: "reports", label: "Reports" },
-            ]}
-          />
+          <SegmentedTabs tabs={TABS} />
         </div>
 
         <TabsContent value="runs">
@@ -103,6 +116,10 @@ function Payroll() {
 
         <TabsContent value="payments">
           <PaymentsTab canPay={isPreparer} />
+        </TabsContent>
+
+        <TabsContent value="filings">
+          <FilingsTab />
         </TabsContent>
 
         <TabsContent value="reports">
