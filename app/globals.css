@@ -161,7 +161,9 @@
   --info-muted: oklch(0.955 0.03 245);
   --danger-muted: oklch(0.96 0.03 25);
   --neutral-muted: oklch(0.965 0 0);
-  --app-canvas: oklch(0.973 0 0);
+  /* The content area is the page itself, not a tray the page sits in:
+     the same surface as a card, so nothing is a container in a container. */
+  --app-canvas: var(--card);
   --sidebar-hover: oklch(0.955 0 0);
 }
 
@@ -177,7 +179,7 @@
   --info-muted: oklch(0.29 0.05 245);
   --danger-muted: oklch(0.3 0.06 25);
   --neutral-muted: oklch(0.26 0 0);
-  --app-canvas: oklch(0.175 0 0);
+  --app-canvas: var(--card);
   --sidebar-hover: oklch(0.26 0 0);
 }
 
@@ -273,4 +275,9 @@
   right: 0;
   background-color: var(--card);
   box-shadow: -12px 0 12px -12px oklch(0 0 0 / 0.25);
+}
+
+/* In a header row the pinned cell wears the header's tint, not the card's. */
+thead .sticky-actions {
+  background-color: color-mix(in oklab, var(--muted) 40%, var(--card));
 }

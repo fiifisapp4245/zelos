@@ -3,16 +3,13 @@
 import * as React from "react"
 import Link from "next/link"
 import { notFound, useParams } from "next/navigation"
-import {
-  ArrowLeft,
-  Check,
-  Globe,
-  ShieldCheck,
-  SlidersHorizontal,
-} from "lucide-react"
+import { Check, Globe, ShieldCheck, SlidersHorizontal } from "lucide-react"
 
 import { PageShell } from "@/components/shell/page-shell"
-import { SettingsNav } from "@/components/shell/settings-nav"
+import {
+  SettingsGroupNav,
+  SettingsGroupTabs,
+} from "@/components/shell/settings-nav"
 import { SETTINGS_NAV_GROUPS } from "@/lib/nav/settings-nav"
 import { EmptyState, Panel, Pill } from "@/components/common"
 import { useStore } from "@/lib/store"
@@ -44,59 +41,68 @@ export default function SettingDetailPage() {
 
   return (
     <PageShell
-      width="wide"
+      width="canvas"
       crumbs={[
-        { label: "Company settings", href: "/settings" },
-        { label: group?.label ?? category.label, href: "/settings" },
+        { label: "Settings", href: "/settings" },
+        { label: group?.label ?? category.label },
         { label: item.label },
       ]}
     >
-      {/* Title band, matching the hub: white, full width, divider beneath. */}
-      <div className="border-b pb-6">
-        <Link
-          href="/settings"
-          className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          Back to Company Settings
-        </Link>
-        <h1 className="text-[26px] leading-tight font-semibold tracking-tight">
-          {item.label}
-        </h1>
-        <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">
-          {item.blurb}
-        </p>
-      </div>
+      {/* Straight on the content area, as every page is — no frame inside
+          it: the title and group tabs across the top, the group's pages
+          down the left, and only the content scrolling. */}
+      <div className="flex h-full flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="shrink-0 border-b px-5 pt-5 sm:px-7">
+            <p className="mb-4 text-lg font-semibold">Settings</p>
+            <SettingsGroupTabs />
+          </div>
 
-      <div className="flex flex-col gap-6 py-6 lg:flex-row lg:items-start">
-        <SettingsNav className="w-full shrink-0 lg:sticky lg:top-6 lg:w-[232px]" />
+          <div className="flex min-h-0 flex-1 flex-col gap-3 pt-4 pl-5 sm:pl-7 lg:flex-row lg:gap-10 lg:pt-6">
+            <SettingsGroupNav className="w-full shrink-0 lg:w-[220px] lg:overflow-y-auto" />
 
-        <div className="min-w-0 flex-1">
-          {section === "company-information" ? (
-            <CompanyInformation />
-          ) : section === "localization" ? (
-            <LocalizationPanel />
-          ) : section === "role-assignment" ? (
-            <RoleAssignmentPanel />
-          ) : section === "pay-groups" ? (
-            <PayGroupsPanel />
-          ) : section === "allowance-deduction-type" ? (
-            <PayComponentsPanel />
-          ) : section === "statutory-settings" ? (
-            <CountryRulesPanel />
-          ) : section === "payroll-approval" ? (
-            <PayApprovalsPanel />
-          ) : blocks ? (
-            <SettingBlocks blocks={blocks} />
-          ) : (
-            <Panel>
-              <EmptyState
-                icon={SlidersHorizontal}
-                title={`No ${item.label.toLowerCase()} configured`}
-                description="Nothing has been set here yet. Whatever is configured will apply across the company."
-              />
-            </Panel>
-          )}
+            {/* Runs to the right edge, with the gutter inside it, so the
+                scrollbar sits at the far edge rather than against the cards.
+                `relative` for .sr-only, which resolves against the nearest
+                positioned ancestor. */}
+            <div className="relative min-h-0 min-w-0 flex-1 overflow-y-auto pr-5 pb-8 sm:pr-7">
+              <div className="max-w-[1100px]">
+                <div className="mb-5">
+                  <h1 className="text-xl leading-tight font-semibold tracking-tight">
+                    {item.label}
+                  </h1>
+                  <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                    {item.blurb}
+                  </p>
+                </div>
+                {section === "company-information" ? (
+                  <CompanyInformation />
+                ) : section === "localization" ? (
+                  <LocalizationPanel />
+                ) : section === "role-assignment" ? (
+                  <RoleAssignmentPanel />
+                ) : section === "pay-groups" ? (
+                  <PayGroupsPanel />
+                ) : section === "allowance-deduction-type" ? (
+                  <PayComponentsPanel />
+                ) : section === "statutory-settings" ? (
+                  <CountryRulesPanel />
+                ) : section === "payroll-approval" ? (
+                  <PayApprovalsPanel />
+                ) : blocks ? (
+                  <SettingBlocks blocks={blocks} />
+                ) : (
+                  <Panel>
+                    <EmptyState
+                      icon={SlidersHorizontal}
+                      title={`No ${item.label.toLowerCase()} configured`}
+                      description="Nothing has been set here yet. Whatever is configured will apply across the company."
+                    />
+                  </Panel>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </PageShell>

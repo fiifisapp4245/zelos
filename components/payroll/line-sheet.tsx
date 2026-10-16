@@ -68,9 +68,9 @@ export function LineSheet({
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="right"
-        className="flex flex-col gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-[600px]"
+        className="flex flex-col gap-0 overflow-hidden p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[600px]"
       >
-        <SheetHeader>
+        <SheetHeader className="border-b">
           <SheetTitle className="flex items-center gap-2.5">
             {person && <Initials person={person} size="sm" />}
             {fullName(person)}
@@ -81,7 +81,7 @@ export function LineSheet({
         </SheetHeader>
 
         <RevealProvider revealed={revealed}>
-          <div className="space-y-5 px-4 pb-4">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="flex flex-wrap gap-1.5">
                 {line.flags.map((f) => (

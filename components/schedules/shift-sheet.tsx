@@ -99,9 +99,9 @@ export function ShiftSheet({
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent
         side="right"
-        className="flex flex-col gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-[560px]"
+        className="flex flex-col gap-0 overflow-hidden p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[560px]"
       >
-        <SheetHeader>
+        <SheetHeader className="border-b">
           <SheetTitle>
             {editing ? "Shift" : "New shift"} · {formatDate(draft.date)}
           </SheetTitle>
@@ -118,7 +118,7 @@ export function ShiftSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-4 px-4 pb-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
           <div>
             <Label className="mb-1.5 block">Who</Label>
             <Select

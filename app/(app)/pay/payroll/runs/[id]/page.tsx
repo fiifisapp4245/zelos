@@ -282,7 +282,8 @@ function Run() {
             <ExternalUpload
               run={run}
               members={members}
-              canEdit={isPreparer && !settled}
+              isPreparer={isPreparer}
+              settled={settled}
             />
           ) : lines.length === 0 ? (
             <Panel bodyClassName="p-0">

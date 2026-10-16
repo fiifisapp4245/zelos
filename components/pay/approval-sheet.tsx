@@ -129,9 +129,9 @@ export function ApprovalSheet({
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent
         side="right"
-        className="flex flex-col gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-[640px]"
+        className="flex flex-col gap-0 overflow-hidden p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[640px]"
       >
-        <SheetHeader>
+        <SheetHeader className="border-b">
           <SheetTitle className="flex flex-wrap items-center gap-2">
             {request.employeeIds.length === 1
               ? fullName(store.employeeById(request.employeeIds[0]))
@@ -145,7 +145,7 @@ export function ApprovalSheet({
         </SheetHeader>
 
         <RevealProvider revealed={revealed}>
-          <div className="space-y-5 px-4 pb-4">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
             <p className="rounded-lg border bg-muted/40 px-3 py-2.5 text-sm">
               {request.reason}
             </p>

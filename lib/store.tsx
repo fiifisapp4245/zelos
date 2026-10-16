@@ -98,6 +98,7 @@ import type {
   CountrySetup,
   CoverageChoice,
   CoverageDecision,
+  CustomPackSubmission,
   FilingRecord,
   LegalEntity,
   PackAcknowledgement,
@@ -174,6 +175,7 @@ interface State {
   filingRecords: FilingRecord[]
   packIssueReports: PackIssueReport[]
   coverageDecisions: CoverageDecision[]
+  customPackSubmissions: CustomPackSubmission[]
   compensationVersions: CompensationVersion[]
   changeRequests: CompensationChangeRequest[]
   assignmentsAbroad: AssignmentAbroad[]
@@ -231,6 +233,7 @@ export const INITIAL: State = {
   filingRecords: FILING_RECORDS,
   packIssueReports: [],
   coverageDecisions: [],
+  customPackSubmissions: [],
   compensationVersions: COMPENSATION_VERSIONS,
   changeRequests: CHANGE_REQUESTS,
   assignmentsAbroad: ASSIGNMENTS_ABROAD,
@@ -425,6 +428,7 @@ interface StoreValue extends State {
   ) => void
   reportPackIssue: (report: Omit<PackIssueReport, "id" | "by" | "at">) => void
   chooseCoverage: (country: string, choice: CoverageChoice) => void
+  submitCustomPack: (country: string, note: string) => void
   saveApprovalSettings: (patch: Partial<ApprovalSettings>) => void
 
   /**
@@ -1551,6 +1555,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         log({
           employeeId: null,
           action: `Chose how ${country} is paid: ${choice.replace(/_/g, " ")}`,
+        })
+      },
+
+      submitCustomPack: (country, note) => {
+        setState((s) => ({
+          ...s,
+          customPackSubmissions: [
+            ...s.customPackSubmissions.filter((p) => p.country !== country),
+            { country, note, by: actorId, at: nowIso() },
+          ],
+        }))
+        log({
+          employeeId: null,
+          action: `Sent ${country}'s rules to Zelos to build as a custom pack`,
         })
       },
 

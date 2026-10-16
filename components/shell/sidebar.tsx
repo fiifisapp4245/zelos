@@ -8,7 +8,7 @@ import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useStore } from "@/lib/store"
 import { getNavForUser } from "@/lib/nav/get-nav-for-user"
-import { PINNED_SECTION, type NavItemConfig } from "@/lib/nav/nav-config"
+import type { NavItemConfig } from "@/lib/nav/nav-config"
 import { useNavBadges } from "@/lib/nav/use-nav-badges"
 import { ProfileMenu } from "./profile-menu"
 import {
@@ -62,8 +62,6 @@ export function Sidebar({
   const badges = useNavBadges()
 
   const sections = getNavForUser(session)
-  const scrolling = sections.filter((s) => s.id !== PINNED_SECTION)
-  const pinned = sections.find((s) => s.id === PINNED_SECTION)
 
   return (
     <aside
@@ -99,7 +97,7 @@ export function Sidebar({
       </div>
 
       <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 pb-4">
-        {scrolling.map((section) => (
+        {sections.map((section) => (
           <NavSectionList
             key={section.id}
             id={section.id}
@@ -111,19 +109,6 @@ export function Sidebar({
           />
         ))}
       </nav>
-
-      {pinned && (
-        <div className="border-t px-3 py-2">
-          <NavSectionList
-            id={pinned.id}
-            label={pinned.label}
-            items={pinned.items}
-            collapsed={collapsed}
-            isActive={isActive}
-            badges={badges}
-          />
-        </div>
-      )}
 
       <ProfileMenu collapsed={collapsed} isActive={isActive} />
     </aside>

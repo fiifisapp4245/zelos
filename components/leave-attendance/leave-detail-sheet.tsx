@@ -67,9 +67,9 @@ export function LeaveDetailSheet({
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent
         side="right"
-        className="flex flex-col gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-[520px]"
+        className="flex flex-col gap-0 overflow-hidden p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[520px]"
       >
-        <SheetHeader>
+        <SheetHeader className="border-b">
           <SheetTitle className="flex items-center gap-2.5">
             {person && <Initials person={person} size="sm" />}
             {fullName(person)}
@@ -79,7 +79,7 @@ export function LeaveDetailSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <dl className="px-4">
+        <dl className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <Row label="Status">
             <RequestBadge status={request.status} />
           </Row>

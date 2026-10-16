@@ -15,9 +15,15 @@ import type { Block } from "@/lib/data/settings-content"
 import { cn } from "@/lib/utils"
 
 export function SettingBlocks({ blocks }: { blocks: Block[] }) {
+  // A note explains the settings around it, so it is read first: above
+  // the cards it is about, not after them. Otherwise the order is kept.
+  const ordered = [
+    ...blocks.filter((b) => b.kind === "note"),
+    ...blocks.filter((b) => b.kind !== "note"),
+  ]
   return (
     <div className="space-y-5">
-      {blocks.map((block, i) => (
+      {ordered.map((block, i) => (
         <SettingBlock key={i} block={block} />
       ))}
     </div>
@@ -27,7 +33,9 @@ export function SettingBlocks({ blocks }: { blocks: Block[] }) {
 function SettingBlock({ block }: { block: Block }) {
   if (block.kind === "note") {
     return (
-      <div className="flex items-start gap-2.5 rounded-xl border border-info/30 bg-info-muted px-4 py-3.5">
+      // The same width as the cards beside it, so it lines up with them
+      // rather than running past their edge.
+      <div className="flex max-w-3xl items-start gap-2.5 rounded-xl border border-info/30 bg-info-muted px-4 py-3.5">
         <Info className="mt-0.5 size-4 shrink-0 text-info" />
         <div className="min-w-0 text-sm">
           {block.title && <p className="font-medium">{block.title}</p>}

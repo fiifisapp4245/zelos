@@ -283,6 +283,14 @@ export interface CoverageDecision {
   at: string
 }
 
+/** What a company sends Zelos toward building its own pack for a country. */
+export interface CustomPackSubmission {
+  country: string
+  note: string
+  by: string
+  at: string
+}
+
 /* ── Components ──────────────────────────────────────────────────────── */
 
 export type ComponentCategory =

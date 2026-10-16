@@ -39,3 +39,6 @@ next-env.d.ts
 # ~230 MB of single-file HTML exports from the design tool, plus a nested
 # git repository (zelos_design system). Delete this line to include them.
 zelos files/
+
+# Claude Code: personal permission grants, not shared config.
+.claude/settings.local.json

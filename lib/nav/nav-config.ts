@@ -70,7 +70,7 @@ export const NAV_SECTION_LABEL: Record<NavSectionId, string | null> = {
   talent: "Talent",
   relations: "Employee relations",
   me: "Me",
-  pinned: null,
+  pinned: "Workspace",
 }
 
 /**
@@ -91,9 +91,6 @@ export const SECTION_ORDER: Record<NavAudience, NavSectionId[]> = {
   employee: ["primary", "me", "people"],
   payroll: ["primary", "pay", "people", "me", "pinned"],
 }
-
-/** Rendered at the foot of the sidebar rather than in the scrolling list. */
-export const PINNED_SECTION: NavSectionId = "pinned"
 
 const ALL: NavAudience[] = ["hr_admin", "manager", "employee", "payroll"]
 

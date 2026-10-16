@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { AlertTriangle, Globe, Plus } from "lucide-react"
 import { toast } from "sonner"
 
@@ -64,10 +65,29 @@ const CHANNEL_LABEL: Record<string, string> = {
 }
 
 export function PayGroupsPanel() {
-  const store = useStore()
-  const [editing, setEditing] = React.useState<PayGroup | null | undefined>(
-    undefined
+  return (
+    <React.Suspense fallback={null}>
+      <PayGroupsPanelInner />
+    </React.Suspense>
   )
+}
+
+/**
+ * "Add a country" on the country rules list lands here with `?new=1` so a
+ * missing country turns straight into a pay group, rather than a page the
+ * person still has to find the button on.
+ */
+function PayGroupsPanelInner() {
+  const store = useStore()
+  const router = useRouter()
+  const params = useSearchParams()
+  const [editing, setEditing] = React.useState<PayGroup | null | undefined>(
+    () => (params.get("new") === "1" ? null : undefined)
+  )
+
+  React.useEffect(() => {
+    if (params.get("new") === "1") router.replace("/settings/pay-groups")
+  }, [params, router])
 
   return (
     <div className="space-y-4">
@@ -235,16 +255,16 @@ function PayGroupSheet({
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="right"
-        className="flex flex-col gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-[520px]"
+        className="flex flex-col gap-0 overflow-hidden p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[520px]"
       >
-        <SheetHeader>
+        <SheetHeader className="border-b">
           <SheetTitle>{group ? "Edit pay group" : "New pay group"}</SheetTitle>
           <SheetDescription>
             One entity, one country, one currency, one cycle.
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-4 px-4 pb-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
           <div>
             <Label htmlFor="group-name" className="mb-1.5 block">
               Name
@@ -652,9 +672,9 @@ function ComponentSheet({
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="right"
-        className="flex flex-col gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-[480px]"
+        className="flex flex-col gap-0 overflow-hidden p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[480px]"
       >
-        <SheetHeader>
+        <SheetHeader className="border-b">
           <SheetTitle>
             {component ? "Edit component" : "New component"}
           </SheetTitle>
@@ -664,7 +684,7 @@ function ComponentSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-4 px-4 pb-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
           <div>
             <Label htmlFor="component-name" className="mb-1.5 block">
               Name

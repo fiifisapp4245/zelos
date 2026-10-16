@@ -179,7 +179,9 @@ export function Panel({
     <section className={cn("rounded-xl border bg-card", className)}>
       {(title || actions) && (
         <header className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
-          <div className="min-w-0">
+          {/* Grows into the space, but gives way to the actions first, so
+              they stay top-right until the panel is too narrow for both. */}
+          <div className="min-w-[min(100%,16rem)] flex-1 basis-0">
             {title && <h2 className="text-[15px] font-semibold">{title}</h2>}
             {description && (
               <p className="mt-0.5 text-sm text-muted-foreground">
