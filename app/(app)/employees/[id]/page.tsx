@@ -77,7 +77,11 @@ import {
 import { completeness } from "@/lib/selectors"
 import { lifecycleTasks } from "@/lib/lifecycle-actions"
 import { LifecycleWorklist } from "@/components/employees/lifecycle-worklist"
-import type { Employee, LifecycleState } from "@/lib/types"
+import type { Employee, EmployeeDocument, LifecycleState } from "@/lib/types"
+import {
+  UploadDocumentDialog,
+  downloadDocument,
+} from "@/components/documents/document-dialogs"
 import { cn } from "@/lib/utils"
 import { ChangeStatusDialog } from "@/components/employees/change-status-dialog"
 import { RoleChangeDialog, type RoleChangeKind } from "./role-change-dialog"
@@ -1065,93 +1069,118 @@ function DocumentsTab({ employeeId }: { employeeId: string }) {
   const canSeeConfidential = has(viewer, "hr_admin") || isSelf(viewer, employee)
   const visible = mine.filter((d) => !d.confidential || canSeeConfidential)
   const hidden = mine.length - visible.length
+  const [dlg, setDlg] = React.useState<{
+    kind: "upload"
+    category?: EmployeeDocument["category"]
+  } | null>(null)
 
   return (
-    <Section
-      title={`Documents · ${visible.length} on file${hidden > 0 ? `, ${hidden} withheld` : ""}`}
-      actions={
-        (has(viewer, "hr_admin") || isSelf(viewer, employee)) && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => toast("Choose a file to upload.")}
-          >
-            Upload
-          </Button>
-        )
-      }
-    >
-      {visible.length === 0 ? (
-        <EmptyState icon={Lock} title="No documents on file" />
-      ) : (
-        <ul className="divide-y">
-          {visible.map((d) => {
-            const expires = daysUntil(d.expiresOn)
-            return (
-              <li
-                key={d.id}
-                className="flex flex-wrap items-center gap-3 px-5 py-3.5"
-              >
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="size-4"
-                    fill="none"
-                    aria-hidden
-                  >
-                    <path
-                      d="M14 3v5h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"
-                      stroke="currentColor"
-                      strokeWidth="1.7"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {d.name}
-                    {d.confidential && (
-                      <Lock className="ml-1.5 inline size-3 text-muted-foreground" />
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground capitalize">
-                    {d.category} · {d.sizeKb} KB · uploaded{" "}
-                    {formatDate(d.uploadedAt)}
-                  </p>
-                </div>
-                {d.expiresOn && (
-                  <span
-                    className={cn(
-                      "tabular text-xs",
-                      expires !== null && expires <= 60
-                        ? "font-medium text-destructive"
-                        : "text-muted-foreground"
-                    )}
-                  >
-                    expires {formatDate(d.expiresOn)}
-                  </span>
-                )}
-                <DocumentBadge status={d.status} />
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => toast("Download started.")}
+    <>
+      <Section
+        title={`Documents · ${visible.length} on file${hidden > 0 ? `, ${hidden} withheld` : ""}`}
+        actions={
+          (has(viewer, "hr_admin") || isSelf(viewer, employee)) && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setDlg({ kind: "upload" })}
+            >
+              Upload
+            </Button>
+          )
+        }
+      >
+        {visible.length === 0 ? (
+          <EmptyState icon={Lock} title="No documents on file" />
+        ) : (
+          <ul className="divide-y">
+            {visible.map((d) => {
+              const expires = daysUntil(d.expiresOn)
+              return (
+                <li
+                  key={d.id}
+                  className="flex flex-wrap items-center gap-3 px-5 py-3.5"
                 >
-                  Download
-                </Button>
-              </li>
-            )
-          })}
-        </ul>
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="size-4"
+                      fill="none"
+                      aria-hidden
+                    >
+                      <path
+                        d="M14 3v5h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {d.name}
+                      {d.confidential && (
+                        <Lock className="ml-1.5 inline size-3 text-muted-foreground" />
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {d.category} · {d.sizeKb} KB · uploaded{" "}
+                      {formatDate(d.uploadedAt)}
+                    </p>
+                  </div>
+                  {d.expiresOn && (
+                    <span
+                      className={cn(
+                        "tabular text-xs",
+                        expires !== null && expires <= 60
+                          ? "font-medium text-destructive"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      expires {formatDate(d.expiresOn)}
+                    </span>
+                  )}
+                  <DocumentBadge status={d.status} />
+                  {d.status === "missing" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setDlg({ kind: "upload", category: d.category })
+                      }
+                    >
+                      Upload
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => downloadDocument(d, fullName(employee))}
+                    >
+                      Download
+                    </Button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {hidden > 0 && (
+          <div className="border-t px-5 py-3 text-xs text-muted-foreground">
+            {hidden} medical document{hidden === 1 ? "" : "s"} withheld. Medical
+            records use purpose-based access — HR must state a reason, and
+            seniority alone does not grant it.
+          </div>
+        )}
+      </Section>
+      {dlg?.kind === "upload" && (
+        <UploadDocumentDialog
+          employeeId={employeeId}
+          category={dlg.category}
+          onClose={() => setDlg(null)}
+        />
       )}
-      {hidden > 0 && (
-        <div className="border-t px-5 py-3 text-xs text-muted-foreground">
-          {hidden} medical document{hidden === 1 ? "" : "s"} withheld. Medical
-          records use purpose-based access — HR must state a reason, and
-          seniority alone does not grant it.
-        </div>
-      )}
-    </Section>
+    </>
   )
 }
 

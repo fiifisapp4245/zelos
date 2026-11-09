@@ -210,16 +210,14 @@ function Offices() {
           >
             <Pencil className="size-4" />
           </Link>
-          <button
-            type="button"
-            aria-label={`Remove ${branch.name}`}
-            onClick={() =>
-              toast("Archive a branch from Organizational structure.")
-            }
+          <Link
+            href="/structure"
+            aria-label={`Archive ${branch.name} in Organizational structure`}
+            title="Archive in Organizational structure"
             className="grid size-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           >
             <Trash2 className="size-4" />
-          </button>
+          </Link>
         </div>
       ))}
     </Panel>

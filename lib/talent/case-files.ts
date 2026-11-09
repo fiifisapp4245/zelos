@@ -34,9 +34,12 @@ export const ACCEPTED_EXTENSIONS = [
 ]
 
 /** Why a file cannot be attached, or null when it can. */
-export function fileProblem(file: File): string | null {
+export function fileProblem(
+  file: File,
+  accepted: string[] = ACCEPTED_EXTENSIONS
+): string | null {
   const ext = file.name.split(".").pop()?.toLowerCase() ?? ""
-  if (!ACCEPTED_EXTENSIONS.includes(ext))
+  if (!accepted.includes(ext))
     return `${file.name}: .${ext || "?"} files are not accepted.`
   if (file.size > MAX_UPLOAD_MB * 1024 * 1024)
     return `${file.name}: larger than ${MAX_UPLOAD_MB} MB.`

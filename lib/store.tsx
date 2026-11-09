@@ -136,7 +136,10 @@ import type {
   Requisition,
   CaseEvent,
   SavedReport,
+  AlertSettings,
+  ExternalReturnFile,
 } from "./types"
+import { DEFAULT_ALERT_SETTINGS } from "./alerts"
 import { TODAY, TODAY_ISO, LIFECYCLE_TRANSITIONS } from "./format"
 import { addDays } from "./time"
 import {
@@ -202,6 +205,8 @@ interface State {
   timesheets: Timesheet[]
   actingAssignments: ActingAssignment[]
   savedReports: SavedReport[]
+  alertSettings: AlertSettings
+  externalReturnFiles: ExternalReturnFile[]
   company: CompanyProfile
   /** Editable settings tables, keyed by table id. */
   tables: Record<string, TableRow[]>
@@ -261,6 +266,8 @@ export const INITIAL: State = {
   timesheets: PERIOD_TIMESHEETS,
   actingAssignments: ACTING_ASSIGNMENTS,
   savedReports: [],
+  alertSettings: DEFAULT_ALERT_SETTINGS,
+  externalReturnFiles: [],
   company: COMPANY,
   tables: TABLE_ROWS,
   activeRole: "hr_admin",
@@ -488,6 +495,7 @@ interface StoreValue extends State {
   cancelLeave: (id: string) => void
   addOnboardingTask: (task: OnboardingTask) => void
   deleteOnboardingTask: (id: string) => void
+  addDocuments: (docs: EmployeeDocument[]) => void
   updateDocument: (id: string, patch: Partial<EmployeeDocument>) => void
   deleteDocument: (id: string) => void
   updateRequisition: (id: string, patch: Partial<Requisition>) => void
@@ -527,6 +535,9 @@ interface StoreValue extends State {
     patch: Partial<DisciplinaryCase>,
     event: string
   ) => void
+  addExternalReturnFiles: (files: ExternalReturnFile[]) => void
+  removeExternalReturnFile: (id: string) => void
+  setAlertSettings: (patch: Partial<AlertSettings>) => void
   saveReport: (
     r: Omit<SavedReport, "id" | "createdBy" | "createdOn" | "lastRunOn">
   ) => void
@@ -2065,6 +2076,24 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         }))
       },
 
+      addDocuments: (docs) => {
+        setState((s) => ({
+          ...s,
+          documents: [...docs, ...s.documents],
+          auditLog: [
+            ...docs.map((d) => ({
+              id: uid("a"),
+              employeeId: d.employeeId,
+              actorId,
+              action: `Uploaded document ${d.name}`,
+              field: d.category,
+              at: nowIso(),
+            })),
+            ...s.auditLog,
+          ],
+        }))
+      },
+
       updateDocument: (id, patch) => {
         setState((s) => {
           const doc = s.documents.find((d) => d.id === id)
@@ -2496,6 +2525,49 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             ],
           }
         })
+      },
+
+      addExternalReturnFiles: (files) => {
+        setState((s) => ({
+          ...s,
+          externalReturnFiles: [...files, ...s.externalReturnFiles],
+          auditLog: [
+            ...files.map((f) => ({
+              id: uid("a"),
+              employeeId: null,
+              actorId,
+              action: `Attached an external return: ${f.name}`,
+              field: f.payGroupId,
+              at: nowIso(),
+            })),
+            ...s.auditLog,
+          ],
+        }))
+      },
+
+      removeExternalReturnFile: (id) => {
+        setState((s) => ({
+          ...s,
+          externalReturnFiles: s.externalReturnFiles.filter((f) => f.id !== id),
+        }))
+      },
+
+      setAlertSettings: (patch) => {
+        setState((s) => ({
+          ...s,
+          alertSettings: { ...s.alertSettings, ...patch },
+          auditLog: [
+            {
+              id: uid("a"),
+              employeeId: null,
+              actorId,
+              action: "Changed compliance alert settings",
+              field: Object.keys(patch).join(", "),
+              at: nowIso(),
+            },
+            ...s.auditLog,
+          ],
+        }))
       },
 
       saveReport: (r) => {

@@ -2,7 +2,17 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { BadgeCheck, Download, FileText, Trash2, Upload } from "lucide-react"
+import {
+  BadgeCheck,
+  BellRing,
+  Download,
+  FileText,
+  History,
+  Pencil,
+  RefreshCw,
+  Trash2,
+  Upload,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { PageShell } from "@/components/shell/page-shell"
@@ -17,6 +27,14 @@ import { DocumentBadge } from "@/components/common/status"
 import { RowActions } from "@/components/common/row-actions"
 import { FilterSearch, FilterToolbar } from "@/components/common/filter-bar"
 import { Button } from "@/components/ui/button"
+import {
+  DOC_CATEGORY_LABEL,
+  DocumentHistoryDialog,
+  EditDocumentDialog,
+  RemoveDocumentDialog,
+  UploadDocumentDialog,
+  downloadDocument,
+} from "@/components/documents/document-dialogs"
 import { useStore } from "@/lib/store"
 import { has, isSelf } from "@/lib/rbac"
 import { visibleEmployees } from "@/lib/selectors"
@@ -24,16 +42,18 @@ import { DOC_STATUS_LABEL, daysUntil, formatDate, fullName } from "@/lib/format"
 import type { DocumentStatus, EmployeeDocument } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-const CATEGORY_LABEL: Record<EmployeeDocument["category"], string> = {
-  contract: "Contract",
-  identity: "Identity",
-  certificate: "Certificate",
-  statutory: "Statutory",
-  medical: "Medical",
-  other: "Other",
-}
+const CATEGORY_LABEL = DOC_CATEGORY_LABEL
 
 const CATEGORIES = Object.keys(CATEGORY_LABEL) as EmployeeDocument["category"][]
+
+type Dlg =
+  | {
+      kind: "upload"
+      employeeId?: string
+      category?: EmployeeDocument["category"]
+    }
+  | { kind: "replace" | "edit" | "remove" | "history"; doc: EmployeeDocument }
+  | null
 
 export default function DocumentsPage() {
   const store = useStore()
@@ -41,6 +61,7 @@ export default function DocumentsPage() {
   const scope = visibleEmployees(viewer, employees)
   const scopeIds = new Set(scope.map((e) => e.id))
 
+  const [dlg, setDlg] = React.useState<Dlg>(null)
   const [query, setQuery] = React.useState("")
   const [status, setStatus] = React.useState<DocumentStatus | "all">("all")
   const [category, setCategory] = React.useState<
@@ -88,12 +109,7 @@ export default function DocumentsPage() {
         title="Document vault"
         description="Contracts, identity, statutory and certification documents. Expiry dates here feed the compliance alerts automatically."
         actions={
-          <Button
-            size="lg"
-            onClick={() =>
-              toast("Choose files and the employee to attach them to.")
-            }
-          >
+          <Button size="lg" onClick={() => setDlg({ kind: "upload" })}>
             <Upload className="size-4" />
             Upload
           </Button>
@@ -218,16 +234,50 @@ export default function DocumentsPage() {
                     </span>
                   )}
                   <DocumentBadge status={d.status} />
+                  {d.status === "missing" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setDlg({
+                          kind: "upload",
+                          employeeId: d.employeeId,
+                          category: d.category,
+                        })
+                      }
+                    >
+                      <Upload className="size-3.5" />
+                      Upload
+                    </Button>
+                  )}
                   <RowActions
                     label={`Actions for ${d.name}`}
                     actions={[
-                      {
+                      d.status !== "missing" && {
                         label: "Download",
                         icon: Download,
-                        onSelect: () => toast(`Downloading ${d.name}.`),
+                        onSelect: () => downloadDocument(d, fullName(emp)),
+                      },
+                      {
+                        label: "View history",
+                        icon: History,
+                        onSelect: () => setDlg({ kind: "history", doc: d }),
+                      },
+                      (has(viewer, "hr_admin") ||
+                        (emp && isSelf(viewer, emp))) &&
+                        d.status !== "missing" && {
+                          label: "Replace file",
+                          icon: RefreshCw,
+                          onSelect: () => setDlg({ kind: "replace", doc: d }),
+                        },
+                      has(viewer, "hr_admin") && {
+                        label: "Edit details",
+                        icon: Pencil,
+                        onSelect: () => setDlg({ kind: "edit", doc: d }),
                       },
                       has(viewer, "hr_admin") &&
-                        d.status !== "verified" && {
+                        d.status !== "verified" &&
+                        d.status !== "missing" && {
                           label: "Mark verified",
                           icon: BadgeCheck,
                           onSelect: () => {
@@ -235,16 +285,29 @@ export default function DocumentsPage() {
                             toast.success(`${d.name} marked verified.`)
                           },
                         },
+                      has(viewer, "hr_admin") &&
+                        ["missing", "expiring", "expired"].includes(
+                          d.status
+                        ) && {
+                          label: "Ask for a new copy",
+                          icon: BellRing,
+                          onSelect: () => {
+                            store.addNotification({
+                              title: `Upload needed: ${d.name}`,
+                              body: `HR needs ${d.status === "missing" ? "a copy of" : "a current copy of"} ${d.name}.`,
+                              kind: "alert",
+                              href: "/me/documents",
+                            })
+                            toast.success(
+                              `Request sent to ${emp ? fullName(emp) : "the employee"}.`
+                            )
+                          },
+                        },
                       has(viewer, "hr_admin") && {
                         label: "Remove",
                         icon: Trash2,
                         destructive: true,
-                        onSelect: () => {
-                          store.deleteDocument(d.id)
-                          toast.success(
-                            `${d.name} removed. Logged in the audit trail.`
-                          )
-                        },
+                        onSelect: () => setDlg({ kind: "remove", doc: d }),
                       },
                     ]}
                   />
@@ -263,6 +326,25 @@ export default function DocumentsPage() {
           </div>
         )}
       </Panel>
+      {dlg?.kind === "upload" && (
+        <UploadDocumentDialog
+          employeeId={dlg.employeeId}
+          category={dlg.category}
+          onClose={() => setDlg(null)}
+        />
+      )}
+      {dlg?.kind === "replace" && (
+        <UploadDocumentDialog replace={dlg.doc} onClose={() => setDlg(null)} />
+      )}
+      {dlg?.kind === "edit" && (
+        <EditDocumentDialog doc={dlg.doc} onClose={() => setDlg(null)} />
+      )}
+      {dlg?.kind === "remove" && (
+        <RemoveDocumentDialog doc={dlg.doc} onClose={() => setDlg(null)} />
+      )}
+      {dlg?.kind === "history" && (
+        <DocumentHistoryDialog doc={dlg.doc} onClose={() => setDlg(null)} />
+      )}
     </PageShell>
   )
 }
