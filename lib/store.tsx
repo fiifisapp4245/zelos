@@ -134,9 +134,18 @@ import type {
   Payslip,
   PermissionRole,
   Requisition,
+  CaseEvent,
+  SavedReport,
 } from "./types"
-import { TODAY, TODAY_ISO } from "./format"
+import { TODAY, TODAY_ISO, LIFECYCLE_TRANSITIONS } from "./format"
 import { addDays } from "./time"
+import {
+  STANDARD_ASSETS,
+  caseStage,
+  endStateFor,
+  newCaseId as newOffboardingId,
+} from "./talent/offboarding"
+import { preHireFrom } from "./talent/recruitment"
 import type { Viewer } from "./rbac"
 import type { SessionContext } from "./session"
 
@@ -192,6 +201,7 @@ interface State {
   payPeriods: PayPeriod[]
   timesheets: Timesheet[]
   actingAssignments: ActingAssignment[]
+  savedReports: SavedReport[]
   company: CompanyProfile
   /** Editable settings tables, keyed by table id. */
   tables: Record<string, TableRow[]>
@@ -250,6 +260,7 @@ export const INITIAL: State = {
   payPeriods: PAY_PERIODS,
   timesheets: PERIOD_TIMESHEETS,
   actingAssignments: ACTING_ASSIGNMENTS,
+  savedReports: [],
   company: COMPANY,
   tables: TABLE_ROWS,
   activeRole: "hr_admin",
@@ -263,7 +274,7 @@ const STORAGE_KEY = "zelos-hr-session"
  * this week's types is how you get a crash three screens away from the
  * change that caused it.
  */
-export const STORAGE_VERSION = 11
+export const STORAGE_VERSION = 12
 
 /**
  * Keeps only the restored slices that still look like the ones we seed.
@@ -482,8 +493,45 @@ interface StoreValue extends State {
   updateRequisition: (id: string, patch: Partial<Requisition>) => void
   toggleClearance: (
     caseId: string,
-    key: keyof OffboardingCase["clearance"]
+    key: "access" | "finance" | "handover"
   ) => void
+  /** Opens an exit: the case, and the record moves to Serving notice. */
+  openOffboarding: (draft: {
+    employeeId: string
+    reason: OffboardingCase["reason"]
+    noticeGivenOn: string
+    lastWorkingDay: string
+  }) => OffboardingCase | null
+  updateOffboarding: (
+    id: string,
+    patch: Partial<OffboardingCase>,
+    action: string
+  ) => void
+  /** Closes the case and moves the record to its end state. */
+  closeOffboarding: (id: string) => void
+  addRequisition: (r: Requisition) => void
+  addCandidate: (c: Candidate) => void
+  updateCandidate: (id: string, patch: Partial<Candidate>) => void
+  /** Turns a hired candidate into a pre-hire record, with onboarding started. */
+  hireCandidate: (id: string) => Employee | null
+  updateReview: (
+    id: string,
+    patch: Partial<PerformanceReview>,
+    action?: string
+  ) => void
+  addReviews: (reviews: PerformanceReview[]) => void
+  raiseCase: (c: DisciplinaryCase) => void
+  /** Changes a case and writes what happened into its own history. */
+  updateCase: (
+    id: string,
+    patch: Partial<DisciplinaryCase>,
+    event: string
+  ) => void
+  saveReport: (
+    r: Omit<SavedReport, "id" | "createdBy" | "createdOn" | "lastRunOn">
+  ) => void
+  updateSavedReport: (id: string, patch: Partial<SavedReport>) => void
+  deleteSavedReport: (id: string) => void
   toggleOnboardingTask: (id: string) => void
   moveCandidate: (id: string, stage: Candidate["stage"]) => void
   acknowledgeAlert: (id: string) => void
@@ -2074,16 +2122,411 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       },
 
       toggleClearance: (caseId, key) => {
+        setState((s) => {
+          const c = s.offboarding.find((x) => x.id === caseId)
+          if (!c) return s
+          return {
+            ...s,
+            offboarding: s.offboarding.map((x) =>
+              x.id === caseId
+                ? {
+                    ...x,
+                    clearance: { ...x.clearance, [key]: !x.clearance[key] },
+                  }
+                : x
+            ),
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: c.employeeId,
+                actorId,
+                action: `Marked ${key} clearance ${c.clearance[key] ? "outstanding" : "done"}`,
+                field: caseId,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      openOffboarding: (draft) => {
+        let created: OffboardingCase | null = null
+        setState((s) => {
+          const emp = s.employees.find((e) => e.id === draft.employeeId)
+          if (!emp) return s
+          const open = s.offboarding.some(
+            (c) => c.employeeId === emp.id && c.state !== "closed"
+          )
+          if (open) return s
+          created = {
+            id: newOffboardingId(s.offboarding),
+            employeeId: emp.id,
+            reason: draft.reason,
+            noticeGivenOn: draft.noticeGivenOn,
+            lastWorkingDay: draft.lastWorkingDay,
+            exitInterviewDone: false,
+            clearance: {
+              assets: STANDARD_ASSETS.map((a) => ({ ...a })),
+              access: false,
+              finance: false,
+              handover: false,
+            },
+            finalSettlement: null,
+            state: "notice",
+            exitInterviewOn: null,
+            exitNotes: null,
+            settlement: null,
+            sentToPayrollOn: null,
+            handoverTo: null,
+            closedOn: null,
+          }
+          // Only a record that may legally go on notice is moved there; a
+          // probationer or someone already dismissed keeps their state until close.
+          const moving =
+            emp.lifecycleState !== "notice" &&
+            LIFECYCLE_TRANSITIONS[emp.lifecycleState].includes("notice")
+          return {
+            ...s,
+            offboarding: [created, ...s.offboarding],
+            employees: moving
+              ? s.employees.map((e) =>
+                  e.id === emp.id ? { ...e, lifecycleState: "notice" } : e
+                )
+              : s.employees,
+            lifecycleEvents: moving
+              ? [
+                  {
+                    id: uid("le"),
+                    employeeId: emp.id,
+                    from: emp.lifecycleState,
+                    to: "notice",
+                    reason: `Offboarding opened: ${draft.reason.replace("_", " ")}`,
+                    actorId,
+                    at: nowIso(),
+                    effectiveDate: draft.noticeGivenOn,
+                  },
+                  ...s.lifecycleEvents,
+                ]
+              : s.lifecycleEvents,
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: emp.id,
+                actorId,
+                action: "Opened an offboarding case",
+                field: created.id,
+                after: draft.reason,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+        return created
+      },
+
+      updateOffboarding: (id, patch, action) => {
+        setState((s) => {
+          const c = s.offboarding.find((x) => x.id === id)
+          if (!c) return s
+          const merged = { ...c, ...patch }
+          merged.state = caseStage(merged)
+          return {
+            ...s,
+            offboarding: s.offboarding.map((x) => (x.id === id ? merged : x)),
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: c.employeeId,
+                actorId,
+                action,
+                field: id,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      closeOffboarding: (id) => {
+        setState((s) => {
+          const c = s.offboarding.find((x) => x.id === id)
+          if (!c || c.closedOn) return s
+          const emp = s.employees.find((e) => e.id === c.employeeId)
+          const end = endStateFor(c.reason)
+          // Someone already terminated by a disciplinary outcome is at their
+          // end state; the case still closes, but the record is not moved twice.
+          const move =
+            !!emp && LIFECYCLE_TRANSITIONS[emp.lifecycleState].includes(end)
+          return {
+            ...s,
+            offboarding: s.offboarding.map((x) =>
+              x.id === id ? { ...x, closedOn: TODAY_ISO, state: "closed" } : x
+            ),
+            employees: move
+              ? s.employees.map((e) =>
+                  e.id === c.employeeId ? { ...e, lifecycleState: end } : e
+                )
+              : s.employees,
+            lifecycleEvents: move
+              ? [
+                  {
+                    id: uid("le"),
+                    employeeId: c.employeeId,
+                    from: emp!.lifecycleState,
+                    to: end,
+                    reason: "Offboarding complete",
+                    actorId,
+                    at: nowIso(),
+                    effectiveDate: c.lastWorkingDay,
+                  },
+                  ...s.lifecycleEvents,
+                ]
+              : s.lifecycleEvents,
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: c.employeeId,
+                actorId,
+                action: "Closed an offboarding case",
+                field: id,
+                after: end,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      addRequisition: (r) => {
+        setState((s) => ({ ...s, requisitions: [r, ...s.requisitions] }))
+      },
+
+      addCandidate: (c) => {
+        setState((s) => ({ ...s, candidates: [c, ...s.candidates] }))
+      },
+
+      updateCandidate: (id, patch) => {
         setState((s) => ({
           ...s,
-          offboarding: s.offboarding.map((c) =>
-            c.id === caseId
-              ? {
-                  ...c,
-                  clearance: { ...c.clearance, [key]: !c.clearance[key] },
-                }
-              : c
+          candidates: s.candidates.map((c) =>
+            c.id === id ? { ...c, ...patch } : c
           ),
+        }))
+      },
+
+      hireCandidate: (id) => {
+        let created: Employee | null = null
+        setState((s) => {
+          const c = s.candidates.find((x) => x.id === id)
+          const req = c && s.requisitions.find((r) => r.id === c.requisitionId)
+          if (!c || !req || c.employeeId) return s
+          const emp = preHireFrom(c, req, s.employees)
+          created = emp
+          const hiredCount = s.candidates.filter(
+            (x) =>
+              x.requisitionId === req.id && (x.stage === "hired" || x.id === id)
+          ).length
+          const due = (days: number) => addDays(emp.startDate, days)
+          const tasks: OnboardingTask[] = (
+            [
+              [
+                "Return signed employment contract",
+                "employee",
+                -3,
+                "paperwork",
+              ],
+              [
+                "Submit Ghana Card & SSNIT number",
+                "employee",
+                -2,
+                "compliance",
+              ],
+              ["Create work email & accounts", "it", -2, "access"],
+              ["Issue laptop and access badge", "it", -1, "access"],
+              ["Register on payroll", "hr", -1, "compliance"],
+              ["Day-one orientation", "hr", 0, "orientation"],
+            ] as const
+          ).map(([title, owner, offset, category]) => ({
+            id: uid("ot"),
+            employeeId: emp.id,
+            title,
+            owner,
+            dueOn: due(offset),
+            done: false,
+            category,
+          }))
+          return {
+            ...s,
+            employees: [emp, ...s.employees],
+            candidates: s.candidates.map((x) =>
+              x.id === id ? { ...x, stage: "hired", employeeId: emp.id } : x
+            ),
+            requisitions: s.requisitions.map((r) =>
+              r.id === req.id && hiredCount >= r.openings
+                ? { ...r, status: "filled" }
+                : r
+            ),
+            onboardingTasks: [...s.onboardingTasks, ...tasks],
+            lifecycleEvents: [
+              {
+                id: uid("le"),
+                employeeId: emp.id,
+                from: null,
+                to: "pre_hire",
+                reason: `Hired from ${req.id}`,
+                actorId,
+                at: nowIso(),
+                effectiveDate: emp.startDate,
+              },
+              ...s.lifecycleEvents,
+            ],
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: emp.id,
+                actorId,
+                action: "Created pre-hire record from a recruitment hire",
+                field: c.id,
+                after: req.id,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+        return created
+      },
+
+      updateReview: (id, patch, action) => {
+        setState((s) => {
+          const r = s.reviews.find((x) => x.id === id)
+          if (!r) return s
+          return {
+            ...s,
+            reviews: s.reviews.map((x) =>
+              x.id === id ? { ...x, ...patch } : x
+            ),
+            auditLog: action
+              ? [
+                  {
+                    id: uid("a"),
+                    employeeId: r.employeeId,
+                    actorId,
+                    action,
+                    field: id,
+                    after: patch.status,
+                    at: nowIso(),
+                  },
+                  ...s.auditLog,
+                ]
+              : s.auditLog,
+          }
+        })
+      },
+
+      addReviews: (reviews) => {
+        setState((s) => ({
+          ...s,
+          reviews: [...reviews, ...s.reviews],
+          auditLog: [
+            {
+              id: uid("a"),
+              employeeId: null,
+              actorId,
+              action: `Launched a review cycle for ${reviews.length} people`,
+              field: reviews[0]?.cycle,
+              at: nowIso(),
+            },
+            ...s.auditLog,
+          ],
+        }))
+      },
+
+      raiseCase: (c) => {
+        setState((s) => ({
+          ...s,
+          cases: [c, ...s.cases],
+          auditLog: [
+            {
+              id: uid("a"),
+              employeeId: c.employeeId,
+              actorId,
+              action: "Raised a disciplinary case",
+              field: c.id,
+              after: c.severity,
+              at: nowIso(),
+            },
+            ...s.auditLog,
+          ],
+        }))
+      },
+
+      updateCase: (id, patch, event) => {
+        setState((s) => {
+          const c = s.cases.find((x) => x.id === id)
+          if (!c) return s
+          const at = nowIso()
+          const entry: CaseEvent = { id: uid("ce"), at, actorId, text: event }
+          return {
+            ...s,
+            cases: s.cases.map((x) =>
+              x.id === id
+                ? {
+                    ...x,
+                    ...patch,
+                    events: [...(patch.events ?? x.events), entry],
+                  }
+                : x
+            ),
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: c.employeeId,
+                actorId,
+                action: "Updated a disciplinary case",
+                field: id,
+                after: event,
+                at,
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      saveReport: (r) => {
+        setState((s) => ({
+          ...s,
+          savedReports: [
+            {
+              ...r,
+              id: uid("sr"),
+              createdBy: actorId,
+              createdOn: TODAY_ISO,
+              lastRunOn: null,
+            },
+            ...s.savedReports,
+          ],
+        }))
+      },
+
+      updateSavedReport: (id, patch) => {
+        setState((s) => ({
+          ...s,
+          savedReports: s.savedReports.map((r) =>
+            r.id === id ? { ...r, ...patch } : r
+          ),
+        }))
+      },
+
+      deleteSavedReport: (id) => {
+        setState((s) => ({
+          ...s,
+          savedReports: s.savedReports.filter((r) => r.id !== id),
         }))
       },
 

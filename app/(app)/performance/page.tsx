@@ -8,6 +8,7 @@ import {
   Eye,
   Lock,
   NotebookPen,
+  Rocket,
   Star,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -35,6 +36,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { SegmentedTabs } from "@/components/common/segmented-tabs"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { LaunchCycleDialog } from "@/components/talent/cycle-dialog"
+import { NativeSelect } from "@/components/talent/form"
+import { ReviewSheet } from "@/components/talent/review-sheet"
 import { useStore } from "@/lib/store"
 import {
   MIN_AGGREGATION_GROUP,
@@ -44,29 +48,49 @@ import {
 } from "@/lib/rbac"
 import { directReports, visibleEmployees } from "@/lib/selectors"
 import {
+  TODAY_ISO,
   formatDate,
   formatDateTime,
   fullName,
   relativeTime,
 } from "@/lib/format"
-import type { CoachingNote } from "@/lib/types"
+import {
+  OWNER_LABEL,
+  REVIEW_FLOW,
+  STEP_ACTION,
+  isOverdue,
+  isWaitingOn,
+  ownerOf,
+  ratingBuckets,
+} from "@/lib/talent/performance"
+import { REVIEW_STATUS_LABEL } from "@/lib/format"
+import type { CoachingNote, ReviewStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 export default function PerformancePage() {
   const store = useStore()
   const { viewer, employees, reviews, coachingNotes } = store
+  const isHr = has(viewer, "hr_admin")
   const scope = visibleEmployees(viewer, employees)
   const scopeIds = new Set(scope.map((e) => e.id))
 
   const [noteFor, setNoteFor] = React.useState<string | null>(null)
   const [escalating, setEscalating] = React.useState<CoachingNote | null>(null)
+  const [openReview, setOpenReview] = React.useState<string | null>(null)
+  const [launching, setLaunching] = React.useState(false)
+  const [cycle, setCycle] = React.useState("all")
+  const [status, setStatus] = React.useState<ReviewStatus | "all" | "mine">(
+    "all"
+  )
 
   const visibleReviews = reviews.filter((r) => scopeIds.has(r.employeeId))
-  const mineToDo = visibleReviews.filter(
-    (r) => r.managerId === viewer.employeeId && r.status !== "complete"
-  )
+  const cycles = [...new Set(visibleReviews.map((r) => r.cycle))]
+  const waiting = visibleReviews.filter((r) => isWaitingOn(viewer, r))
+  const overdue = visibleReviews.filter((r) => isOverdue(r, TODAY_ISO))
   const complete = visibleReviews.filter((r) => r.status === "complete")
-  const rated = complete.filter((r) => r.rating !== null)
+  const rated = visibleReviews.filter(
+    (r) => r.rating !== null && ["shared", "complete"].includes(r.status)
+  )
   const avg =
     rated.length > 0
       ? (rated.reduce((s, r) => s + (r.rating ?? 0), 0) / rated.length).toFixed(
@@ -74,8 +98,18 @@ export default function PerformancePage() {
         )
       : "—"
 
+  const list = visibleReviews
+    .filter((r) => cycle === "all" || r.cycle === cycle)
+    .filter((r) =>
+      status === "all"
+        ? true
+        : status === "mine"
+          ? isWaitingOn(viewer, r)
+          : r.status === status
+    )
+
   const myNotes = coachingNotes.filter((n) => canViewCoachingNote(viewer, n))
-  const unescalated = myNotes.filter((n) => !n.escalated)
+  const canWriteNotes = directReports(viewer, employees).length > 0
 
   return (
     <PageShell
@@ -88,33 +122,41 @@ export default function PerformancePage() {
     >
       <PageHeader
         title="Performance"
-        description="Official reviews are on the record. Coaching notes stay private to the manager who wrote them until they are deliberately escalated."
+        description="Each review runs self review, manager review, calibration, then shared. What a manager writes stays hidden from the employee until HR shares it. Coaching notes stay private until escalated."
+        actions={
+          isHr && (
+            <Button size="lg" onClick={() => setLaunching(true)}>
+              <Rocket className="size-4" />
+              Launch a cycle
+            </Button>
+          )
+        }
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Reviews you own"
-          value={mineToDo.length}
-          hint="Open in the current cycle"
+          label="Waiting on you"
+          value={waiting.length}
+          hint="Reviews that need your step"
+        />
+        <StatCard
+          label="Overdue"
+          value={overdue.length}
+          hint="Past their due date"
         />
         <StatCard
           label="Complete"
           value={complete.length}
-          hint="Shared with the employee"
+          hint="Acknowledged by the employee"
         />
         <StatCard
           label="Average rating"
           value={canShowAggregate(rated.length) ? avg : "—"}
           hint={
             canShowAggregate(rated.length)
-              ? `Across ${rated.length} reviews`
-              : `Hidden — needs ${MIN_AGGREGATION_GROUP}+ reviews`
+              ? `Across ${rated.length} shared reviews`
+              : `Hidden — needs ${MIN_AGGREGATION_GROUP}+ shared reviews`
           }
-        />
-        <StatCard
-          label="Your private notes"
-          value={unescalated.length}
-          hint="Not visible to anyone else"
         />
       </div>
 
@@ -122,21 +164,72 @@ export default function PerformancePage() {
         <SegmentedTabs
           className="mb-5"
           tabs={[
-            { value: "reviews", label: "Review cycle" },
-            { value: "notes", label: "Coaching notes" },
+            { value: "reviews", label: "Reviews", count: waiting.length },
+            ...(isHr ? [{ value: "cycle", label: "Cycle progress" }] : []),
+            {
+              value: "notes",
+              label: "Coaching notes",
+              count: myNotes.filter((n) => !n.escalated).length,
+            },
           ]}
+          emphasise={["reviews"]}
         />
 
         <TabsContent value="reviews">
-          <Panel bodyClassName="p-0">
-            {visibleReviews.length === 0 ? (
-              <EmptyState icon={BadgeCheck} title="No reviews in your scope" />
+          <Panel
+            bodyClassName="p-0"
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <NativeSelect
+                  aria-label="Cycle"
+                  value={cycle}
+                  onChange={(e) => setCycle(e.target.value)}
+                  className="h-9 w-auto"
+                >
+                  <option value="all">All cycles</option>
+                  {cycles.map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </NativeSelect>
+                <NativeSelect
+                  aria-label="Status"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as typeof status)}
+                  className="h-9 w-auto"
+                >
+                  <option value="all">All statuses</option>
+                  <option value="mine">Waiting on me</option>
+                  {REVIEW_FLOW.map((s) => (
+                    <option key={s} value={s}>
+                      {REVIEW_STATUS_LABEL[s]}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </div>
+            }
+            title="Reviews"
+            description="Open one to do your step, or to see where it has got to."
+          >
+            {list.length === 0 ? (
+              <EmptyState
+                icon={BadgeCheck}
+                title="No reviews match"
+                description="Try a different cycle or status."
+              />
             ) : (
               <ul className="divide-y">
-                {visibleReviews.map((r) => {
+                {list.map((r) => {
                   const emp = store.employeeById(r.employeeId)
                   const manager = store.employeeById(r.managerId)
-                  const isMine = r.managerId === viewer.employeeId
+                  const mine = isWaitingOn(viewer, r)
+                  const late = isOverdue(r, TODAY_ISO)
+                  const owner = ownerOf(r.status)
+                  // The employee does not see the rating until it is shared.
+                  const showRating =
+                    r.rating !== null &&
+                    (viewer.employeeId !== r.employeeId ||
+                      ["shared", "complete"].includes(r.status) ||
+                      isHr)
                   return (
                     <li
                       key={r.id}
@@ -145,22 +238,26 @@ export default function PerformancePage() {
                       {emp && <Initials person={emp} size="md" />}
                       <div className="min-w-0 flex-1">
                         <p className="flex flex-wrap items-center gap-2">
-                          <Link
-                            href={`/employees/${r.employeeId}`}
+                          <button
+                            type="button"
+                            onClick={() => setOpenReview(r.id)}
                             className="text-sm font-medium hover:underline"
                           >
                             {fullName(emp)}
-                          </Link>
+                          </button>
                           <Pill tone="neutral">{r.cycle}</Pill>
-                          {isMine && <Pill tone="info">You own this</Pill>}
+                          {mine && <Pill tone="info">Your turn</Pill>}
+                          {late && <Pill tone="danger">Overdue</Pill>}
                         </p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           Reviewer {fullName(manager)} · due{" "}
                           {formatDate(r.dueOn)}
+                          {owner &&
+                            ` · waiting on ${OWNER_LABEL[owner].toLowerCase()}`}
                           {r.sharedOn && ` · shared ${formatDate(r.sharedOn)}`}
                         </p>
                       </div>
-                      {r.rating !== null && (
+                      {showRating && r.rating !== null && (
                         <span
                           className="flex items-center gap-0.5"
                           aria-label={`${r.rating} out of 5`}
@@ -182,17 +279,13 @@ export default function PerformancePage() {
                         </span>
                       )}
                       <ReviewBadge status={r.status} />
-                      {isMine && r.status !== "complete" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            toast("Opens the review form for this cycle.")
-                          }
-                        >
-                          Continue
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        variant={mine ? "default" : "outline"}
+                        onClick={() => setOpenReview(r.id)}
+                      >
+                        {mine ? STEP_ACTION[r.status] : "Open"}
+                      </Button>
                     </li>
                   )
                 })}
@@ -200,6 +293,17 @@ export default function PerformancePage() {
             )}
           </Panel>
         </TabsContent>
+
+        {isHr && (
+          <TabsContent value="cycle">
+            <CycleProgress
+              reviews={visibleReviews}
+              cycle={cycle === "all" ? (cycles[0] ?? "") : cycle}
+              cycles={cycles}
+              onCycle={setCycle}
+            />
+          </TabsContent>
+        )}
 
         <TabsContent value="notes">
           <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
@@ -211,6 +315,10 @@ export default function PerformancePage() {
                 <Button
                   size="sm"
                   variant="outline"
+                  disabled={!canWriteNotes}
+                  title={
+                    canWriteNotes ? undefined : "You have no direct reports"
+                  }
                   onClick={() => setNoteFor("new")}
                 >
                   <NotebookPen className="size-3.5" />
@@ -325,6 +433,8 @@ export default function PerformancePage() {
         </TabsContent>
       </Tabs>
 
+      <ReviewSheet reviewId={openReview} onClose={() => setOpenReview(null)} />
+      {launching && <LaunchCycleDialog onClose={() => setLaunching(false)} />}
       {noteFor !== null && (
         <WriteNoteDialog open onOpenChange={() => setNoteFor(null)} />
       )}
@@ -531,5 +641,148 @@ function EscalateDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * Where every review in a cycle has got to, and who each one is waiting on —
+ * the view HR chases from. Ratings are shown only once enough exist that no
+ * single person can be picked out.
+ */
+function CycleProgress({
+  reviews,
+  cycle,
+  cycles,
+  onCycle,
+}: {
+  reviews: ReturnType<typeof useStore>["reviews"]
+  cycle: string
+  cycles: string[]
+  onCycle: (c: string) => void
+}) {
+  const store = useStore()
+  const inCycle = reviews.filter((r) => r.cycle === cycle)
+  const byStatus = REVIEW_FLOW.map((s) => ({
+    status: s,
+    rows: inCycle.filter((r) => r.status === s),
+  }))
+  const late = inCycle.filter((r) => isOverdue(r, TODAY_ISO))
+  const done = inCycle.filter((r) => r.status === "complete").length
+  const shared = inCycle.filter(
+    (r) => r.rating !== null && ["shared", "complete"].includes(r.status)
+  )
+  const buckets = ratingBuckets(shared)
+  const top = Math.max(1, ...buckets.map((b) => b.count))
+
+  function remind() {
+    const owners = new Set(late.map((r) => ownerOf(r.status)))
+    store.addNotification({
+      title: `${cycle} reviews overdue`,
+      body: `${late.length} reviews are past due. Waiting on: ${[...owners]
+        .filter(Boolean)
+        .map((o) => OWNER_LABEL[o!].toLowerCase())
+        .join(", ")}.`,
+      kind: "alert",
+      href: "/performance",
+    })
+    toast.success(`Reminder sent for ${late.length} overdue reviews.`)
+  }
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+      <Panel
+        title="Progress"
+        description={
+          cycle
+            ? `${done} of ${inCycle.length} complete in ${cycle}.`
+            : "No cycle yet. Launch one to begin."
+        }
+        actions={
+          cycles.length > 1 && (
+            <NativeSelect
+              aria-label="Cycle"
+              value={cycle}
+              onChange={(e) => onCycle(e.target.value)}
+              className="h-9 w-auto"
+            >
+              {cycles.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </NativeSelect>
+          )
+        }
+      >
+        <ul className="space-y-3">
+          {byStatus.map(({ status, rows }) => (
+            <li key={status}>
+              <div className="mb-1 flex items-baseline justify-between text-sm">
+                <span>
+                  {REVIEW_STATUS_LABEL[status]}
+                  {ownerOf(status) && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {OWNER_LABEL[ownerOf(status)!].toLowerCase()}
+                    </span>
+                  )}
+                </span>
+                <span className="tabular text-muted-foreground">
+                  {rows.length}
+                </span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{
+                    width: `${inCycle.length ? (rows.length / inCycle.length) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
+        {late.length > 0 && (
+          <div className="mt-5 flex flex-wrap items-center gap-3 border-t pt-4 text-sm">
+            <span className="flex-1 text-muted-foreground">
+              {late.length} overdue.
+            </span>
+            <Button size="sm" variant="outline" onClick={remind}>
+              Send reminders
+            </Button>
+          </div>
+        )}
+      </Panel>
+
+      <Panel
+        title="Rating distribution"
+        description="Shared reviews only. Withheld while the group is small enough to identify someone."
+      >
+        {canShowAggregate(shared.length) ? (
+          <ul className="space-y-2.5">
+            {buckets.map((b) => (
+              <li key={b.rating} className="flex items-center gap-3 text-sm">
+                <span className="tabular w-4 text-muted-foreground">
+                  {b.rating}
+                </span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${(b.count / top) * 100}%` }}
+                  />
+                </div>
+                <span className="tabular w-5 text-right text-muted-foreground">
+                  {b.count}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="flex items-start gap-2 text-sm text-muted-foreground">
+            <Lock className="mt-0.5 size-4 shrink-0" />
+            {shared.length} shared so far. The distribution appears at{" "}
+            {MIN_AGGREGATION_GROUP}.
+          </p>
+        )}
+      </Panel>
+    </div>
   )
 }

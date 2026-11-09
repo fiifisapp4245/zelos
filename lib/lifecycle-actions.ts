@@ -190,8 +190,8 @@ export function lifecycleTasks(
       })
     }
 
-    const retireOn = retirementDate(e.dateOfBirth)
-    if ((daysUntil(retireOn) ?? 1e9) <= horizonDays) {
+    const retireOn = e.dateOfBirth ? retirementDate(e.dateOfBirth) : null
+    if (retireOn && (daysUntil(retireOn) ?? 1e9) <= horizonDays) {
       push({
         kind: "retirement_due",
         employee: e,
