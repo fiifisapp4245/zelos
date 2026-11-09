@@ -234,6 +234,34 @@ export interface Candidate {
   source: string
   rating: number
   avatarTone: string
+  /** Recruiter's working notes. Not shared with the candidate. */
+  notes: string
+  /** Why they were turned down, so a rejection is never unexplained. */
+  rejectedReason: string | null
+  interviews: Interview[]
+  offer: CandidateOffer | null
+  /** The pre-hire record this person became, once hired. */
+  employeeId: string | null
+}
+
+export type InterviewKind = "phone" | "technical" | "panel" | "final"
+
+export interface Interview {
+  id: string
+  kind: InterviewKind
+  scheduledFor: string
+  interviewerId: string
+  /** 1–5, recorded after the interview. */
+  score: number | null
+  feedback: string | null
+}
+
+export interface CandidateOffer {
+  salaryMonthly: number
+  startDate: string
+  status: "draft" | "sent" | "accepted" | "declined"
+  sentOn: string | null
+  decidedOn: string | null
 }
 
 export interface OnboardingTask {
@@ -265,6 +293,18 @@ export interface PerformanceReview {
   sharedOn: string | null
   /** What the reviewer wrote, shown when the review is signed off. */
   reviewerComments: string | null
+  /** The employee's own account of the period, written first. */
+  selfSummary: string | null
+  selfDevelopment: string | null
+  selfRating: number | null
+  selfSubmittedOn: string | null
+  /** The manager's 1–5 score per competency, keyed by competency id. */
+  scores: Record<string, number> | null
+  /** Why HR moved the rating at calibration, when it moved. */
+  calibrationNote: string | null
+  /** The employee's reply once the review is shared with them. */
+  employeeComment: string | null
+  acknowledgedOn: string | null
 }
 
 /** Private to the authoring manager until deliberately escalated (system map §3). */
@@ -281,6 +321,61 @@ export interface CoachingNote {
 export type CaseState =
   "open" | "investigation" | "hearing" | "finalised" | "dismissed"
 
+export type SanctionKind =
+  | "no_action"
+  | "verbal_warning"
+  | "written_warning"
+  | "final_warning"
+  | "suspension"
+  | "demotion"
+  | "dismissal"
+
+export type CaseDocumentCategory =
+  | "allegation"
+  | "evidence"
+  | "statement"
+  | "report"
+  | "hearing_notice"
+  | "minutes"
+  | "outcome"
+  | "appeal"
+  | "other"
+
+export interface CaseDocument {
+  id: string
+  name: string
+  category: CaseDocumentCategory
+  sizeKb: number
+  uploadedBy: string
+  uploadedAt: string
+}
+
+export interface CaseEvent {
+  id: string
+  at: string
+  actorId: string
+  text: string
+}
+
+export interface CaseHearing {
+  scheduledFor: string
+  venue: string
+  /** Notice is a due-process step: the employee must have time to prepare. */
+  noticeGivenOn: string
+  panelIds: string[]
+  /** Who the employee brought, if anyone. */
+  companion: string | null
+  held: boolean
+  minutes: string
+}
+
+export interface CaseAppeal {
+  lodgedOn: string
+  grounds: string
+  decision: "pending" | "upheld" | "overturned"
+  decidedOn: string | null
+}
+
 export interface DisciplinaryCase {
   id: string
   employeeId: string
@@ -291,6 +386,17 @@ export interface DisciplinaryCase {
   raisedOn: string
   outcome: string | null
   closedOn: string | null
+  /** What is alleged, in plain words, as put to the employee. */
+  description: string
+  incidentOn: string
+  investigatorId: string | null
+  /** When the employee was told of the allegation in writing. */
+  notifiedOn: string | null
+  hearing: CaseHearing | null
+  sanction: SanctionKind | null
+  appeal: CaseAppeal | null
+  documents: CaseDocument[]
+  events: CaseEvent[]
 }
 
 export type OffboardingReason =
@@ -325,6 +431,26 @@ export interface OffboardingCase {
   }
   finalSettlement: number | null
   state: "notice" | "clearing" | "settled" | "closed"
+  exitInterviewOn: string | null
+  exitNotes: string | null
+  /** What went into the settlement figure, so it can be checked. */
+  settlement: SettlementBreakdown | null
+  sentToPayrollOn: string | null
+  /** Who takes over the work. */
+  handoverTo: string | null
+  closedOn: string | null
+}
+
+export interface SettlementBreakdown {
+  /** Days worked in the final month and not yet paid. */
+  salaryDays: number
+  /** Accrued annual leave paid out. */
+  leaveDays: number
+  /** Notice the company waives and pays instead of working. */
+  noticeInLieuDays: number
+  /** Anything recovered from the final pay (loans, unreturned items). */
+  deductions: number
+  note: string
 }
 
 export interface Department {
@@ -478,4 +604,19 @@ export interface ActingAssignment {
   coveringForId: string | null
   startDate: string
   endDate: string
+}
+
+/* ── Reports ─────────────────────────────────────────────────────────────── */
+
+export interface SavedReport {
+  id: string
+  /** Which report this is a saved view of. */
+  reportId: string
+  /** The choices the report was saved with, e.g. what it groups by. */
+  options: Record<string, string>
+  name: string
+  createdBy: string
+  createdOn: string
+  schedule: "none" | "weekly" | "monthly"
+  lastRunOn: string | null
 }

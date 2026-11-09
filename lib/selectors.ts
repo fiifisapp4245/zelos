@@ -108,6 +108,7 @@ export function completeness(e: Employee) {
 export function approachingRetirement(employees: Employee[], withinDays = 365) {
   return employees
     .filter(isOnStrength)
+    .filter((e) => !!e.dateOfBirth)
     .map((e) => {
       const years = age(e.dateOfBirth)
       const retireOn = new Date(e.dateOfBirth)

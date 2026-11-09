@@ -36,7 +36,7 @@ function fingerprint(): Record<string, string[]> {
 
 describe("persisted state and its version", () => {
   it("is at the version that matches the shape recorded here", () => {
-    expect(STORAGE_VERSION).toBe(11)
+    expect(STORAGE_VERSION).toBe(12)
   })
 
   it("carries the fields the pay screens read", () => {

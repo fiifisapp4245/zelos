@@ -270,9 +270,10 @@ export function celebrationsFor(
 ): Celebration[] {
   const out: Celebration[] = []
   for (const e of employees) {
-    const birthday = nextOccurrence(e.dateOfBirth)
-    const bd = daysUntil(birthday)
-    if (bd !== null && bd >= 0 && bd <= withinDays) {
+    // A record created from a hire has no birthday until the person fills it in.
+    const birthday = e.dateOfBirth ? nextOccurrence(e.dateOfBirth) : null
+    const bd = birthday ? daysUntil(birthday) : null
+    if (birthday && bd !== null && bd >= 0 && bd <= withinDays) {
       out.push({ employee: e, kind: "birthday", on: birthday, daysAway: bd })
     }
     const anniversary = nextOccurrence(e.startDate)

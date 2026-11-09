@@ -68,3 +68,10 @@ export function restMinutesBetween(
     86_400_000
   return dayGap * 24 * 60 + toMinutes(second.start) - toMinutes(first.end)
 }
+
+/** Whole days from one date to another; negative when `to` is earlier. */
+export function daysBetween(from: string, to: string) {
+  const a = new Date(`${from.slice(0, 10)}T00:00:00`).getTime()
+  const b = new Date(`${to.slice(0, 10)}T00:00:00`).getTime()
+  return Math.round((b - a) / 86_400_000)
+}

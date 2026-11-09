@@ -5,6 +5,7 @@ import type {
   AuditEntry,
   Branch,
   Candidate,
+  CandidateOffer,
   CoachingNote,
   Department,
   DisciplinaryCase,
@@ -795,6 +796,28 @@ function cand(
   i: number
 ): Candidate {
   const slug = name.toLowerCase().replace(/\s+/g, ".")
+  const req = REQUISITIONS.find((r) => r.id === requisitionId)
+  const interviewer = req?.hiringManagerId ?? "fiifi"
+  const past = ["interview", "assessment", "offer", "hired"].includes(stage)
+  const scored = ["assessment", "offer", "hired"].includes(stage)
+  const offer: CandidateOffer | null =
+    stage === "offer"
+      ? {
+          salaryMonthly: req?.budgetMonthly ?? 0,
+          startDate: req?.targetStartDate ?? "2026-11-02",
+          status: "sent",
+          sentOn: "2026-09-14",
+          decidedOn: null,
+        }
+      : stage === "hired"
+        ? {
+            salaryMonthly: req?.budgetMonthly ?? 0,
+            startDate: req?.targetStartDate ?? "2026-10-05",
+            status: "accepted",
+            sentOn: "2026-08-20",
+            decidedOn: "2026-08-24",
+          }
+        : null
   return {
     id,
     requisitionId,
@@ -806,6 +829,25 @@ function cand(
     source,
     rating,
     avatarTone: CAND_TONES[i % CAND_TONES.length],
+    notes: "",
+    rejectedReason:
+      stage === "rejected" ? "Skills do not match the role" : null,
+    interviews: past
+      ? [
+          {
+            id: `iv-${id}`,
+            kind: "technical",
+            scheduledFor: scored ? "2026-09-04" : "2026-09-22",
+            interviewerId: interviewer,
+            score: scored ? Math.min(5, Math.max(3, rating)) : null,
+            feedback: scored
+              ? "Clear communicator, solid fundamentals. Would work well with the team."
+              : null,
+          },
+        ]
+      : [],
+    offer,
+    employeeId: id === "c-10" ? "nana" : null,
   }
 }
 
@@ -1024,7 +1066,18 @@ export const ONBOARDING_TASKS: OnboardingTask[] = [
   },
 ]
 
-export const REVIEWS: PerformanceReview[] = [
+const RAW_REVIEWS: Pick<
+  PerformanceReview,
+  | "id"
+  | "employeeId"
+  | "cycle"
+  | "status"
+  | "rating"
+  | "managerId"
+  | "dueOn"
+  | "sharedOn"
+  | "reviewerComments"
+>[] = [
   {
     id: "pr-1",
     employeeId: "kofi",
@@ -1123,6 +1176,49 @@ export const REVIEWS: PerformanceReview[] = [
   },
 ]
 
+/**
+ * A review is seeded as far through the flow as its status says, so the form
+ * for each step opens with what the steps before it would have left behind.
+ */
+export const REVIEWS: PerformanceReview[] = RAW_REVIEWS.map((r) => {
+  const order = [
+    "not_started",
+    "self_review",
+    "manager_review",
+    "calibration",
+    "shared",
+    "complete",
+  ]
+  const at = order.indexOf(r.status)
+  const selfDone = at >= 2
+  const scored = at >= 3
+  const rating = r.rating
+  return {
+    ...r,
+    selfSummary: selfDone
+      ? "Delivered the agreed work this cycle and picked up extra scope when the team was short."
+      : null,
+    selfDevelopment: selfDone
+      ? "I want to get better at planning further ahead and handing work over earlier."
+      : null,
+    selfRating: selfDone ? 4 : null,
+    selfSubmittedOn: selfDone ? "2026-09-08" : null,
+    scores:
+      scored && rating !== null
+        ? {
+            delivery: Math.min(5, Math.round(rating)),
+            collaboration: Math.max(1, Math.round(rating) - 1),
+            ownership: Math.min(5, Math.round(rating)),
+            growth: Math.round(rating),
+          }
+        : null,
+    calibrationNote: null,
+    employeeComment:
+      r.status === "complete" ? "Thanks — agreed with the goals set." : null,
+    acknowledgedOn: r.status === "complete" ? r.sharedOn : null,
+  }
+})
+
 export const COACHING_NOTES: CoachingNote[] = [
   {
     id: "cn-1",
@@ -1173,6 +1269,52 @@ export const CASES: DisciplinaryCase[] = [
     raisedOn: "2026-08-24",
     outcome: null,
     closedOn: null,
+    description:
+      "Access logs show the employee opened a colleague's personnel and pay records on 21 August without a business reason.",
+    incidentOn: "2026-08-21",
+    investigatorId: "esi",
+    notifiedOn: "2026-08-25",
+    hearing: null,
+    sanction: null,
+    appeal: null,
+    documents: [
+      {
+        id: "cd-1",
+        name: "Access-log-extract-21Aug.pdf",
+        category: "evidence",
+        sizeKb: 184,
+        uploadedBy: "fiifi",
+        uploadedAt: "2026-08-24T15:10:00",
+      },
+      {
+        id: "cd-2",
+        name: "Allegation-letter-signed.pdf",
+        category: "allegation",
+        sizeKb: 96,
+        uploadedBy: "fiifi",
+        uploadedAt: "2026-08-25T09:30:00",
+      },
+    ],
+    events: [
+      {
+        id: "ce-1",
+        at: "2026-08-24T14:00:00",
+        actorId: "fiifi",
+        text: "Case raised for gross misconduct.",
+      },
+      {
+        id: "ce-2",
+        at: "2026-08-25T09:30:00",
+        actorId: "fiifi",
+        text: "Employee notified in writing of the allegation.",
+      },
+      {
+        id: "ce-3",
+        at: "2026-08-26T10:00:00",
+        actorId: "fiifi",
+        text: "Moved to investigation. Esi Quainoo assigned as investigator.",
+      },
+    ],
   },
   {
     id: "DC-2026-02",
@@ -1184,6 +1326,82 @@ export const CASES: DisciplinaryCase[] = [
     raisedOn: "2026-09-05",
     outcome: null,
     closedOn: null,
+    description:
+      "Arrived more than 30 minutes late on seven working days in August with no notice. Raised informally on 28 August; no change.",
+    incidentOn: "2026-08-28",
+    investigatorId: "serwa",
+    notifiedOn: "2026-09-06",
+    hearing: {
+      scheduledFor: "2026-09-22",
+      venue: "Meeting room 2, Accra HQ",
+      noticeGivenOn: "2026-09-15",
+      panelIds: ["fiifi", "adwoa"],
+      companion: null,
+      held: false,
+      minutes: "",
+    },
+    sanction: null,
+    appeal: null,
+    documents: [
+      {
+        id: "cd-3",
+        name: "Attendance-summary-Aug.pdf",
+        category: "evidence",
+        sizeKb: 74,
+        uploadedBy: "adwoa",
+        uploadedAt: "2026-09-05T11:00:00",
+      },
+      {
+        id: "cd-4",
+        name: "Statement-A-Darko.pdf",
+        category: "statement",
+        sizeKb: 58,
+        uploadedBy: "serwa",
+        uploadedAt: "2026-09-10T16:20:00",
+      },
+      {
+        id: "cd-5",
+        name: "Investigation-report.pdf",
+        category: "report",
+        sizeKb: 132,
+        uploadedBy: "serwa",
+        uploadedAt: "2026-09-12T10:05:00",
+      },
+      {
+        id: "cd-6",
+        name: "Hearing-notice-22Sep.pdf",
+        category: "hearing_notice",
+        sizeKb: 49,
+        uploadedBy: "fiifi",
+        uploadedAt: "2026-09-15T09:00:00",
+      },
+    ],
+    events: [
+      {
+        id: "ce-4",
+        at: "2026-09-05T11:00:00",
+        actorId: "adwoa",
+        text: "Case raised for minor misconduct.",
+      },
+      {
+        id: "ce-5",
+        at: "2026-09-06T09:00:00",
+        actorId: "fiifi",
+        text: "Employee notified in writing. Serwa Acheampong assigned as investigator.",
+      },
+      {
+        id: "ce-6",
+        at: "2026-09-12T10:05:00",
+        actorId: "serwa",
+        text: "Investigation report filed. Moved to hearing.",
+      },
+      {
+        id: "ce-7",
+        at: "2026-09-15T09:00:00",
+        actorId: "fiifi",
+        text: "Hearing set for 22 September. Notice sent.",
+      },
+    ],
   },
   {
     id: "DC-2026-01",
@@ -1195,6 +1413,85 @@ export const CASES: DisciplinaryCase[] = [
     raisedOn: "2026-04-02",
     outcome: "Written warning issued; policy refresher completed 2026-05-10.",
     closedOn: "2026-05-10",
+    description:
+      "Posted internal campaign figures on a personal account before they were announced.",
+    incidentOn: "2026-03-30",
+    investigatorId: "fiifi",
+    notifiedOn: "2026-04-03",
+    hearing: {
+      scheduledFor: "2026-04-24",
+      venue: "Meeting room 1, Accra HQ",
+      noticeGivenOn: "2026-04-17",
+      panelIds: ["fiifi", "yaw"],
+      companion: "A colleague",
+      held: true,
+      minutes:
+        "Employee accepted the post was made in error. Panel agreed a written warning and a policy refresher.",
+    },
+    sanction: "written_warning",
+    appeal: null,
+    documents: [
+      {
+        id: "cd-7",
+        name: "Post-screenshot.png",
+        category: "evidence",
+        sizeKb: 220,
+        uploadedBy: "abena",
+        uploadedAt: "2026-04-02T10:00:00",
+      },
+      {
+        id: "cd-8",
+        name: "Statement-Abla.pdf",
+        category: "statement",
+        sizeKb: 61,
+        uploadedBy: "fiifi",
+        uploadedAt: "2026-04-10T14:00:00",
+      },
+      {
+        id: "cd-9",
+        name: "Investigation-report.pdf",
+        category: "report",
+        sizeKb: 118,
+        uploadedBy: "fiifi",
+        uploadedAt: "2026-04-15T12:00:00",
+      },
+      {
+        id: "cd-10",
+        name: "Hearing-minutes-24Apr.pdf",
+        category: "minutes",
+        sizeKb: 88,
+        uploadedBy: "fiifi",
+        uploadedAt: "2026-04-24T16:30:00",
+      },
+      {
+        id: "cd-11",
+        name: "Outcome-letter.pdf",
+        category: "outcome",
+        sizeKb: 54,
+        uploadedBy: "fiifi",
+        uploadedAt: "2026-05-10T09:00:00",
+      },
+    ],
+    events: [
+      {
+        id: "ce-8",
+        at: "2026-04-02T10:00:00",
+        actorId: "abena",
+        text: "Case raised for serious misconduct.",
+      },
+      {
+        id: "ce-9",
+        at: "2026-04-24T16:30:00",
+        actorId: "fiifi",
+        text: "Hearing held. Minutes recorded.",
+      },
+      {
+        id: "ce-10",
+        at: "2026-05-10T09:00:00",
+        actorId: "fiifi",
+        text: "Finalised: written warning. Outcome letter issued.",
+      },
+    ],
   },
 ]
 
@@ -1218,6 +1515,12 @@ export const OFFBOARDING: OffboardingCase[] = [
     },
     finalSettlement: null,
     state: "clearing",
+    exitInterviewOn: null,
+    exitNotes: null,
+    settlement: null,
+    sentToPayrollOn: null,
+    handoverTo: "yaa",
+    closedOn: null,
   },
   {
     id: "OFF-2025-11",
@@ -1238,6 +1541,19 @@ export const OFFBOARDING: OffboardingCase[] = [
     },
     finalSettlement: 41300,
     state: "closed",
+    exitInterviewOn: "2025-12-12",
+    exitNotes:
+      "Leaving on good terms after a long career. Happy to be called on for advice.",
+    settlement: {
+      salaryDays: 22,
+      leaveDays: 12,
+      noticeInLieuDays: 0,
+      deductions: 0,
+      note: "Retirement settlement.",
+    },
+    sentToPayrollOn: "2025-12-18",
+    handoverTo: "kojo",
+    closedOn: "2025-12-31",
   },
 ]
 

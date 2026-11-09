@@ -33,7 +33,7 @@ export function PageHeader({
         {meta && <div className="mt-2">{meta}</div>}
       </div>
       {actions && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex max-w-full flex-wrap items-center gap-2">
           {actions}
         </div>
       )}

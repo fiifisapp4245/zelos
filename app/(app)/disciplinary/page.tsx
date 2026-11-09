@@ -3,7 +3,6 @@
 import * as React from "react"
 import Link from "next/link"
 import { Gavel, Lock, Plus, ShieldAlert } from "lucide-react"
-import { toast } from "sonner"
 
 import { PageShell } from "@/components/shell/page-shell"
 import {
@@ -16,6 +15,9 @@ import {
 } from "@/components/common"
 import { CaseBadge } from "@/components/common/status"
 import { Button } from "@/components/ui/button"
+import { CaseSheet } from "@/components/talent/case-sheet"
+import { RaiseCaseDialog } from "@/components/talent/case-dialogs"
+import { NativeSelect } from "@/components/talent/form"
 import { useStore } from "@/lib/store"
 import { canViewCase, has } from "@/lib/rbac"
 import {
@@ -24,7 +26,8 @@ import {
   fullName,
   relativeTime,
 } from "@/lib/format"
-import type { DisciplinaryCase } from "@/lib/types"
+import { SEVERITY_LABEL, caseSteps, isClosed } from "@/lib/talent/disciplinary"
+import type { CaseState, DisciplinaryCase } from "@/lib/types"
 
 const SEVERITY_TONE = {
   minor: "neutral",
@@ -43,6 +46,15 @@ const STATE_ORDER: DisciplinaryCase["state"][] = [
 export default function DisciplinaryPage() {
   const store = useStore()
   const { viewer, cases, employees } = store
+  const isHr = has(viewer, "hr_admin")
+  const canRaise =
+    isHr || has(viewer, "line_manager") || has(viewer, "head_of_department")
+
+  const [openId, setOpenId] = React.useState<string | null>(null)
+  const [raising, setRaising] = React.useState(false)
+  const [filter, setFilter] = React.useState<CaseState | "all" | "active">(
+    "all"
+  )
 
   const visible = cases.filter((c) => {
     const emp = employees.find((e) => e.id === c.employeeId)
@@ -50,8 +62,13 @@ export default function DisciplinaryPage() {
   })
   const hidden = cases.length - visible.length
 
-  const open = visible.filter(
-    (c) => !["finalised", "dismissed"].includes(c.state)
+  const open = visible.filter((c) => !isClosed(c))
+  const shown = visible.filter((c) =>
+    filter === "all"
+      ? true
+      : filter === "active"
+        ? !isClosed(c)
+        : c.state === filter
   )
 
   return (
@@ -65,17 +82,14 @@ export default function DisciplinaryPage() {
     >
       <PageHeader
         title="Disciplinary"
-        description="Who can read a case depends on its state, not just their role. Open cases stay narrow; finalised outcomes widen to the people they affect."
+        description="Every case follows the same due process: the allegation is put in writing, investigated, heard, decided, and open to appeal. Who can read a case depends on its state, not just their role."
         actions={
-          <Button
-            size="lg"
-            onClick={() =>
-              toast("Opens a new case with a due-process checklist.")
-            }
-          >
-            <Plus className="size-4" />
-            Raise a case
-          </Button>
+          canRaise && (
+            <Button size="lg" onClick={() => setRaising(true)}>
+              <Plus className="size-4" />
+              Raise a case
+            </Button>
+          )
         }
       />
 
@@ -93,13 +107,7 @@ export default function DisciplinaryPage() {
           label="Gross misconduct"
           value={visible.filter((c) => c.severity === "gross").length}
         />
-        <StatCard
-          label="Closed"
-          value={
-            visible.filter((c) => ["finalised", "dismissed"].includes(c.state))
-              .length
-          }
-        />
+        <StatCard label="Closed" value={visible.length - open.length} />
       </div>
 
       {hidden > 0 && (
@@ -125,109 +133,115 @@ export default function DisciplinaryPage() {
           />
         </Panel>
       ) : (
-        <Panel bodyClassName="p-0">
-          <ul className="divide-y">
-            {visible.map((c) => {
-              const emp = store.employeeById(c.employeeId)
-              const raiser = store.employeeById(c.raisedBy)
-              return (
-                <li key={c.id} className="px-5 py-4">
-                  <div className="flex flex-wrap items-start gap-3">
-                    {emp && <Initials person={emp} size="md" />}
-                    <div className="min-w-0 flex-1">
-                      <p className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{c.title}</span>
-                        <CaseBadge state={c.state} />
-                        <Pill tone={SEVERITY_TONE[c.severity]}>
-                          {c.severity === "gross" && (
-                            <ShieldAlert className="size-3" />
-                          )}
-                          {c.severity} misconduct
-                        </Pill>
-                        <span className="font-mono text-[11px] text-muted-foreground">
-                          {c.id}
-                        </span>
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {emp && (
-                          <Link
-                            href={`/employees/${emp.id}`}
-                            className="text-foreground hover:underline"
+        <Panel
+          title="Cases"
+          bodyClassName="p-0"
+          actions={
+            <NativeSelect
+              aria-label="Filter by state"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as typeof filter)}
+              className="h-9 w-auto"
+            >
+              <option value="all">All cases</option>
+              <option value="active">Open only</option>
+              {STATE_ORDER.map((s) => (
+                <option key={s} value={s}>
+                  {CASE_STATE_LABEL[s]}
+                </option>
+              ))}
+            </NativeSelect>
+          }
+        >
+          {shown.length === 0 ? (
+            <EmptyState icon={Gavel} title="No cases in this state" />
+          ) : (
+            <ul className="divide-y">
+              {shown.map((c) => {
+                const emp = store.employeeById(c.employeeId)
+                const raiser = store.employeeById(c.raisedBy)
+                const nextStep = caseSteps(c).find(
+                  (s) => s.stage === c.state && !s.done
+                )
+                const mine = c.raisedBy === viewer.employeeId
+                return (
+                  <li key={c.id} className="px-5 py-4">
+                    <div className="flex flex-wrap items-start gap-3">
+                      {emp && <Initials person={emp} size="md" />}
+                      <div className="min-w-0 flex-1">
+                        <p className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setOpenId(c.id)}
+                            className="text-left font-medium hover:underline"
                           >
-                            {fullName(emp)}
-                          </Link>
-                        )}{" "}
-                        · raised by {fullName(raiser)}{" "}
-                        {relativeTime(c.raisedOn)} ({formatDate(c.raisedOn)})
-                      </p>
-                      {c.outcome && (
-                        <p className="mt-2 rounded-lg border-l-2 border-border bg-muted/50 px-3 py-2 text-sm">
-                          <span className="text-muted-foreground">
-                            Outcome:
-                          </span>{" "}
-                          {c.outcome}
-                          {c.closedOn && (
-                            <span className="text-muted-foreground">
-                              {" "}
-                              · closed {formatDate(c.closedOn)}
-                            </span>
+                            {c.title}
+                          </button>
+                          <CaseBadge state={c.state} />
+                          <Pill tone={SEVERITY_TONE[c.severity]}>
+                            {c.severity === "gross" && (
+                              <ShieldAlert className="size-3" />
+                            )}
+                            {SEVERITY_LABEL[c.severity]}
+                          </Pill>
+                          {mine && <Pill tone="info">You raised this</Pill>}
+                          {c.appeal?.decision === "pending" && (
+                            <Pill tone="warning">Appeal pending</Pill>
                           )}
+                          <span className="font-mono text-[11px] text-muted-foreground">
+                            {c.id}
+                          </span>
                         </p>
-                      )}
-                    </div>
-                    {has(viewer, "hr_admin") && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {emp && (
+                            <Link
+                              href={`/employees/${emp.id}`}
+                              className="text-foreground hover:underline"
+                            >
+                              {fullName(emp)}
+                            </Link>
+                          )}{" "}
+                          · raised by {fullName(raiser)}{" "}
+                          {relativeTime(c.raisedOn)} ({formatDate(c.raisedOn)})
+                        </p>
+                        {isHr && nextStep && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Next: {nextStep.label.toLowerCase()}
+                          </p>
+                        )}
+                        {c.outcome && (
+                          <p className="mt-2 rounded-lg border-l-2 border-border bg-muted/50 px-3 py-2 text-sm">
+                            <span className="text-muted-foreground">
+                              Outcome:
+                            </span>{" "}
+                            {c.outcome}
+                            {c.closedOn && (
+                              <span className="text-muted-foreground">
+                                {" "}
+                                · closed {formatDate(c.closedOn)}
+                              </span>
+                            )}
+                          </p>
+                        )}
+                      </div>
                       <Button
                         size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          toast("Opens the case file and due-process timeline.")
-                        }
+                        variant={isHr ? "outline" : "ghost"}
+                        onClick={() => setOpenId(c.id)}
                       >
-                        Open case
+                        {isHr ? "Open case file" : "View case"}
                       </Button>
-                    )}
-                  </div>
-
-                  <CaseProgress state={c.state} />
-                </li>
-              )
-            })}
-          </ul>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </Panel>
       )}
+
+      <CaseSheet caseId={openId} onClose={() => setOpenId(null)} />
+      {raising && <RaiseCaseDialog onClose={() => setRaising(false)} />}
     </PageShell>
-  )
-}
-
-function CaseProgress({ state }: { state: DisciplinaryCase["state"] }) {
-  if (state === "dismissed") {
-    return (
-      <p className="mt-3 text-xs text-muted-foreground">
-        Dismissed — no further action, and the record reflects that.
-      </p>
-    )
-  }
-  const stages = STATE_ORDER.filter((s) => s !== "dismissed")
-  const current = stages.indexOf(state)
-
-  return (
-    <ol className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px]">
-      {stages.map((s, i) => (
-        <li key={s} className="flex items-center gap-1.5">
-          {i > 0 && <span className="text-muted-foreground/40">›</span>}
-          <span
-            className={
-              i < current
-                ? "text-muted-foreground line-through"
-                : i === current
-                  ? "rounded-full bg-success-muted px-2 py-0.5 font-medium text-primary"
-                  : "text-muted-foreground/60"
-            }
-          >
-            {CASE_STATE_LABEL[s]}
-          </span>
-        </li>
-      ))}
-    </ol>
   )
 }
