@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { Info, Pencil, Trash2, Users } from "lucide-react"
-import { toast } from "sonner"
 
 import { Panel, Pill, Initials, Field, SectionGrid } from "@/components/common"
 import { SettingsTable } from "./settings-table"
@@ -337,14 +336,8 @@ function CoverBlock({
         </SectionGrid>
 
         {action && (
-          <Button
-            size="lg"
-            className="mt-6"
-            onClick={() =>
-              toast("Editing the company profile is not wired up yet.")
-            }
-          >
-            {action}
+          <Button size="lg" className="mt-6" asChild>
+            <Link href="/settings/company-information">{action}</Link>
           </Button>
         )}
       </div>
@@ -372,14 +365,8 @@ function OfficesBlock({
       description={description}
       bodyClassName="space-y-3 p-4"
       actions={
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() =>
-            toast("Add an office from Organizational structure -> Branches.")
-          }
-        >
-          Add office
+        <Button size="sm" variant="outline" asChild>
+          <Link href="/structure">Add office</Link>
         </Button>
       }
     >
@@ -415,16 +402,14 @@ function OfficesBlock({
           >
             <Pencil className="size-4" />
           </Link>
-          <button
-            type="button"
-            aria-label={`Remove ${branch.name}`}
-            onClick={() =>
-              toast("Archive a branch from Organizational structure.")
-            }
+          <Link
+            href="/structure"
+            aria-label={`Archive ${branch.name} in Organizational structure`}
+            title="Archive in Organizational structure"
             className="grid size-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           >
             <Trash2 className="size-4" />
-          </button>
+          </Link>
         </div>
       ))}
     </Panel>

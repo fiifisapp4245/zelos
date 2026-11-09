@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/select"
 import { Amount, RevealProvider, RevealToggle } from "@/components/pay/money"
 import { usePayroll } from "./use-payroll"
+import { ReturnUploadDialog } from "./return-upload-dialog"
+import { fileFor } from "@/lib/talent/case-files"
 import { useStore } from "@/lib/store"
 import { packFor } from "@/lib/pay/rule-packs"
 import { complianceCalendar, periodLabel } from "@/lib/pay/compliance"
@@ -56,6 +58,10 @@ const MONTH = (period: string) =>
  */
 export function ReportsTab() {
   const store = useStore()
+  const [returnFor, setReturnFor] = React.useState<{
+    id: string
+    name: string
+  } | null>(null)
   const { runs, groups, groupFor, linesFor } = usePayroll()
   const [groupId, setGroupId] = React.useState("all")
   const [revealed, setRevealed] = React.useState(false)
@@ -199,12 +205,13 @@ export function ReportsTab() {
                           size="sm"
                           className="h-8"
                           onClick={() =>
-                            toast("Choose the provider's return to attach it.")
+                            setReturnFor({ id: group.id, name: group.name })
                           }
                         >
                           <Upload className="size-3.5" />
                           Upload a return
                         </Button>
+                        <AttachedReturns payGroupId={group.id} />
                       </div>
                     ) : (
                       <ul className="mt-2 flex flex-wrap gap-2">
@@ -479,7 +486,68 @@ export function ReportsTab() {
             )
           })}
       </div>
+      {returnFor && (
+        <ReturnUploadDialog
+          payGroupId={returnFor.id}
+          groupName={returnFor.name}
+          onClose={() => setReturnFor(null)}
+        />
+      )}
     </RevealProvider>
+  )
+}
+
+function AttachedReturns({ payGroupId }: { payGroupId: string }) {
+  const store = useStore()
+  const files = store.externalReturnFiles.filter(
+    (f) => f.payGroupId === payGroupId
+  )
+  if (files.length === 0) return null
+  return (
+    <ul className="basis-full space-y-1.5">
+      {files.map((f) => {
+        const file = fileFor(f.id)
+        return (
+          <li
+            key={f.id}
+            className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm"
+          >
+            <span className="min-w-0 flex-1 truncate">{f.name}</span>
+            <span className="tabular text-xs text-muted-foreground">
+              {f.sizeKb} KB · {formatDate(f.uploadedAt)}
+            </span>
+            <Button
+              size="xs"
+              variant="ghost"
+              disabled={!file}
+              title={
+                file
+                  ? undefined
+                  : "The prototype keeps file contents only until the tab reloads."
+              }
+              onClick={() => {
+                if (!file) return
+                const url = URL.createObjectURL(file)
+                window.open(url, "_blank", "noopener")
+                setTimeout(() => URL.revokeObjectURL(url), 60_000)
+              }}
+            >
+              Open
+            </Button>
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={() => {
+                store.removeExternalReturnFile(f.id)
+                toast.success(`${f.name} removed.`)
+              }}
+            >
+              Remove
+            </Button>
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 

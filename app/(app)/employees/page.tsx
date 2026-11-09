@@ -40,6 +40,7 @@ import { isOnStrength, visibleEmployees } from "@/lib/selectors"
 import {
   EMPLOYMENT_TYPE_LABEL,
   LIFECYCLE_LABEL,
+  TODAY_ISO,
   daysUntil,
   formatDate,
   fullName,
@@ -47,6 +48,9 @@ import {
 import type { Employee, EmploymentType, LifecycleState } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { csvCell } from "@/lib/reports"
+import { downloadText } from "@/components/reports/report-viewer"
+import { ImportEmployeesDialog } from "@/components/employees/import-dialog"
 import { ChangeStatusDialog } from "@/components/employees/change-status-dialog"
 import { EditRecordDialog } from "./[id]/edit-record-dialog"
 
@@ -63,6 +67,7 @@ export default function DirectoryPage() {
   const [contractOnly, setContractOnly] = React.useState(false)
   const [view, setView] = React.useState<ListView>("table")
   const [sort, setSort] = React.useState<SortKey>("name")
+  const [importing, setImporting] = React.useState(false)
 
   const scope = React.useMemo(
     () => visibleEmployees(viewer, employees),
@@ -108,6 +113,46 @@ export default function DirectoryPage() {
     setContractOnly(false)
   }
 
+  // What is on screen is what is exported: the same filters, the same order.
+  // Pay and identity numbers are never part of a directory export.
+  function exportCsv() {
+    const head = [
+      "Employee ID",
+      "Name",
+      "Job title",
+      "Department",
+      "Branch",
+      "Employment type",
+      "Status",
+      "Start date",
+      "Work email",
+      "Line manager",
+    ]
+    const lines = filtered.map((e) =>
+      [
+        e.employeeId,
+        fullName(e),
+        e.jobTitle,
+        e.department,
+        e.branch,
+        EMPLOYMENT_TYPE_LABEL[e.employmentType],
+        LIFECYCLE_LABEL[e.lifecycleState],
+        e.startDate,
+        e.email,
+        fullName(store.employeeById(e.managerId)) === "—"
+          ? ""
+          : fullName(store.employeeById(e.managerId)),
+      ]
+        .map(csvCell)
+        .join(",")
+    )
+    downloadText(
+      `employees-${TODAY_ISO}.csv`,
+      [head.map(csvCell).join(","), ...lines].join("\r\n")
+    )
+    toast.success(`Exported ${filtered.length} people.`)
+  }
+
   const expiring = scope.filter(
     (e) => e.contractEndDate && (daysUntil(e.contractEndDate) ?? 999) <= 90
   ).length
@@ -133,9 +178,8 @@ export default function DirectoryPage() {
             <Button
               variant="outline"
               size="lg"
-              onClick={() =>
-                toast("Export queued — CSV will download when ready.")
-              }
+              disabled={filtered.length === 0}
+              onClick={exportCsv}
             >
               <Download className="size-4" />
               Export
@@ -145,9 +189,7 @@ export default function DirectoryPage() {
                 <Button
                   variant="outline"
                   size="lg"
-                  onClick={() =>
-                    toast("Bulk import accepts the Zelos CSV template.")
-                  }
+                  onClick={() => setImporting(true)}
                 >
                   <Upload className="size-4" />
                   Import
@@ -296,6 +338,9 @@ export default function DirectoryPage() {
           <DirectoryGrid rows={filtered} />
         )}
       </div>
+      {importing && (
+        <ImportEmployeesDialog onClose={() => setImporting(false)} />
+      )}
     </PageShell>
   )
 }

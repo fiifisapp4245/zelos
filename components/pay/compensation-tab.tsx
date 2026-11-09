@@ -112,8 +112,7 @@ export function EmployeeCompensation({ employeeId }: { employeeId: string }) {
 
   const group = store.payGroups.find((g) => g.id === current.payGroupId)
   const entity = store.legalEntities.find((e) => e.id === current.entityId)
-  const pack =
-    packFor(store.countryRulePacks, current.workCountry, TODAY_ISO)
+  const pack = packFor(store.countryRulePacks, current.workCountry, TODAY_ISO)
   const cost = employerCost(current, pack, store.payComponents)
   const recurring = current.components
     .map((value) => ({
@@ -520,29 +519,11 @@ function RelocateDialog({
                 {result.blocked}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="bg-card"
-                  onClick={() =>
-                    toast(
-                      "Contractor conversion starts in the Leaver and joiner flow."
-                    )
-                  }
-                >
-                  Convert to contractor
+                <Button variant="outline" size="sm" className="bg-card" asChild>
+                  <Link href="/lifecycle">Convert to contractor</Link>
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="bg-card"
-                  onClick={() =>
-                    toast(
-                      "Register the entity under Settings → Pay → Pay groups."
-                    )
-                  }
-                >
-                  Register an entity
+                <Button variant="outline" size="sm" className="bg-card" asChild>
+                  <Link href="/settings/pay-groups">Register an entity</Link>
                 </Button>
               </div>
             </div>

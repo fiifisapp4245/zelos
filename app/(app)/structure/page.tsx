@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   Archive,
   Building2,
@@ -41,6 +42,7 @@ type Tab = "departments" | "branches" | "archive"
 export default function StructurePage() {
   const store = useStore()
   const { viewer, departments, branches } = store
+  const router = useRouter()
   const { celebrate, dialog } = useSuccessDialog()
 
   const [tab, setTab] = React.useState<Tab>("departments")
@@ -251,7 +253,7 @@ export default function StructurePage() {
                 "The department is live. Assign a head and start moving people into it.",
               primary: {
                 label: "View org chart",
-                onSelect: () => toast("Opens the org chart."),
+                onSelect: () => router.push("/org-chart"),
               },
               dismissLabel: "Back to structure",
             })

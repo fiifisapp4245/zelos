@@ -1,9 +1,9 @@
 "use client"
 
 import * as React from "react"
+import { toast } from "sonner"
 import Link from "next/link"
 import { Bell, ExternalLink, Mail, Settings2 } from "lucide-react"
-import { toast } from "sonner"
 
 import { PageShell } from "@/components/shell/page-shell"
 import {
@@ -15,6 +15,11 @@ import {
   StatCard,
 } from "@/components/common"
 import { Button } from "@/components/ui/button"
+import {
+  AlertSettingsDialog,
+  EmailManagersDialog,
+} from "@/components/alerts/alert-dialogs"
+import { isDue } from "@/lib/alerts"
 import { useStore } from "@/lib/store"
 import { openAlertsFor, visibleEmployees } from "@/lib/selectors"
 import { RETIREMENT_AGE, daysUntil, formatDate, fullName } from "@/lib/format"
@@ -45,9 +50,12 @@ export default function AlertsPage() {
   const scopeIds = new Set(scope.map((e) => e.id))
 
   const [kind, setKind] = React.useState<AlertKind | "all">("all")
+  const [dlg, setDlg] = React.useState<"settings" | "email" | null>(null)
 
   const inScope = alerts.filter((a) => scopeIds.has(a.employeeId))
-  const open = openAlertsFor(viewer, employees, alerts)
+  const allOpen = openAlertsFor(viewer, employees, alerts)
+  const open = allOpen.filter((a) => isDue(a, store.alertSettings))
+  const notYet = allOpen.length - open.length
   const filtered = kind === "all" ? open : open.filter((a) => a.kind === kind)
   const acknowledged = inScope.filter((a) => a.acknowledged)
 
@@ -83,16 +91,15 @@ export default function AlertsPage() {
             <Button
               variant="outline"
               size="lg"
-              onClick={() => toast("Opens alert threshold settings.")}
+              onClick={() => setDlg("settings")}
             >
               <Settings2 className="size-4" />
               Alert settings
             </Button>
             <Button
               size="lg"
-              onClick={() =>
-                toast("Drafted an email to every affected line manager.")
-              }
+              disabled={open.length === 0}
+              onClick={() => setDlg("email")}
             >
               <Mail className="size-4" />
               Email line managers
@@ -142,7 +149,11 @@ export default function AlertsPage() {
           <EmptyState
             icon={Bell}
             title="Nothing open"
-            description="Every alert in this category has been acknowledged."
+            description={
+              notYet > 0
+                ? `${notYet} more will appear as they come within their lead time.`
+                : "Every alert in this category has been acknowledged."
+            }
           />
         ) : (
           <ul className="divide-y">
@@ -176,6 +187,12 @@ export default function AlertsPage() {
             })}
           </ul>
         </Panel>
+      )}
+      {dlg === "settings" && (
+        <AlertSettingsDialog onClose={() => setDlg(null)} />
+      )}
+      {dlg === "email" && (
+        <EmailManagersDialog alerts={open} onClose={() => setDlg(null)} />
       )}
     </PageShell>
   )

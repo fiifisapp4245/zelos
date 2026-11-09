@@ -374,13 +374,23 @@ function SelfStep({
                   title: "Self review reminder",
                   body: `Your ${r.cycle} self review is due ${formatDate(r.dueOn)}.`,
                   kind: "alert",
-                  href: "/performance",
+                  href: "/me/performance",
                 })
+                store.updateReview(
+                  r.id,
+                  { lastReminderOn: TODAY_ISO },
+                  "Reminded the employee about their self review"
+                )
                 toast.success("Reminder sent.")
               }}
             >
               Send reminder
             </Button>
+            {r.lastReminderOn && (
+              <span className="self-center text-xs text-muted-foreground">
+                Last reminded {formatDate(r.lastReminderOn)}
+              </span>
+            )}
             <Button
               size="sm"
               variant="ghost"

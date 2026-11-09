@@ -78,6 +78,11 @@ export default function PerformancePage() {
   const [escalating, setEscalating] = React.useState<CoachingNote | null>(null)
   const [openReview, setOpenReview] = React.useState<string | null>(null)
   const [launching, setLaunching] = React.useState(false)
+  const [tab, setTab] = React.useState("reviews")
+  const [justLaunched, setJustLaunched] = React.useState<{
+    cycle: string
+    count: number
+  } | null>(null)
   const [cycle, setCycle] = React.useState("all")
   const [status, setStatus] = React.useState<ReviewStatus | "all" | "mine">(
     "all"
@@ -160,7 +165,7 @@ export default function PerformancePage() {
         />
       </div>
 
-      <Tabs defaultValue="reviews">
+      <Tabs value={tab} onValueChange={setTab}>
         <SegmentedTabs
           className="mb-5"
           tabs={[
@@ -301,6 +306,9 @@ export default function PerformancePage() {
               cycle={cycle === "all" ? (cycles[0] ?? "") : cycle}
               cycles={cycles}
               onCycle={setCycle}
+              onOpen={setOpenReview}
+              banner={justLaunched}
+              onDismissBanner={() => setJustLaunched(null)}
             />
           </TabsContent>
         )}
@@ -434,7 +442,17 @@ export default function PerformancePage() {
       </Tabs>
 
       <ReviewSheet reviewId={openReview} onClose={() => setOpenReview(null)} />
-      {launching && <LaunchCycleDialog onClose={() => setLaunching(false)} />}
+      {launching && (
+        <LaunchCycleDialog
+          onClose={() => setLaunching(false)}
+          onLaunched={(name, count) => {
+            // Land where the result is, not on a list that looks unchanged.
+            setCycle(name)
+            setJustLaunched({ cycle: name, count })
+            setTab("cycle")
+          }}
+        />
+      )}
       {noteFor !== null && (
         <WriteNoteDialog open onOpenChange={() => setNoteFor(null)} />
       )}
@@ -654,11 +672,17 @@ function CycleProgress({
   cycle,
   cycles,
   onCycle,
+  onOpen,
+  banner,
+  onDismissBanner,
 }: {
   reviews: ReturnType<typeof useStore>["reviews"]
   cycle: string
   cycles: string[]
   onCycle: (c: string) => void
+  onOpen: (id: string) => void
+  banner: { cycle: string; count: number } | null
+  onDismissBanner: () => void
 }) {
   const store = useStore()
   const inCycle = reviews.filter((r) => r.cycle === cycle)
@@ -674,22 +698,56 @@ function CycleProgress({
   const buckets = ratingBuckets(shared)
   const top = Math.max(1, ...buckets.map((b) => b.count))
 
-  function remind() {
-    const owners = new Set(late.map((r) => ownerOf(r.status)))
+  const open = inCycle
+    .filter((r) => r.status !== "complete")
+    .sort(
+      (a, b) =>
+        Number(isOverdue(b, TODAY_ISO)) - Number(isOverdue(a, TODAY_ISO)) ||
+        a.dueOn.localeCompare(b.dueOn)
+    )
+
+  function remindOne(r: (typeof open)[number], quiet = false) {
+    const owner = ownerOf(r.status)
+    const who =
+      owner === "employee"
+        ? store.employeeById(r.employeeId)
+        : store.employeeById(r.managerId)
     store.addNotification({
-      title: `${cycle} reviews overdue`,
-      body: `${late.length} reviews are past due. Waiting on: ${[...owners]
-        .filter(Boolean)
-        .map((o) => OWNER_LABEL[o!].toLowerCase())
-        .join(", ")}.`,
+      title: `${cycle} review reminder`,
+      body: `${fullName(store.employeeById(r.employeeId))}'s review is waiting on ${
+        owner ? OWNER_LABEL[owner].toLowerCase() : "someone"
+      }${who ? ` (${fullName(who)})` : ""}, due ${formatDate(r.dueOn)}.`,
       kind: "alert",
       href: "/performance",
     })
-    toast.success(`Reminder sent for ${late.length} overdue reviews.`)
+    store.updateReview(
+      r.id,
+      { lastReminderOn: TODAY_ISO },
+      "Sent a performance review reminder"
+    )
+    if (!quiet)
+      toast.success(`Reminder sent to ${who ? fullName(who) : "them"}.`)
+  }
+
+  function remindOverdue() {
+    late.forEach((r) => remindOne(r, true))
+    toast.success(`Reminders sent for ${late.length} overdue reviews.`)
   }
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+      {banner && banner.cycle === cycle && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-success-muted/40 px-4 py-3 text-sm lg:col-span-2">
+          <span className="min-w-0 flex-1">
+            <strong className="font-medium">{banner.cycle} is live.</strong>{" "}
+            {banner.count} reviews opened, and each person has been asked for a
+            self review. Chase anyone below as the due date nears.
+          </span>
+          <Button size="sm" variant="ghost" onClick={onDismissBanner}>
+            Dismiss
+          </Button>
+        </div>
+      )}
       <Panel
         title="Progress"
         description={
@@ -745,7 +803,7 @@ function CycleProgress({
             <span className="flex-1 text-muted-foreground">
               {late.length} overdue.
             </span>
-            <Button size="sm" variant="outline" onClick={remind}>
+            <Button size="sm" variant="outline" onClick={remindOverdue}>
               Send reminders
             </Button>
           </div>
@@ -781,6 +839,64 @@ function CycleProgress({
             {shared.length} shared so far. The distribution appears at{" "}
             {MIN_AGGREGATION_GROUP}.
           </p>
+        )}
+      </Panel>
+
+      <Panel
+        className="lg:col-span-2"
+        title="Still open"
+        description="Overdue first. Open one to see where it is stuck."
+        bodyClassName="p-0"
+      >
+        {open.length === 0 ? (
+          <p className="px-5 py-8 text-center text-sm text-muted-foreground">
+            Everything in this cycle is complete.
+          </p>
+        ) : (
+          <ul className="divide-y">
+            {open.map((r) => {
+              const emp = store.employeeById(r.employeeId)
+              const owner = ownerOf(r.status)
+              return (
+                <li
+                  key={r.id}
+                  className="flex flex-wrap items-center gap-3 px-5 py-3"
+                >
+                  {emp && <Initials person={emp} size="sm" />}
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="font-medium">{fullName(emp)}</span>
+                      <ReviewBadge status={r.status} />
+                      {isOverdue(r, TODAY_ISO) && (
+                        <Pill tone="danger">Overdue</Pill>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Waiting on{" "}
+                      {owner ? OWNER_LABEL[owner].toLowerCase() : "—"} · due{" "}
+                      {formatDate(r.dueOn)}
+                      {r.lastReminderOn &&
+                        ` · reminded ${formatDate(r.lastReminderOn)}`}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => remindOne(r)}
+                  >
+                    Remind
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => onOpen(r.id)}
+                  >
+                    Open
+                  </Button>
+                </li>
+              )
+            })}
+          </ul>
         )}
       </Panel>
     </div>

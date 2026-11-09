@@ -305,6 +305,8 @@ export interface PerformanceReview {
   /** The employee's reply once the review is shared with them. */
   employeeComment: string | null
   acknowledgedOn: string | null
+  /** When whoever the review is waiting on was last nudged. */
+  lastReminderOn?: string | null
 }
 
 /** Private to the authoring manager until deliberately escalated (system map §3). */
@@ -619,4 +621,20 @@ export interface SavedReport {
   createdOn: string
   schedule: "none" | "weekly" | "monthly"
   lastRunOn: string | null
+}
+
+/** How far ahead each kind of alert starts appearing, and when HR last chased managers. */
+export interface AlertSettings {
+  leadDays: Record<AlertKind, number>
+  lastEmailedOn: string | null
+}
+
+/** A return produced outside Zelos (by a local provider) and kept with the pay group. */
+export interface ExternalReturnFile {
+  id: string
+  payGroupId: string
+  name: string
+  sizeKb: number
+  uploadedBy: string
+  uploadedAt: string
 }

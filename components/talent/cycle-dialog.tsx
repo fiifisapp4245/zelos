@@ -13,7 +13,13 @@ import { isOnStrength } from "@/lib/selectors"
 import { blankReview } from "@/lib/talent/performance"
 
 /** Starts a review cycle for everyone who has been here long enough to be reviewed. */
-export function LaunchCycleDialog({ onClose }: { onClose: () => void }) {
+export function LaunchCycleDialog({
+  onClose,
+  onLaunched,
+}: {
+  onClose: () => void
+  onLaunched?: (cycle: string, count: number) => void
+}) {
   const store = useStore()
   const [cycle, setCycle] = React.useState("H1 2027")
   const [due, setDue] = React.useState("2027-04-15")
@@ -61,6 +67,7 @@ export function LaunchCycleDialog({ onClose }: { onClose: () => void }) {
     toast.success(
       `${name} launched for ${eligible.length} people. Self reviews are open.`
     )
+    onLaunched?.(name, eligible.length)
     onClose()
   }
 

@@ -1936,10 +1936,10 @@ function CoverageChoicePanel({ country }: { country: string }) {
               Results are uploaded when you run payroll
             </p>
             <p className="mt-0.5 text-muted-foreground">
-              There is nothing to upload here yet — this only sets {country}{" "}
-              to be paid by upload. Download the template below, send it to
-              your local provider, and upload what comes back from the
-              payroll run itself.
+              There is nothing to upload here yet — this only sets {country} to
+              be paid by upload. Download the template below, send it to your
+              local provider, and upload what comes back from the payroll run
+              itself.
             </p>
             <Button asChild size="sm" variant="outline" className="mt-2 h-8">
               <Link href="/pay/payroll">
@@ -1972,14 +1972,12 @@ function CoverageChoicePanel({ country }: { country: string }) {
               </>
             ) : (
               <>
-                <p className="font-medium">
-                  Send Zelos what you have
-                </p>
+                <p className="font-medium">Send Zelos what you have</p>
                 <p className="mt-0.5 text-muted-foreground">
                   Nobody types a tax rate into Zelos directly. Describe the
-                  rates, bands and filing rules your company keeps for{" "}
-                  {country} — or say where to find them — and Zelos builds it
-                  as a pack only your company uses.
+                  rates, bands and filing rules your company keeps for {country}{" "}
+                  — or say where to find them — and Zelos builds it as a pack
+                  only your company uses.
                 </p>
               </>
             )}

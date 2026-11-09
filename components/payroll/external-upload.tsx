@@ -225,9 +225,7 @@ export function ExternalUpload({
             }}
             className={cn(
               "flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed p-8 text-center transition-colors",
-              dragOver
-                ? "border-primary bg-success-muted"
-                : "hover:bg-muted/40"
+              dragOver ? "border-primary bg-success-muted" : "hover:bg-muted/40"
             )}
           >
             <FileSpreadsheet
@@ -238,8 +236,8 @@ export function ExternalUpload({
               Drag the file your provider returned here, or click to browse
             </p>
             <p className="text-xs text-muted-foreground">
-              The template you downloaded, filled in — gross, deductions and
-              net for everybody in this period.
+              The template you downloaded, filled in — gross, deductions and net
+              for everybody in this period.
             </p>
             <input
               ref={inputRef}
@@ -283,8 +281,8 @@ export function ExternalUpload({
             {errors.length > 0 && (
               <p className="flex items-center gap-2 text-sm font-medium text-destructive">
                 <AlertTriangle className="size-4" aria-hidden />
-                {errors.length} {errors.length === 1 ? "row" : "rows"} cannot
-                be accepted
+                {errors.length} {errors.length === 1 ? "row" : "rows"} cannot be
+                accepted
               </p>
             )}
 

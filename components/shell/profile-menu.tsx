@@ -3,7 +3,6 @@
 import * as React from "react"
 import Link from "next/link"
 import { ChevronDown, LogOut } from "lucide-react"
-import { toast } from "sonner"
 
 import { useStore } from "@/lib/store"
 import { fullName, initials } from "@/lib/format"
@@ -53,7 +52,13 @@ export function ProfileMenu({
 
   function signOut() {
     setOpen(false)
-    toast("Signing out is not wired up in the prototype.")
+    // Ends the demo session, so signing back in starts from the seeded data.
+    try {
+      sessionStorage.removeItem("zelos-hr-session")
+    } catch {
+      // Blocked storage: the sign-out page still shows.
+    }
+    window.location.assign("/signed-out")
   }
 
   if (collapsed) {
