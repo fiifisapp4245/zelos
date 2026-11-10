@@ -9,8 +9,10 @@ import type {
   AttendanceRecord,
   Candidate,
   DisciplinaryCase,
+  CheckIn,
   Employee,
   EmployeeDocument,
+  Goal,
   LeaveBalance,
   LeaveRequest,
   OffboardingCase,
@@ -31,6 +33,8 @@ export interface ReportSource {
   leaveBalances: LeaveBalance[]
   documents: EmployeeDocument[]
   attendance: AttendanceRecord[]
+  goals: Goal[]
+  checkIns: CheckIn[]
 }
 
 export function buildReportData(viewer: Viewer, s: ReportSource): ReportData {
@@ -51,5 +55,10 @@ export function buildReportData(viewer: Viewer, s: ReportSource): ReportData {
     leaveBalances: s.leaveBalances.filter((b) => ids.has(b.employeeId)),
     documents: s.documents.filter((d) => ids.has(d.employeeId)),
     attendance: s.attendance.filter((a) => ids.has(a.employeeId)),
+    // Company and team goals are open to all; an individual goal is its owner's.
+    goals: s.goals.filter(
+      (g) => g.level !== "individual" || (g.ownerId && ids.has(g.ownerId))
+    ),
+    checkIns: s.checkIns,
   }
 }

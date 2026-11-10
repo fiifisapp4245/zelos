@@ -1036,3 +1036,56 @@ export interface SurveyParticipation {
   surveyId: string
   employeeId: string
 }
+
+/* ── Goals and OKRs ──────────────────────────────────────────────────────── */
+
+export type GoalLevel = "company" | "team" | "individual"
+
+export type GoalStatus = "draft" | "proposed" | "active" | "done" | "cancelled"
+
+export interface KeyResult {
+  id: string
+  title: string
+  /** yes_no is 0 or 1; percent and number are measured between start and target. */
+  kind: "number" | "percent" | "yes_no"
+  start: number
+  target: number
+  current: number
+  /** What the number counts, e.g. "customers". */
+  unit: string
+}
+
+export interface Goal {
+  id: string
+  title: string
+  description: string
+  level: GoalLevel
+  /** The person, for an individual goal. */
+  ownerId: string | null
+  /** The department, for a team goal. */
+  team: string | null
+  /** The goal this one supports, so effort can be traced up to what the company is trying to do. */
+  parentId: string | null
+  /** The review cycle it belongs to, e.g. "H2 2026", so reviews can show it. */
+  cycle: string
+  startOn: string
+  dueOn: string
+  status: GoalStatus
+  keyResults: KeyResult[]
+  createdBy: string
+  /** Set when a manager sent it back, so the owner knows what to change. */
+  returnNote: string | null
+}
+
+export type Confidence = "on_track" | "at_risk" | "off_track"
+
+export interface CheckIn {
+  id: string
+  goalId: string
+  at: string
+  by: string
+  confidence: Confidence
+  note: string
+  /** Where each key result stood after this check-in. */
+  values: Record<string, number>
+}

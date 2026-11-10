@@ -16,6 +16,14 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Initials, Pill } from "@/components/common"
 import { ReviewBadge } from "@/components/common/status"
+import { HEALTH_TONE, ProgressBar } from "@/components/goals/goal-bits"
+import {
+  CONFIDENCE_LABEL,
+  canViewGoal,
+  healthOf,
+  pct,
+  progressOf,
+} from "@/lib/goals"
 import { FormRow, NativeSelect, ScorePicker } from "./form"
 import { useStore } from "@/lib/store"
 import { has } from "@/lib/rbac"
@@ -113,6 +121,7 @@ function Body({ r, onClose }: { r: PerformanceReview; onClose: () => void }) {
         </SheetHeader>
 
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">
+          <GoalsPanel r={r} />
           {/* What came before, read-only, so each step is done knowing the last. */}
           {stepIndex >= 2 && r.selfSummary && <SelfAssessment r={r} />}
           {stepIndex >= 3 && !hideFromEmployee && r.scores && (
@@ -181,6 +190,60 @@ const STEP_NAME: Record<string, string> = {
   calibration: "Calibration",
   shared: "Shared",
   complete: "Complete",
+}
+
+/** The goals this person held in the review's cycle, with where each ended up, so the rating is given with them in view. */
+function GoalsPanel({ r }: { r: PerformanceReview }) {
+  const store = useStore()
+  const ctx = { viewer: store.viewer, employees: store.employees }
+  const mine = store.goals.filter(
+    (g) =>
+      g.level === "individual" &&
+      g.ownerId === r.employeeId &&
+      g.cycle === r.cycle &&
+      g.status !== "draft" &&
+      g.status !== "proposed" &&
+      g.status !== "cancelled" &&
+      canViewGoal(g, ctx)
+  )
+  return (
+    <Block title="Goals this cycle">
+      {mine.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No goals were set for {r.cycle}.{" "}
+          <Link href="/goals" className="underline">
+            Set one
+          </Link>
+        </p>
+      ) : (
+        <ul className="divide-y rounded-lg border">
+          {mine.map((g) => {
+            const health = healthOf(g, store.goals, store.checkIns, TODAY_ISO)
+            return (
+              <li key={g.id} className="space-y-1.5 px-3 py-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="font-medium">{g.title}</span>
+                  <span className="flex items-center gap-2">
+                    {g.status === "done" ? (
+                      <Pill tone="success">Done</Pill>
+                    ) : (
+                      <Pill tone={HEALTH_TONE[health]}>
+                        {CONFIDENCE_LABEL[health]}
+                      </Pill>
+                    )}
+                    <span className="tabular text-xs font-medium">
+                      {pct(progressOf(g, store.goals))}%
+                    </span>
+                  </span>
+                </div>
+                <ProgressBar value={progressOf(g, store.goals)} />
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </Block>
+  )
 }
 
 function Block({

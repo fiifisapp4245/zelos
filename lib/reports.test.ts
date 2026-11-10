@@ -1,3 +1,4 @@
+import { GOALS, CHECK_INS } from "./data/goals"
 import { describe, expect, it } from "vitest"
 
 import {
@@ -35,6 +36,8 @@ const data: ReportData = {
   leaveBalances: LEAVE_BALANCES,
   documents: DOCUMENTS,
   attendance: ATTENDANCE,
+  goals: GOALS,
+  checkIns: CHECK_INS,
 }
 const today = "2026-09-18"
 const hr: Viewer = { employeeId: "fiifi", roles: ["hr_admin", "employee"] }

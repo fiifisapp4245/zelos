@@ -10,7 +10,9 @@ import { addDays } from "./time"
 export const SCHEDULE_DAYS = { weekly: 7, monthly: 30 } as const
 
 /** The day a repeating report next goes out, counted from the last time it did. */
-export function nextDue(r: Pick<SavedReport, "schedule" | "lastRunOn" | "createdOn">) {
+export function nextDue(
+  r: Pick<SavedReport, "schedule" | "lastRunOn" | "createdOn">
+) {
   if (r.schedule === "none") return null
   return addDays(r.lastRunOn ?? r.createdOn, SCHEDULE_DAYS[r.schedule])
 }
@@ -31,8 +33,13 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
 /** Splits "a@x.com, b@y.com; c@z.com" into addresses, and says which were not addresses. */
 export function parseRecipients(text: string) {
-  const parts = text.split(/[,;\s]+/).map((p) => p.trim()).filter(Boolean)
-  const ok = [...new Set(parts.filter((p) => EMAIL.test(p)).map((p) => p.toLowerCase()))]
+  const parts = text
+    .split(/[,;\s]+/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+  const ok = [
+    ...new Set(parts.filter((p) => EMAIL.test(p)).map((p) => p.toLowerCase())),
+  ]
   const bad = parts.filter((p) => !EMAIL.test(p))
   return { ok, bad }
 }
@@ -47,7 +54,10 @@ export function reportEmail(p: {
   sendAt: string
   rows: number
 }): Omit<EmailMessage, "id" | "createdAt" | "status"> {
-  const file = `${p.report.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-${p.today}.csv`
+  const file = `${p.report.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")}-${p.today}.csv`
   return {
     kind: "report",
     to: p.to,
