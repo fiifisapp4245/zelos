@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { FormDialog } from "@/components/common/form-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { FormRow, NativeSelect } from "./form"
 import { useStore } from "@/lib/store"
 import { EMPLOYMENT_TYPE_LABEL, TODAY_ISO, fullName } from "@/lib/format"
@@ -49,9 +50,26 @@ export function RequisitionDialog({
   const [budget, setBudget] = React.useState(
     existing ? String(existing.budgetMonthly) : ""
   )
+  const c0 = existing?.careers
+  const [published, setPublished] = React.useState(c0?.published ?? false)
+  const [summary, setSummary] = React.useState(c0?.summary ?? "")
+  const [duties, setDuties] = React.useState(
+    (c0?.responsibilities ?? []).join("\n")
+  )
+  const [needs, setNeeds] = React.useState((c0?.requirements ?? []).join("\n"))
+  const [asks, setAsks] = React.useState((c0?.questions ?? []).join("\n"))
+  const [closes, setCloses] = React.useState(c0?.closesOn ?? "")
   const [touched, setTouched] = React.useState(false)
 
   const errors = {
+    summary:
+      published && summary.trim().length < 20
+        ? "Write a short summary of the role (at least 20 characters)."
+        : null,
+    closes:
+      closes && closes < TODAY_ISO && !existing?.careers?.closesOn
+        ? "The closing date has passed."
+        : null,
     title: title.trim() ? null : "Give the role a title.",
     openings:
       Number(openings) >= 1 && Number.isInteger(Number(openings))
@@ -81,6 +99,23 @@ export function RequisitionDialog({
       hiringManagerId: manager,
       targetStartDate: start,
       budgetMonthly: Number(budget),
+      careers: {
+        published,
+        summary: summary.trim(),
+        responsibilities: duties
+          .split("\n")
+          .map((x) => x.trim())
+          .filter(Boolean),
+        requirements: needs
+          .split("\n")
+          .map((x) => x.trim())
+          .filter(Boolean),
+        questions: asks
+          .split("\n")
+          .map((x) => x.trim())
+          .filter(Boolean),
+        closesOn: closes || null,
+      },
     }
     if (existing) {
       store.updateRequisition(existing.id, fields)
@@ -228,6 +263,88 @@ export function RequisitionDialog({
             onChange={(e) => setBudget(e.target.value)}
           />
         </FormRow>
+      </div>
+
+      <div className="mt-6 space-y-4 border-t pt-5">
+        <div>
+          <p className="text-sm font-medium">Careers page</p>
+          <p className="text-xs text-muted-foreground">
+            What candidates see on the public jobs page. It only shows while the
+            requisition is open.
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="size-4 accent-[var(--primary)]"
+            checked={published}
+            onChange={(e) => setPublished(e.target.checked)}
+          />
+          Show this role on the careers page
+        </label>
+        <FormRow
+          label="Summary"
+          htmlFor="rq-sum"
+          error={touched ? errors.summary : null}
+        >
+          <Textarea
+            id="rq-sum"
+            rows={3}
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+          />
+        </FormRow>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormRow
+            label="What they will do"
+            htmlFor="rq-duties"
+            hint="One per line."
+          >
+            <Textarea
+              id="rq-duties"
+              rows={4}
+              value={duties}
+              onChange={(e) => setDuties(e.target.value)}
+            />
+          </FormRow>
+          <FormRow
+            label="What you are looking for"
+            htmlFor="rq-needs"
+            hint="One per line."
+          >
+            <Textarea
+              id="rq-needs"
+              rows={4}
+              value={needs}
+              onChange={(e) => setNeeds(e.target.value)}
+            />
+          </FormRow>
+          <FormRow
+            label="Questions on the application"
+            htmlFor="rq-asks"
+            hint="One per line. Each one is required."
+            className="sm:col-span-2"
+          >
+            <Textarea
+              id="rq-asks"
+              rows={3}
+              value={asks}
+              onChange={(e) => setAsks(e.target.value)}
+            />
+          </FormRow>
+          <FormRow
+            label="Apply by (optional)"
+            htmlFor="rq-closes"
+            error={touched ? errors.closes : null}
+          >
+            <Input
+              id="rq-closes"
+              type="date"
+              value={closes}
+              onChange={(e) => setCloses(e.target.value)}
+            />
+          </FormRow>
+        </div>
       </div>
     </FormDialog>
   )

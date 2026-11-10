@@ -212,6 +212,19 @@ export interface Requisition {
   openedOn: string
   targetStartDate: string
   budgetMonthly: number
+  /** What the public careers page shows. Absent means it has never been set up. */
+  careers?: CareersListing
+}
+
+export interface CareersListing {
+  published: boolean
+  summary: string
+  responsibilities: string[]
+  requirements: string[]
+  /** Asked on the application form, each one required. */
+  questions: string[]
+  /** Last day to apply, or null for open until filled. */
+  closesOn: string | null
 }
 
 export type CandidateStage =
@@ -242,6 +255,9 @@ export interface Candidate {
   offer: CandidateOffer | null
   /** The pre-hire record this person became, once hired. */
   employeeId: string | null
+  /** What they said on the careers form, and the CV they attached. */
+  answers?: Record<string, string>
+  cvName?: string
 }
 
 export type InterviewKind = "phone" | "technical" | "panel" | "final"
@@ -254,6 +270,12 @@ export interface Interview {
   /** 1–5, recorded after the interview. */
   score: number | null
   feedback: string | null
+  /** Set when the interview came from a booking, so it has a time and a way to join. */
+  startsAt?: string
+  durationMin?: number
+  link?: string
+  bookingId?: string
+  status?: "scheduled" | "cancelled" | "no_show"
 }
 
 export interface CandidateOffer {
@@ -262,6 +284,8 @@ export interface CandidateOffer {
   status: "draft" | "sent" | "accepted" | "declined"
   sentOn: string | null
   decidedOn: string | null
+  /** The signing request this offer went out on, once sent for signature. */
+  signatureId?: string
 }
 
 export interface OnboardingTask {
@@ -637,4 +661,221 @@ export interface ExternalReturnFile {
   sizeKb: number
   uploadedBy: string
   uploadedAt: string
+}
+
+/* ── Email outbox ────────────────────────────────────────────────────────── */
+
+export type EmailKind =
+  | "booking_invite"
+  | "booking_confirmation"
+  | "booking_reminder"
+  | "booking_cancelled"
+  | "assessment_invite"
+  | "assessment_submitted"
+  | "assessment_reminder"
+  | "manager_alert"
+  | "report"
+  | "other"
+
+/**
+ * What the prototype would have emailed. There is no mail server, so a message
+ * is recorded here instead: HR can read exactly what was sent, and follow its
+ * links, which is what a real build would have delivered.
+ */
+export interface EmailMessage {
+  id: string
+  kind: EmailKind
+  to: string
+  toName: string
+  subject: string
+  body: string
+  /** The one button in the message, when it has one. */
+  cta?: { label: string; href: string }
+  createdAt: string
+  /** When it goes out. Later than now means it is still waiting. */
+  sendAt: string
+  status: "sent" | "scheduled" | "cancelled"
+  relatedId?: string
+}
+
+/* ── Interview booking ───────────────────────────────────────────────────── */
+
+export interface BookingPage {
+  id: string
+  name: string
+  /** Pinned to one requisition, or null for any. */
+  requisitionId: string | null
+  kind: InterviewKind
+  durationMin: number
+  bufferMin: number
+  /** How many days ahead a candidate can book. */
+  advanceDays: number
+  /** The least notice allowed, in hours. */
+  minNoticeHours: number
+  /** Most interviews of this kind in one day. */
+  dailyLimit: number
+  interviewerIds: string[]
+  assign: "round_robin" | "fixed"
+  video: "zelos_meet" | "external" | "in_person"
+  /** A meeting URL for external, or an address for in person. */
+  videoLink: string
+  /** Asked before they book. */
+  questions: string[]
+  /** Hours before the interview after which they can no longer change it. */
+  cancelCutoffHours: number
+  active: boolean
+}
+
+/** When someone can be interviewed. Times are in the company's time zone. */
+export interface Availability {
+  employeeId: string
+  /** 1 = Monday … 7 = Sunday. */
+  days: number[]
+  start: string
+  end: string
+}
+
+export interface Booking {
+  id: string
+  /** The private link's key. Unguessable, expires, and works only for one candidate. */
+  token: string
+  candidateId: string
+  pageId: string
+  status: "invited" | "booked" | "cancelled" | "no_show" | "completed"
+  invitedOn: string
+  expiresOn: string
+  slotStart: string | null
+  interviewerId: string | null
+  timeZone: string | null
+  answers: Record<string, string>
+  bookedOn: string | null
+  link: string | null
+  interviewId: string | null
+  history: { at: string; text: string }[]
+}
+
+/* ── Assessments ─────────────────────────────────────────────────────────── */
+
+export type QuestionKind =
+  "mcq" | "multi" | "short" | "long" | "upload" | "code"
+
+export interface TestCase {
+  args: unknown[]
+  expected: unknown
+  /** Hidden cases decide the score; visible ones are for trying the code. */
+  hidden: boolean
+}
+
+export interface Question {
+  id: string
+  kind: QuestionKind
+  prompt: string
+  skill: string
+  level: "junior" | "mid" | "senior"
+  marks: number
+  options?: string[]
+  /** Indexes of the right option(s), for mcq and multi. */
+  correct?: number[]
+  /** What a reviewer should look for in a written answer. */
+  guide?: string
+  code?: {
+    language: "javascript"
+    /** The function the tests call. */
+    fn: string
+    starter: string
+    tests: TestCase[]
+  }
+}
+
+export interface AssessmentTest {
+  id: string
+  name: string
+  requisitionId: string | null
+  questionIds: string[]
+  /** Give each candidate a random N of the pool, so no two papers match. */
+  pickCount: number | null
+  shuffle: boolean
+  durationMin: number
+  passMarkPct: number
+  /** How long the invitation stays open to start. */
+  windowDays: number
+  /** Moving to Offer waits for a reviewed result. */
+  requiredForOffer: boolean
+  active: boolean
+}
+
+export interface AnswerValue {
+  text?: string
+  choices?: number[]
+  fileName?: string
+  code?: string
+  /** Hidden-test result from the last submit, so the score is not just the editor's say-so. */
+  passed?: number
+  total?: number
+}
+
+export interface IntegrityFlag {
+  at: string
+  kind: "tab_left" | "paste" | "fullscreen_exit"
+  detail?: string
+}
+
+export interface TestInvitation {
+  id: string
+  token: string
+  candidateId: string
+  testId: string
+  status: "invited" | "started" | "submitted" | "expired"
+  invitedOn: string
+  windowEnd: string
+  startedAt: string | null
+  /** The server's deadline. Answers after it are refused. */
+  deadline: string | null
+  /** Extra time granted, e.g. for an accessibility need. Recorded, never silent. */
+  extraMinutes: number
+  extraNote: string | null
+  submittedAt: string | null
+  /** The paper this person was issued. */
+  questionIds: string[]
+  answers: Record<string, AnswerValue>
+  flags: IntegrityFlag[]
+  autoMarks: Record<string, number>
+  reviewMarks: Record<string, number>
+  reviewed: boolean
+  reviewNote: string | null
+  reviewerId: string | null
+}
+
+/* ── Offer letters and e-signature ───────────────────────────────────────── */
+
+export interface OfferTemplate {
+  id: string
+  name: string
+  /** Plain text with {{placeholders}}, filled from the candidate and the role. */
+  body: string
+}
+
+export interface OfferSignature {
+  id: string
+  /** The private link's key for the candidate. */
+  token: string
+  candidateId: string
+  templateId: string | null
+  /** The letter exactly as sent. Never re-rendered, so what was signed is what is shown. */
+  letter: string
+  /** SHA-256 of the letter, so a changed letter is detectable. */
+  letterHash: string
+  salaryMonthly: number
+  startDate: string
+  status: "sent" | "viewed" | "signed" | "declined" | "withdrawn" | "expired"
+  sentOn: string
+  expiresOn: string
+  viewedOn: string | null
+  signedOn: string | null
+  signedName: string | null
+  /** A drawn signature as a small image, when they drew one. */
+  signatureImage: string | null
+  declinedReason: string | null
+  /** Every step, in order, with a time. This is the audit trail. */
+  trail: { at: string; text: string }[]
 }

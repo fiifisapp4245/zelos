@@ -174,12 +174,18 @@ function NotificationBell() {
             </li>
           ))}
         </ul>
-        <div className="border-t p-2">
+        <div className="flex border-t p-2">
           <Link
             href="/alerts"
-            className="block rounded-lg px-2.5 py-2 text-center text-sm text-primary transition-colors hover:bg-muted"
+            className="block flex-1 rounded-lg px-2.5 py-2 text-center text-sm text-primary transition-colors hover:bg-muted"
           >
             View all alerts
+          </Link>
+          <Link
+            href="/outbox"
+            className="block flex-1 rounded-lg px-2.5 py-2 text-center text-sm text-primary transition-colors hover:bg-muted"
+          >
+            Sent emails
           </Link>
         </div>
       </PopoverContent>

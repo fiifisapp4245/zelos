@@ -153,7 +153,26 @@ export function EmailManagersDialog({
                   kind: "alert",
                   href: "/alerts",
                 })
-                void id
+                const m = store.employeeById(id)
+                if (m)
+                  store.queueEmail({
+                    kind: "manager_alert",
+                    to: m.email,
+                    toName: fullName(m),
+                    subject: `${list.length} compliance date${list.length === 1 ? "" : "s"} on your team`,
+                    body: `${note}\n\n${list
+                      .map(
+                        (a) =>
+                          `• ${fullName(store.employeeById(a.employeeId))}: ${KIND_LABEL[a.kind].toLowerCase()}, ${a.dueOn}`
+                      )
+                      .join("\n")}`,
+                    cta: {
+                      label: "Open alerts",
+                      href: `${window.location.origin}/alerts`,
+                    },
+                    sendAt: new Date().toISOString(),
+                    status: "sent",
+                  })
               })
               store.setAlertSettings({ lastEmailedOn: TODAY_ISO })
               toast.success(

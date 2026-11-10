@@ -22,9 +22,10 @@ semantic status colours all come from there. No component hard-codes a colour.
 
 ## No backend
 
-Everything runs from seeded mock data held in React state and mirrored into `sessionStorage`.
-Edits you make while demoing persist across navigation and reset when the tab closes, or via
-**Reset demo data** in the persona switcher.
+Everything runs from seeded mock data held in React state and mirrored into `localStorage`.
+Edits you make while demoing persist across navigation and reloads, and are shared between tabs
+(which is how a candidate's booking link, opened in a second tab, reaches the recruiter's view).
+Which persona you view as stays with the tab. Reset with **Reset demo data** in the persona switcher.
 
 - [lib/data/employees.ts](lib/data/employees.ts) — 25-person workforce
 - [lib/data/records.ts](lib/data/records.ts) — leave, attendance, documents, cases, alerts, pipeline
@@ -184,3 +185,43 @@ stay deferred until there is clean operational data for it to read.
 
 Company Settings screens are read-only: they show what each area holds and how it is
 configured, but nothing there writes yet.
+
+
+## Interview booking and assessments
+
+Two candidate-facing flows, both public pages with no login, protected by a private token.
+
+- **Booking** — Recruitment → Booking sets up pages (length, buffer, window, interviewers, video) and
+  weekly availability. From a candidate's record, *Send booking link* creates a private link
+  (`/book/<token>`). The candidate picks a slot in their own time zone, gets a confirmation with a
+  video link and a calendar file, and can reschedule or cancel until the cut-off. A slot can never be
+  booked twice; public holidays and approved leave are taken out of availability.
+- **Assessments** — Recruitment → Assessments holds the question bank (multiple choice, multiple
+  answer, short, long, upload, JavaScript coding), tests built from it, and results. A candidate opens
+  `/assess/<token>`, accepts the terms, and takes the test against a clock fixed at the moment they
+  start (refreshing does not add time; answers after the deadline are refused; the test submits
+  itself). Written answers go to a reviewer; moving to Offer can require a reviewed result.
+- **Outbox** — there is no mail server. Every email these flows would send is recorded under `/outbox`
+  (bell menu → *Sent emails*), links included. Reminders sit there as *Scheduled*.
+
+Prototype limits, on purpose: coding runs in a Web Worker with the network removed and a 3-second kill
+(a real build uses an isolated server-side sandbox), the editor has no syntax highlighting, uploaded
+files keep only their name, and calendar sync is not built.
+
+## Careers page and offer e-signature
+
+- **Careers** — Recruitment → Careers publishes a requisition to the public jobs page (`/careers`,
+  `/careers/<requisition>`). A role shows only while it is open, published and before its closing
+  date. The form (name, email, phone, CV, the role's own questions, consent) refuses an incomplete
+  application or a second one to the same role from the same email, and the application lands in the
+  pipeline at Applied with the CV and answers on the candidate's record.
+- **Offers** — from a candidate, *Prepare letter* fills a template from the offer and the role, shows
+  exactly what will be sent, and sends a private link (`/sign/<token>`). The letter is stored as text
+  with its SHA-256, so what the candidate signs is what was sent. They type their name (checked against
+  the candidate's own), optionally draw a signature, and sign or decline. A signature accepts the offer
+  and hires the candidate: the same pre-hire record and onboarding tasks as *Hire*. The signed copy can
+  be printed or downloaded, and carries the signing record. Withdrawing, resending and expiry are
+  handled; a changed letter is reported as not matching its checksum.
+
+This is an electronic signature in the sense of a typed name with an audit trail, suitable for a
+prototype. A production build should add identity checks, a trusted timestamp and PDF output.

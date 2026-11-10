@@ -6,6 +6,8 @@ import {
   ArrowRight,
   Calendar,
   CheckCircle2,
+  Copy,
+  ExternalLink,
   Undo2,
   UserCheck,
   XCircle,
@@ -25,6 +27,16 @@ import { Textarea } from "@/components/ui/textarea"
 import { Pill } from "@/components/common"
 import { StageBadge } from "@/components/common/status"
 import { FormRow, NativeSelect, ScorePicker } from "./form"
+import { CandidateBooking } from "./candidate-booking"
+import { CandidateAssessment } from "./candidate-assessment"
+import {
+  OfferLetterDialog,
+  SIGN_STATUS,
+  TrailDialog,
+  signUrl,
+} from "./offer-dialogs"
+import { copyText } from "./booking-tab"
+import { fileFor } from "@/lib/talent/case-files"
 import { useStore } from "@/lib/store"
 import { has } from "@/lib/rbac"
 import { STAGE_LABEL, TODAY_ISO, formatDate, fullName, ghs } from "@/lib/format"
@@ -66,7 +78,13 @@ function SheetBody({ c, onClose }: { c: Candidate; onClose: () => void }) {
   const isHr = has(viewer, "hr_admin")
   const req = store.requisitions.find((r) => r.id === c.requisitionId)
   const next = nextStage(c.stage)
-  const blocker = c.stage === "rejected" ? null : advanceBlocker(c)
+  const blocker =
+    c.stage === "rejected"
+      ? null
+      : advanceBlocker(c, {
+          tests: store.tests,
+          invitations: store.invitations,
+        })
   const avg = averageInterviewScore(c)
   const [notes, setNotes] = React.useState(c.notes)
   const [rejecting, setRejecting] = React.useState(false)
@@ -248,6 +266,43 @@ function SheetBody({ c, onClose }: { c: Candidate; onClose: () => void }) {
             </section>
           )}
 
+          {(c.answers && Object.keys(c.answers).length > 0) || c.cvName ? (
+            <section>
+              <h3 className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                Application
+              </h3>
+              <div className="space-y-3 rounded-lg border p-3 text-sm">
+                {c.cvName && (
+                  <p className="flex flex-wrap items-center gap-2">
+                    <span className="text-muted-foreground">CV</span>
+                    <span className="font-medium">{c.cvName}</span>
+                    {fileFor(`cv-${c.id}`) && (
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        onClick={() => {
+                          const f = fileFor(`cv-${c.id}`)
+                          if (!f) return
+                          const url = URL.createObjectURL(f)
+                          window.open(url, "_blank", "noopener")
+                          setTimeout(() => URL.revokeObjectURL(url), 60_000)
+                        }}
+                      >
+                        Open
+                      </Button>
+                    )}
+                  </p>
+                )}
+                {Object.entries(c.answers ?? {}).map(([q, a]) => (
+                  <div key={q}>
+                    <p className="text-xs text-muted-foreground">{q}</p>
+                    <p className="whitespace-pre-line">{a}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           <section>
             <h3 className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               Recruiter rating
@@ -261,6 +316,8 @@ function SheetBody({ c, onClose }: { c: Candidate; onClose: () => void }) {
           </section>
 
           <Interviews c={c} avg={avg} />
+
+          <CandidateAssessment c={c} />
 
           {isHr &&
             c.stage !== "rejected" &&
@@ -349,6 +406,10 @@ function Interviews({ c, avg }: { c: Candidate; avg: number | null }) {
         )}
       </div>
 
+      {c.stage !== "rejected" && c.stage !== "hired" && (
+        <CandidateBooking c={c} />
+      )}
+
       {adding && (
         <div className="mb-3 space-y-3 rounded-lg border p-3">
           <div className="grid gap-3 sm:grid-cols-3">
@@ -414,9 +475,25 @@ function Interviews({ c, avg }: { c: Candidate; avg: number | null }) {
                   {INTERVIEW_KIND_LABEL[iv.kind]}
                 </span>
                 <span className="text-muted-foreground">
-                  {formatDate(iv.scheduledFor)} ·{" "}
-                  {fullName(store.employeeById(iv.interviewerId))}
+                  {iv.startsAt
+                    ? `${formatDate(iv.scheduledFor)}, ${new Date(iv.startsAt).toISOString().slice(11, 16)} UTC`
+                    : formatDate(iv.scheduledFor)}{" "}
+                  · {fullName(store.employeeById(iv.interviewerId))}
                 </span>
+                {iv.status === "cancelled" && (
+                  <Pill tone="neutral">Cancelled</Pill>
+                )}
+                {iv.status === "no_show" && <Pill tone="danger">No-show</Pill>}
+                {iv.link && iv.status !== "cancelled" && (
+                  <a
+                    href={iv.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs underline"
+                  >
+                    Join
+                  </a>
+                )}
                 {iv.score !== null ? (
                   <Pill tone="success">
                     <CheckCircle2 className="size-3" />
@@ -511,30 +588,34 @@ function OfferSection({ c }: { c: Candidate }) {
   const store = useStore()
   const req = store.requisitions.find((r) => r.id === c.requisitionId)
   const o = c.offer
+  const sig = store.offerSignatures.find((x) => x.id === o?.signatureId)
   const [salary, setSalary] = React.useState(
     String(o?.salaryMonthly ?? req?.budgetMonthly ?? "")
   )
   const [start, setStart] = React.useState(
     o?.startDate ?? req?.targetStartDate ?? ""
   )
+  const [letter, setLetter] = React.useState(false)
+  const [trail, setTrail] = React.useState(false)
   const editable = !o || o.status === "draft"
   const overBudget = req && Number(salary) > req.budgetMonthly
+  const live = sig && (sig.status === "sent" || sig.status === "viewed")
 
-  function send() {
+  function saveDraft(): boolean {
     if (!(Number(salary) > 0) || !start) {
       toast.error("Enter a salary and a start date.")
-      return
+      return false
     }
     store.updateCandidate(c.id, {
       offer: {
         salaryMonthly: Number(salary),
         startDate: start,
-        status: "sent",
-        sentOn: TODAY_ISO,
+        status: "draft",
+        sentOn: null,
         decidedOn: null,
       },
     })
-    toast.success(`Offer sent to ${c.name}.`)
+    return true
   }
 
   return (
@@ -570,9 +651,26 @@ function OfferSection({ c }: { c: Candidate }) {
               />
             </FormRow>
           </div>
-          <Button size="sm" onClick={send}>
-            Send offer
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => {
+                // Saved first, so the letter is made from what is on screen.
+                if (saveDraft()) setLetter(true)
+              }}
+            >
+              Prepare letter
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (saveDraft()) toast.success("Offer details saved.")
+              }}
+            >
+              Save draft
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="rounded-lg border p-3 text-sm">
@@ -599,36 +697,139 @@ function OfferSection({ c }: { c: Candidate }) {
             Sent {formatDate(o!.sentOn!)}
             {o!.decidedOn && ` · answered ${formatDate(o!.decidedOn)}`}
           </p>
-          {o!.status === "sent" && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                onClick={() => {
-                  store.updateCandidate(c.id, {
-                    offer: { ...o!, status: "accepted", decidedOn: TODAY_ISO },
-                  })
-                  toast.success("Offer accepted. They can now be hired.")
-                }}
-              >
-                Record acceptance
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  store.updateCandidate(c.id, {
-                    offer: { ...o!, status: "declined", decidedOn: TODAY_ISO },
-                    stage: "rejected",
-                    rejectedReason: "Offer declined",
-                  })
-                  toast.success("Recorded as declined.")
-                }}
-              >
-                Record decline
-              </Button>
-            </div>
+
+          {sig && (
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              <Pill tone={SIGN_STATUS[sig.status].tone}>
+                {SIGN_STATUS[sig.status].label}
+              </Pill>
+              <span className="text-muted-foreground">
+                {sig.status === "signed" && sig.signedOn
+                  ? `Signed ${formatDate(sig.signedOn)} by ${sig.signedName}`
+                  : sig.status === "declined"
+                    ? sig.declinedReason
+                    : sig.status === "withdrawn"
+                      ? "No longer valid"
+                      : `Sign by ${formatDate(sig.expiresOn)}`}
+              </span>
+            </p>
           )}
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {live && (
+              <>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() =>
+                    copyText(signUrl(sig!.token), "Signing link copied.")
+                  }
+                >
+                  <Copy className="size-3" />
+                  Copy link
+                </Button>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => window.open(signUrl(sig!.token), "_blank")}
+                >
+                  <ExternalLink className="size-3" />
+                  Open as the candidate
+                </Button>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => {
+                    store.resendOffer(sig!.id)
+                    toast.success("Sent again, with a fresh deadline.")
+                  }}
+                >
+                  Resend
+                </Button>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => {
+                    store.withdrawOffer(sig!.id)
+                    toast.success("Withdrawn. The link no longer works.")
+                  }}
+                >
+                  Withdraw
+                </Button>
+              </>
+            )}
+            {sig && (
+              <Button size="xs" variant="ghost" onClick={() => setTrail(true)}>
+                View record
+              </Button>
+            )}
+            {sig?.status === "signed" && (
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => window.open(signUrl(sig.token), "_blank")}
+              >
+                Signed copy
+              </Button>
+            )}
+            {o!.status === "sent" && !live && (
+              <>
+                <Button size="xs" onClick={() => setLetter(true)}>
+                  Send for signature
+                </Button>
+                {!sig && (
+                  <>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      onClick={() => {
+                        store.updateCandidate(c.id, {
+                          offer: {
+                            ...o!,
+                            status: "accepted",
+                            decidedOn: TODAY_ISO,
+                          },
+                        })
+                        toast.success(
+                          "Recorded as accepted on paper. They can now be hired."
+                        )
+                      }}
+                    >
+                      Record acceptance
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => {
+                        store.updateCandidate(c.id, {
+                          offer: {
+                            ...o!,
+                            status: "declined",
+                            decidedOn: TODAY_ISO,
+                          },
+                          stage: "rejected",
+                          rejectedReason: "Offer declined",
+                        })
+                        toast.success("Recorded as declined.")
+                      }}
+                    >
+                      Record decline
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
         </div>
+      )}
+      {letter && (
+        <OfferLetterDialog
+          candidateId={c.id}
+          onClose={() => setLetter(false)}
+        />
+      )}
+      {trail && sig && (
+        <TrailDialog sig={sig} onClose={() => setTrail(false)} />
       )}
     </section>
   )
