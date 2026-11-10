@@ -29,6 +29,8 @@ import { Button } from "@/components/ui/button"
 import { SegmentedTabs } from "@/components/common/segmented-tabs"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { CandidateSheet } from "@/components/talent/candidate-sheet"
+import { BookingTab } from "@/components/talent/booking-tab"
+import { AssessmentsTab } from "@/components/talent/assessments-tab"
 import {
   AddCandidateDialog,
   RequisitionDialog,
@@ -155,7 +157,20 @@ export default function RecruitmentPage() {
             tabs={[
               { value: "pipeline", label: "Pipeline" },
               { value: "requisitions", label: "Requisitions" },
+              ...(isHr
+                ? [
+                    { value: "booking", label: "Booking" },
+                    {
+                      value: "assessments",
+                      label: "Assessments",
+                      count: store.invitations.filter(
+                        (i) => i.status === "submitted" && !i.reviewed
+                      ).length,
+                    },
+                  ]
+                : []),
             ]}
+            emphasise={["assessments"]}
           />
           {tab === "pipeline" && scope.length > 0 && (
             <NativeSelect
@@ -269,6 +284,18 @@ export default function RecruitmentPage() {
             </div>
           )}
         </TabsContent>
+
+        {isHr && (
+          <TabsContent value="assessments">
+            <AssessmentsTab onOpenCandidate={setOpenCandidate} />
+          </TabsContent>
+        )}
+
+        {isHr && (
+          <TabsContent value="booking">
+            <BookingTab onOpenCandidate={setOpenCandidate} />
+          </TabsContent>
+        )}
 
         <TabsContent value="requisitions">
           <Panel bodyClassName="p-0">
@@ -476,7 +503,10 @@ function StageColumn({
   function advance(c: Candidate) {
     const next = nextStage(c.stage)
     if (!next) return
-    const blocker = advanceBlocker(c)
+    const blocker = advanceBlocker(c, {
+      tests: store.tests,
+      invitations: store.invitations,
+    })
     if (blocker) {
       toast.error(blocker)
       onOpen(c.id)
@@ -508,7 +538,10 @@ function StageColumn({
           </li>
         )}
         {rows.map((c) => {
-          const blocker = advanceBlocker(c)
+          const blocker = advanceBlocker(c, {
+            tests: store.tests,
+            invitations: store.invitations,
+          })
           const req = store.requisitions.find((r) => r.id === c.requisitionId)
           return (
             <li key={c.id} className="rounded-lg border p-2.5">

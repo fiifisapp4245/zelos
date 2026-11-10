@@ -22,9 +22,10 @@ semantic status colours all come from there. No component hard-codes a colour.
 
 ## No backend
 
-Everything runs from seeded mock data held in React state and mirrored into `sessionStorage`.
-Edits you make while demoing persist across navigation and reset when the tab closes, or via
-**Reset demo data** in the persona switcher.
+Everything runs from seeded mock data held in React state and mirrored into `localStorage`.
+Edits you make while demoing persist across navigation and reloads, and are shared between tabs
+(which is how a candidate's booking link, opened in a second tab, reaches the recruiter's view).
+Which persona you view as stays with the tab. Reset with **Reset demo data** in the persona switcher.
 
 - [lib/data/employees.ts](lib/data/employees.ts) — 25-person workforce
 - [lib/data/records.ts](lib/data/records.ts) — leave, attendance, documents, cases, alerts, pipeline
@@ -184,3 +185,25 @@ stay deferred until there is clean operational data for it to read.
 
 Company Settings screens are read-only: they show what each area holds and how it is
 configured, but nothing there writes yet.
+
+
+## Interview booking and assessments
+
+Two candidate-facing flows, both public pages with no login, protected by a private token.
+
+- **Booking** — Recruitment → Booking sets up pages (length, buffer, window, interviewers, video) and
+  weekly availability. From a candidate's record, *Send booking link* creates a private link
+  (`/book/<token>`). The candidate picks a slot in their own time zone, gets a confirmation with a
+  video link and a calendar file, and can reschedule or cancel until the cut-off. A slot can never be
+  booked twice; public holidays and approved leave are taken out of availability.
+- **Assessments** — Recruitment → Assessments holds the question bank (multiple choice, multiple
+  answer, short, long, upload, JavaScript coding), tests built from it, and results. A candidate opens
+  `/assess/<token>`, accepts the terms, and takes the test against a clock fixed at the moment they
+  start (refreshing does not add time; answers after the deadline are refused; the test submits
+  itself). Written answers go to a reviewer; moving to Offer can require a reviewed result.
+- **Outbox** — there is no mail server. Every email these flows would send is recorded under `/outbox`
+  (bell menu → *Sent emails*), links included. Reminders sit there as *Scheduled*.
+
+Prototype limits, on purpose: coding runs in a Web Worker with the network removed and a 3-second kill
+(a real build uses an isolated server-side sandbox), the editor has no syntax highlighting, uploaded
+files keep only their name, and calendar sync is not built.

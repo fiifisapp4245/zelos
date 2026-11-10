@@ -25,6 +25,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Pill } from "@/components/common"
 import { StageBadge } from "@/components/common/status"
 import { FormRow, NativeSelect, ScorePicker } from "./form"
+import { CandidateBooking } from "./candidate-booking"
+import { CandidateAssessment } from "./candidate-assessment"
 import { useStore } from "@/lib/store"
 import { has } from "@/lib/rbac"
 import { STAGE_LABEL, TODAY_ISO, formatDate, fullName, ghs } from "@/lib/format"
@@ -66,7 +68,13 @@ function SheetBody({ c, onClose }: { c: Candidate; onClose: () => void }) {
   const isHr = has(viewer, "hr_admin")
   const req = store.requisitions.find((r) => r.id === c.requisitionId)
   const next = nextStage(c.stage)
-  const blocker = c.stage === "rejected" ? null : advanceBlocker(c)
+  const blocker =
+    c.stage === "rejected"
+      ? null
+      : advanceBlocker(c, {
+          tests: store.tests,
+          invitations: store.invitations,
+        })
   const avg = averageInterviewScore(c)
   const [notes, setNotes] = React.useState(c.notes)
   const [rejecting, setRejecting] = React.useState(false)
@@ -262,6 +270,8 @@ function SheetBody({ c, onClose }: { c: Candidate; onClose: () => void }) {
 
           <Interviews c={c} avg={avg} />
 
+          <CandidateAssessment c={c} />
+
           {isHr &&
             c.stage !== "rejected" &&
             ["offer", "hired"].includes(c.stage) && <OfferSection c={c} />}
@@ -349,6 +359,10 @@ function Interviews({ c, avg }: { c: Candidate; avg: number | null }) {
         )}
       </div>
 
+      {c.stage !== "rejected" && c.stage !== "hired" && (
+        <CandidateBooking c={c} />
+      )}
+
       {adding && (
         <div className="mb-3 space-y-3 rounded-lg border p-3">
           <div className="grid gap-3 sm:grid-cols-3">
@@ -414,9 +428,25 @@ function Interviews({ c, avg }: { c: Candidate; avg: number | null }) {
                   {INTERVIEW_KIND_LABEL[iv.kind]}
                 </span>
                 <span className="text-muted-foreground">
-                  {formatDate(iv.scheduledFor)} ·{" "}
-                  {fullName(store.employeeById(iv.interviewerId))}
+                  {iv.startsAt
+                    ? `${formatDate(iv.scheduledFor)}, ${new Date(iv.startsAt).toISOString().slice(11, 16)} UTC`
+                    : formatDate(iv.scheduledFor)}{" "}
+                  · {fullName(store.employeeById(iv.interviewerId))}
                 </span>
+                {iv.status === "cancelled" && (
+                  <Pill tone="neutral">Cancelled</Pill>
+                )}
+                {iv.status === "no_show" && <Pill tone="danger">No-show</Pill>}
+                {iv.link && iv.status !== "cancelled" && (
+                  <a
+                    href={iv.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs underline"
+                  >
+                    Join
+                  </a>
+                )}
                 {iv.score !== null ? (
                   <Pill tone="success">
                     <CheckCircle2 className="size-3" />

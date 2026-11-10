@@ -1,4 +1,6 @@
 import type {
+  AssessmentTest,
+  TestInvitation,
   Candidate,
   CandidateStage,
   Employee,
@@ -43,13 +45,31 @@ export function nextStage(stage: CandidateStage): CandidateStage | null {
  * Moving a candidate on has to mean something happened. Returns why they
  * cannot move yet, or null when they can.
  */
-export function advanceBlocker(c: Candidate): string | null {
+export interface AssessmentGates {
+  tests: AssessmentTest[]
+  invitations: TestInvitation[]
+}
+
+export function advanceBlocker(
+  c: Candidate,
+  gates?: AssessmentGates
+): string | null {
   const next = nextStage(c.stage)
   if (!next) return "Already hired."
   if (next === "assessment") {
     const scored = c.interviews.filter((i) => i.score !== null)
     if (scored.length === 0)
       return "Record feedback from at least one interview first."
+  }
+  if (next === "offer" && gates) {
+    // A test marked "needed for offer" has to have been taken and signed off.
+    for (const inv of gates.invitations.filter((i) => i.candidateId === c.id)) {
+      const t = gates.tests.find((x) => x.id === inv.testId)
+      if (!t?.requiredForOffer || inv.status === "expired") continue
+      if (inv.status !== "submitted")
+        return `Waiting for them to take “${t.name}”.`
+      if (!inv.reviewed) return `Review “${t.name}” before making an offer.`
+    }
   }
   if (next === "offer") {
     const scored = c.interviews.filter((i) => i.score !== null)

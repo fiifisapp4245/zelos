@@ -3,8 +3,11 @@
 /**
  * Session store.
  *
- * Everything lives in React state and is mirrored into sessionStorage, so edits
- * made while demoing survive navigation but reset on a new tab. No backend.
+ * Everything lives in React state and is mirrored into localStorage, so edits
+ * made while demoing survive navigation and are shared between tabs: a
+ * candidate opening a booking link in a new tab is looking at the same data
+ * the recruiter is. Which persona you are viewing as stays with the tab.
+ * No backend.
  */
 
 import * as React from "react"
@@ -138,10 +141,46 @@ import type {
   SavedReport,
   AlertSettings,
   ExternalReturnFile,
+  EmailMessage,
+  BookingPage,
+  Availability,
+  Booking,
+  Question,
+  AssessmentTest,
+  TestInvitation,
+  AnswerValue,
+  IntegrityFlag,
 } from "./types"
 import { DEFAULT_ALERT_SETTINGS } from "./alerts"
 import { TODAY, TODAY_ISO, LIFECYCLE_TRANSITIONS } from "./format"
 import { addDays } from "./time"
+import {
+  BOOKING_PAGES,
+  AVAILABILITY,
+  BOOKINGS,
+  OUTBOX,
+  QUESTION_BANK,
+  TESTS,
+  INVITATIONS,
+} from "./data/hiring-extra"
+import { holidayDates, newToken } from "./booking/slots"
+import {
+  cancelledEmail,
+  confirmationEmail,
+  inviteEmail,
+  interviewerEmail,
+  planBooking,
+  reminderEmails,
+  type BookingPlan,
+  type BookingWorld,
+} from "./booking/plan"
+import {
+  acceptsAnswers,
+  autoMarks,
+  canStart,
+  deadlineFor,
+  issuePaper,
+} from "./assess/logic"
 import {
   STANDARD_ASSETS,
   caseStage,
@@ -207,6 +246,13 @@ interface State {
   savedReports: SavedReport[]
   alertSettings: AlertSettings
   externalReturnFiles: ExternalReturnFile[]
+  outbox: EmailMessage[]
+  bookingPages: BookingPage[]
+  availability: Availability[]
+  bookings: Booking[]
+  questionBank: Question[]
+  tests: AssessmentTest[]
+  invitations: TestInvitation[]
   company: CompanyProfile
   /** Editable settings tables, keyed by table id. */
   tables: Record<string, TableRow[]>
@@ -268,12 +314,21 @@ export const INITIAL: State = {
   savedReports: [],
   alertSettings: DEFAULT_ALERT_SETTINGS,
   externalReturnFiles: [],
+  outbox: OUTBOX,
+  bookingPages: BOOKING_PAGES,
+  availability: AVAILABILITY,
+  bookings: BOOKINGS,
+  questionBank: QUESTION_BANK,
+  tests: TESTS,
+  invitations: INVITATIONS,
   company: COMPANY,
   tables: TABLE_ROWS,
   activeRole: "hr_admin",
 }
 
 const STORAGE_KEY = "zelos-hr-session"
+/** The persona is per tab, so two tabs can look at the same data as two people. */
+export const ROLE_KEY = "zelos-hr-role"
 
 /**
  * Bump this whenever a persisted shape changes. A stored blob from an older
@@ -281,7 +336,7 @@ const STORAGE_KEY = "zelos-hr-session"
  * this week's types is how you get a crash three screens away from the
  * change that caused it.
  */
-export const STORAGE_VERSION = 12
+export const STORAGE_VERSION = 13
 
 /**
  * Keeps only the restored slices that still look like the ones we seed.
@@ -339,6 +394,8 @@ export function reconcile(saved: State): Partial<State> {
 }
 
 interface StoreValue extends State {
+  /** False until saved data has been read, so a page does not judge the empty seed. */
+  ready: boolean
   viewer: Viewer
   session: SessionContext
   setActiveRole: (role: PermissionRole) => void
@@ -538,6 +595,52 @@ interface StoreValue extends State {
   addExternalReturnFiles: (files: ExternalReturnFile[]) => void
   removeExternalReturnFile: (id: string) => void
   setAlertSettings: (patch: Partial<AlertSettings>) => void
+
+  /** Records an email the prototype would have sent. */
+  queueEmail: (
+    m: Omit<EmailMessage, "id" | "createdAt" | "status"> & {
+      status?: EmailMessage["status"]
+    }
+  ) => void
+  deliverEmail: (id: string) => void
+  cancelEmail: (id: string) => void
+
+  saveBookingPage: (p: BookingPage) => void
+  deleteBookingPage: (id: string) => void
+  setAvailability: (a: Availability) => void
+  /** Makes a private booking link for a candidate and emails it. */
+  sendBookingLink: (
+    candidateId: string,
+    pageId: string
+  ) => { ok: true; token: string } | { ok: false; reason: string }
+  makeBooking: (
+    token: string,
+    start: string,
+    timeZone: string,
+    answers: Record<string, string>
+  ) => { ok: true } | { ok: false; reason: string }
+  cancelBooking: (token: string, by: "candidate" | "recruiter") => void
+  markNoShow: (bookingId: string) => void
+
+  saveQuestion: (q: Question) => void
+  deleteQuestion: (id: string) => void
+  saveTest: (t: AssessmentTest) => void
+  deleteTest: (id: string) => void
+  sendAssessment: (
+    candidateId: string,
+    testId: string
+  ) => { ok: true; token: string } | { ok: false; reason: string }
+  startTest: (token: string) => { ok: true } | { ok: false; reason: string }
+  saveAnswers: (token: string, answers: Record<string, AnswerValue>) => boolean
+  logFlag: (token: string, flag: Omit<IntegrityFlag, "at">) => void
+  submitTest: (token: string) => void
+  saveReview: (
+    id: string,
+    marks: Record<string, number>,
+    note: string,
+    finish: boolean
+  ) => void
+  grantExtraTime: (id: string, minutes: number, note: string) => void
   saveReport: (
     r: Omit<SavedReport, "id" | "createdBy" | "createdOn" | "lastRunOn">
   ) => void
@@ -641,24 +744,267 @@ function uid(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`
 }
 
+function makeEmail(
+  m: Omit<EmailMessage, "id" | "createdAt" | "status"> & {
+    status?: EmailMessage["status"]
+  }
+): EmailMessage {
+  const at = nowIso()
+  const status = m.status ?? (m.sendAt > at ? "scheduled" : "sent")
+  return { ...m, id: uid("em"), createdAt: at, status }
+}
+
+/** The slice of state a booking decision reads. */
+function bookingWorld(s: State): BookingWorld {
+  const rows = (s.tables["public-holidays"] ?? []) as {
+    date?: string
+    observed?: string
+  }[]
+  const year = TODAY.getFullYear()
+  return {
+    candidates: s.candidates,
+    bookings: s.bookings,
+    bookingPages: s.bookingPages,
+    availability: s.availability,
+    leaveRequests: s.leaveRequests,
+    holidays: [...holidayDates(rows, year), ...holidayDates(rows, year + 1)],
+  }
+}
+
+function applyBooking(
+  s: State,
+  plan: Extract<BookingPlan, { ok: true }>,
+  timeZone: string,
+  answers: Record<string, string>
+): State {
+  const origin = typeof window === "undefined" ? "" : window.location.origin
+  const company = s.company.tradingName || s.company.legalName
+  const req = s.requisitions.find((r) => r.id === plan.candidate.requisitionId)
+  const role = req?.title ?? "the role"
+  const interviewer = s.employees.find((e) => e.id === plan.slot.interviewerId)
+  const url = `${origin}/book/${plan.booking.token}`
+  const at = nowIso()
+
+  // A reschedule: the old reminders no longer apply.
+  const outbox = s.outbox.map((e) =>
+    e.relatedId === plan.booking.id &&
+    e.kind === "booking_reminder" &&
+    e.status === "scheduled"
+      ? { ...e, status: "cancelled" as const }
+      : e
+  )
+
+  const mails: EmailMessage[] = [
+    makeEmail({
+      ...confirmationEmail({
+        plan,
+        tz: timeZone,
+        role,
+        company,
+        url,
+        interviewerName: interviewer
+          ? `${interviewer.firstName} ${interviewer.lastName}`
+          : "the team",
+        sendAt: at,
+      }),
+      status: "sent",
+    }),
+    ...(interviewer
+      ? [
+          makeEmail({
+            ...interviewerEmail({
+              plan,
+              interviewer,
+              role,
+              url: `${origin}/recruitment`,
+              sendAt: at,
+            }),
+            status: "sent",
+          }),
+        ]
+      : []),
+    ...reminderEmails({ plan, tz: timeZone, url })
+      // Only a reminder that is still in the future is worth scheduling.
+      .filter((r) => new Date(r.sendAt).getTime() > TODAY.getTime())
+      .map((r) => makeEmail({ ...r, status: "scheduled" })),
+  ]
+
+  return {
+    ...s,
+    bookings: s.bookings.map((b) =>
+      b.id === plan.booking.id
+        ? {
+            ...b,
+            status: "booked" as const,
+            slotStart: plan.slot.start,
+            interviewerId: plan.slot.interviewerId,
+            timeZone,
+            answers,
+            bookedOn: TODAY_ISO,
+            link: plan.meetingLink,
+            interviewId: plan.interview.id,
+            history: [
+              ...b.history,
+              {
+                at,
+                text: plan.rescheduled
+                  ? `Moved to ${plan.slot.start}.`
+                  : `Booked ${plan.slot.start}.`,
+              },
+            ],
+          }
+        : b
+    ),
+    candidates: s.candidates.map((c) => {
+      if (c.id !== plan.candidate.id) return c
+      const has = c.interviews.some((i) => i.id === plan.interview.id)
+      return {
+        ...c,
+        interviews: has
+          ? c.interviews.map((i) =>
+              i.id === plan.interview.id ? plan.interview : i
+            )
+          : [...c.interviews, plan.interview],
+        stage: ["applied", "screening"].includes(c.stage)
+          ? ("interview" as const)
+          : c.stage,
+      }
+    }),
+    outbox: [...mails, ...outbox],
+    notifications: [
+      {
+        id: uid("n"),
+        title: `${plan.candidate.name} ${plan.rescheduled ? "rescheduled" : "booked"} an interview`,
+        body: `${plan.page.name} · ${plan.slot.start.slice(0, 16).replace("T", " ")} UTC`,
+        at,
+        read: false,
+        kind: "system" as const,
+        href: "/recruitment",
+      },
+      ...s.notifications,
+    ],
+    auditLog: [
+      {
+        id: uid("a"),
+        employeeId: null,
+        actorId: plan.slot.interviewerId,
+        action: `${plan.rescheduled ? "Rescheduled" : "Booked"} an interview for ${plan.candidate.name}`,
+        field: plan.page.name,
+        at,
+      },
+      ...s.auditLog,
+    ],
+  }
+}
+
+function applyCancel(
+  s: State,
+  token: string,
+  by: "candidate" | "recruiter",
+  actorId: string
+): State {
+  const b = s.bookings.find((x) => x.token === token)
+  if (!b || (b.status !== "booked" && b.status !== "invited")) return s
+  const page = s.bookingPages.find((p) => p.id === b.pageId)
+  const c = s.candidates.find((x) => x.id === b.candidateId)
+  const origin = typeof window === "undefined" ? "" : window.location.origin
+  const at = nowIso()
+  const wasBooked = b.status === "booked" && !!b.slotStart
+  const mail =
+    wasBooked && page && c
+      ? [
+          makeEmail({
+            ...cancelledEmail({
+              candidate: c,
+              page,
+              slotStart: b.slotStart!,
+              tz: b.timeZone ?? "Africa/Accra",
+              by,
+              sendAt: at,
+              relatedId: b.id,
+              url: `${origin}/book/${b.token}`,
+            }),
+            status: "sent",
+          }),
+        ]
+      : []
+  return {
+    ...s,
+    bookings: s.bookings.map((x) =>
+      x.id === b.id
+        ? {
+            ...x,
+            status: "cancelled" as const,
+            history: [...x.history, { at, text: `Cancelled by the ${by}.` }],
+          }
+        : x
+    ),
+    candidates: s.candidates.map((x) =>
+      x.id === b.candidateId
+        ? {
+            ...x,
+            interviews: x.interviews.map((i) =>
+              i.id === b.interviewId
+                ? { ...i, status: "cancelled" as const }
+                : i
+            ),
+          }
+        : x
+    ),
+    outbox: [
+      ...mail,
+      ...s.outbox.map((e) =>
+        e.relatedId === b.id &&
+        e.kind === "booking_reminder" &&
+        e.status === "scheduled"
+          ? { ...e, status: "cancelled" as const }
+          : e
+      ),
+    ],
+    auditLog: [
+      {
+        id: uid("a"),
+        employeeId: null,
+        actorId: by === "recruiter" ? actorId : (b.interviewerId ?? actorId),
+        action: `Cancelled an interview booking for ${c?.name ?? "a candidate"}`,
+        field: `by the ${by}`,
+        at,
+      },
+      ...s.auditLog,
+    ],
+  }
+}
+
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<State>(INITIAL)
   const [hydrated, setHydrated] = React.useState(false)
+  // Actions that must decide before they write read the latest state from here.
+  const stateRef = React.useRef(state)
+  React.useEffect(() => {
+    stateRef.current = state
+  })
 
   // Restore on mount only, so the server and first client render agree. This has
   // to happen after hydration, which is exactly what the lint rule warns about —
-  // reading sessionStorage during render would produce a mismatch instead.
+  // reading storage during render would produce a mismatch instead.
   React.useEffect(() => {
     try {
-      const raw = sessionStorage.getItem(STORAGE_KEY)
+      const raw = localStorage.getItem(STORAGE_KEY)
+      const role = sessionStorage.getItem(ROLE_KEY) as PermissionRole | null
       if (raw) {
         const saved = JSON.parse(raw) as { version?: number; state?: State }
         if (saved.version === STORAGE_VERSION && saved.state) {
           // eslint-disable-next-line react-hooks/set-state-in-effect
-          setState({ ...INITIAL, ...reconcile(saved.state) })
+          setState({
+            ...INITIAL,
+            ...reconcile(saved.state),
+            activeRole: role ?? INITIAL.activeRole,
+          })
         } else {
-          sessionStorage.removeItem(STORAGE_KEY)
+          localStorage.removeItem(STORAGE_KEY)
         }
+      } else if (role) {
+        setState((s) => ({ ...s, activeRole: role }))
       }
     } catch {
       // Private mode or blocked storage — the seeded state is still fine.
@@ -666,13 +1012,48 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setHydrated(true)
   }, [])
 
+  // Another tab changed the data: take it, but keep this tab's persona.
+  React.useEffect(() => {
+    function onStorage(e: StorageEvent) {
+      if (e.key !== STORAGE_KEY) return
+      try {
+        if (e.newValue === null) {
+          setState((s) => ({ ...INITIAL, activeRole: s.activeRole }))
+          return
+        }
+        const saved = JSON.parse(e.newValue) as {
+          version?: number
+          state?: State
+        }
+        if (saved.version === STORAGE_VERSION && saved.state)
+          setState((s) => ({
+            ...INITIAL,
+            ...reconcile(saved.state!),
+            activeRole: s.activeRole,
+          }))
+      } catch {
+        // A half-written value: the next write replaces it.
+      }
+    }
+    window.addEventListener("storage", onStorage)
+    return () => window.removeEventListener("storage", onStorage)
+  }, [])
+
   React.useEffect(() => {
     if (!hydrated) return
     try {
-      sessionStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ version: STORAGE_VERSION, state })
-      )
+      sessionStorage.setItem(ROLE_KEY, state.activeRole)
+      // The persona is left out of what is shared, or two tabs viewing as
+      // different people would keep overwriting each other.
+      const { activeRole, ...shared } = state
+      void activeRole
+      const next = JSON.stringify({
+        version: STORAGE_VERSION,
+        state: shared,
+      })
+      // Writing what is already there would wake every other tab for nothing.
+      if (localStorage.getItem(STORAGE_KEY) !== next)
+        localStorage.setItem(STORAGE_KEY, next)
     } catch {
       // Over quota or blocked; the in-memory state remains authoritative.
     }
@@ -735,6 +1116,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     return {
       ...state,
+      ready: hydrated,
       viewer,
       session,
       setActiveRole: (role) => setState((s) => ({ ...s, activeRole: role })),
@@ -2552,6 +2934,540 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         }))
       },
 
+      queueEmail: (m) => {
+        setState((s) => ({ ...s, outbox: [makeEmail(m), ...s.outbox] }))
+      },
+
+      deliverEmail: (id) => {
+        setState((s) => ({
+          ...s,
+          outbox: s.outbox.map((e) =>
+            e.id === id && e.status === "scheduled"
+              ? { ...e, status: "sent" as const, sendAt: nowIso() }
+              : e
+          ),
+        }))
+      },
+
+      cancelEmail: (id) => {
+        setState((s) => ({
+          ...s,
+          outbox: s.outbox.map((e) =>
+            e.id === id && e.status === "scheduled"
+              ? { ...e, status: "cancelled" as const }
+              : e
+          ),
+        }))
+      },
+
+      saveBookingPage: (p) => {
+        setState((s) => ({
+          ...s,
+          bookingPages: s.bookingPages.some((x) => x.id === p.id)
+            ? s.bookingPages.map((x) => (x.id === p.id ? p : x))
+            : [p, ...s.bookingPages],
+          auditLog: [
+            {
+              id: uid("a"),
+              employeeId: null,
+              actorId,
+              action: `Saved booking page ${p.name}`,
+              at: nowIso(),
+            },
+            ...s.auditLog,
+          ],
+        }))
+      },
+
+      deleteBookingPage: (id) => {
+        setState((s) => ({
+          ...s,
+          bookingPages: s.bookingPages.filter((p) => p.id !== id),
+        }))
+      },
+
+      setAvailability: (a) => {
+        setState((s) => ({
+          ...s,
+          availability: s.availability.some(
+            (x) => x.employeeId === a.employeeId
+          )
+            ? s.availability.map((x) => (x.employeeId === a.employeeId ? a : x))
+            : [...s.availability, a],
+        }))
+      },
+
+      sendBookingLink: (candidateId, pageId) => {
+        const s0 = stateRef.current
+        const c = s0.candidates.find((x) => x.id === candidateId)
+        const page = s0.bookingPages.find((p) => p.id === pageId)
+        if (!c || !page)
+          return { ok: false, reason: "Candidate or booking page not found." }
+        if (c.stage === "rejected" || c.stage === "hired")
+          return { ok: false, reason: "This application is closed." }
+        if (!page.active)
+          return { ok: false, reason: "That booking page is switched off." }
+        const live = s0.bookings.find(
+          (b) =>
+            b.candidateId === candidateId &&
+            b.pageId === pageId &&
+            (b.status === "invited" || b.status === "booked")
+        )
+        if (live?.status === "booked")
+          return {
+            ok: false,
+            reason:
+              "They have already booked. Reschedule it from their booking.",
+          }
+        const token = live?.token ?? newToken()
+        const origin =
+          typeof window === "undefined" ? "" : window.location.origin
+        const req = s0.requisitions.find((r) => r.id === c.requisitionId)
+        const expiresOn = addDays(TODAY_ISO, 7)
+        setState((s) => {
+          const booking: Booking = live
+            ? {
+                ...live,
+                expiresOn,
+                history: [
+                  ...live.history,
+                  { at: nowIso(), text: "Link sent again." },
+                ],
+              }
+            : {
+                id: uid("bk"),
+                token,
+                candidateId,
+                pageId,
+                status: "invited",
+                invitedOn: TODAY_ISO,
+                expiresOn,
+                slotStart: null,
+                interviewerId: null,
+                timeZone: null,
+                answers: {},
+                bookedOn: null,
+                link: null,
+                interviewId: null,
+                history: [{ at: nowIso(), text: "Booking link sent." }],
+              }
+          const mail = inviteEmail({
+            candidate: c,
+            page,
+            role: req?.title ?? "the role",
+            company: s.company.tradingName || s.company.legalName,
+            url: `${origin}/book/${token}`,
+            expiresOn,
+            sendAt: nowIso(),
+          })
+          return {
+            ...s,
+            bookings: live
+              ? s.bookings.map((b) => (b.id === live.id ? booking : b))
+              : [booking, ...s.bookings],
+            outbox: [
+              makeEmail({ ...mail, relatedId: booking.id, status: "sent" }),
+              ...s.outbox,
+            ],
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: null,
+                actorId,
+                action: `Sent a booking link to ${c.name}`,
+                field: page.name,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+        return { ok: true, token }
+      },
+
+      makeBooking: (token, start, timeZone, answers) => {
+        const decide = (s: State) =>
+          planBooking(bookingWorld(s), token, start, timeZone, answers, TODAY, {
+            interview: uid("iv"),
+          })
+        const first = decide(stateRef.current)
+        if (!first.ok) return { ok: false, reason: first.reason }
+        setState((s) => {
+          // Decided again against the newest state, so a slot taken a moment
+          // ago in another tab is still refused.
+          const plan = decide(s)
+          return plan.ok ? applyBooking(s, plan, timeZone, answers) : s
+        })
+        return { ok: true }
+      },
+
+      cancelBooking: (token, by) => {
+        setState((s) => applyCancel(s, token, by, actorId))
+      },
+
+      markNoShow: (bookingId) => {
+        setState((s) => {
+          const b = s.bookings.find((x) => x.id === bookingId)
+          if (!b || b.status !== "booked") return s
+          return {
+            ...s,
+            bookings: s.bookings.map((x) =>
+              x.id === bookingId
+                ? {
+                    ...x,
+                    status: "no_show" as const,
+                    history: [
+                      ...x.history,
+                      { at: nowIso(), text: "Marked as a no-show." },
+                    ],
+                  }
+                : x
+            ),
+            candidates: s.candidates.map((c) =>
+              c.id === b.candidateId
+                ? {
+                    ...c,
+                    interviews: c.interviews.map((i) =>
+                      i.id === b.interviewId
+                        ? { ...i, status: "no_show" as const }
+                        : i
+                    ),
+                  }
+                : c
+            ),
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: null,
+                actorId,
+                action: "Marked an interview as a no-show",
+                field: b.id,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      saveQuestion: (q) => {
+        setState((s) => ({
+          ...s,
+          questionBank: s.questionBank.some((x) => x.id === q.id)
+            ? s.questionBank.map((x) => (x.id === q.id ? q : x))
+            : [q, ...s.questionBank],
+        }))
+      },
+
+      deleteQuestion: (id) => {
+        setState((s) => ({
+          ...s,
+          questionBank: s.questionBank.filter((q) => q.id !== id),
+          // A test that used it simply stops asking it; papers already issued keep their copy of the id.
+          tests: s.tests.map((t) => ({
+            ...t,
+            questionIds: t.questionIds.filter((x) => x !== id),
+          })),
+        }))
+      },
+
+      saveTest: (t) => {
+        setState((s) => ({
+          ...s,
+          tests: s.tests.some((x) => x.id === t.id)
+            ? s.tests.map((x) => (x.id === t.id ? t : x))
+            : [t, ...s.tests],
+        }))
+      },
+
+      deleteTest: (id) => {
+        setState((s) => ({ ...s, tests: s.tests.filter((t) => t.id !== id) }))
+      },
+
+      sendAssessment: (candidateId, testId) => {
+        const s0 = stateRef.current
+        const c = s0.candidates.find((x) => x.id === candidateId)
+        const test = s0.tests.find((t) => t.id === testId)
+        if (!c || !test)
+          return { ok: false, reason: "Candidate or test not found." }
+        if (c.stage === "rejected" || c.stage === "hired")
+          return { ok: false, reason: "This application is closed." }
+        if (!test.active)
+          return { ok: false, reason: "That test is switched off." }
+        const live = s0.invitations.find(
+          (i) =>
+            i.candidateId === candidateId &&
+            i.testId === testId &&
+            (i.status === "invited" || i.status === "started")
+        )
+        if (live)
+          return { ok: false, reason: "They already have this test open." }
+        const token = newToken()
+        const origin =
+          typeof window === "undefined" ? "" : window.location.origin
+        const paper = issuePaper(test, s0.questionBank)
+        if (paper.length === 0)
+          return { ok: false, reason: "This test has no questions." }
+        const req = s0.requisitions.find((r) => r.id === c.requisitionId)
+        // Real time, not the demo's fixed date: the clock has to really run.
+        const windowEnd = new Date(
+          Date.now() + test.windowDays * 86_400_000
+        ).toISOString()
+        setState((s) => {
+          const inv: TestInvitation = {
+            id: uid("inv"),
+            token,
+            candidateId,
+            testId,
+            status: "invited",
+            invitedOn: new Date().toISOString(),
+            windowEnd,
+            startedAt: null,
+            deadline: null,
+            extraMinutes: 0,
+            extraNote: null,
+            submittedAt: null,
+            questionIds: paper,
+            answers: {},
+            flags: [],
+            autoMarks: {},
+            reviewMarks: {},
+            reviewed: false,
+            reviewNote: null,
+            reviewerId: null,
+          }
+          const company = s.company.tradingName || s.company.legalName
+          return {
+            ...s,
+            invitations: [inv, ...s.invitations],
+            outbox: [
+              makeEmail({
+                kind: "assessment_invite",
+                to: c.email,
+                toName: c.name,
+                subject: `${company}: your online assessment for ${req?.title ?? "the role"}`,
+                body: `Hello ${c.name.split(" ")[0]},\n\nAs part of your application, please complete "${test.name}". It has ${paper.length} questions and a ${test.durationMin}-minute time limit; the clock starts when you press Start and cannot be paused. You have one attempt, and the link is open until ${windowEnd.slice(0, 10)}. Use a laptop for any coding questions.`,
+                cta: {
+                  label: "Open the assessment",
+                  href: `${origin}/assess/${token}`,
+                },
+                sendAt: nowIso(),
+                relatedId: inv.id,
+                status: "sent",
+              }),
+              ...s.outbox,
+            ],
+            // The stage is left alone: moving to Assessment is the recruiter's
+            // call, and has its own rule (interview feedback first).
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: null,
+                actorId,
+                action: `Sent an assessment to ${c.name}`,
+                field: test.name,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+        return { ok: true, token }
+      },
+
+      startTest: (token) => {
+        const inv = stateRef.current.invitations.find((i) => i.token === token)
+        if (!inv)
+          return { ok: false, reason: "This assessment link is not valid." }
+        if (inv.status === "started") return { ok: true }
+        if (!canStart(inv, Date.now()))
+          return {
+            ok: false,
+            reason:
+              inv.status === "invited"
+                ? "This invitation has expired."
+                : "This assessment has already been taken.",
+          }
+        setState((s) => {
+          const i = s.invitations.find((x) => x.token === token)
+          const test = i && s.tests.find((t) => t.id === i.testId)
+          if (!i || !test || i.status !== "invited") return s
+          const startedAt = new Date().toISOString()
+          return {
+            ...s,
+            invitations: s.invitations.map((x) =>
+              x.token === token
+                ? {
+                    ...x,
+                    status: "started" as const,
+                    startedAt,
+                    deadline: deadlineFor(startedAt, test, x.extraMinutes),
+                  }
+                : x
+            ),
+          }
+        })
+        return { ok: true }
+      },
+
+      saveAnswers: (token, answers) => {
+        const inv = stateRef.current.invitations.find((i) => i.token === token)
+        if (!inv || !acceptsAnswers(inv, Date.now())) return false
+        setState((s) => ({
+          ...s,
+          invitations: s.invitations.map((x) =>
+            x.token === token && acceptsAnswers(x, Date.now())
+              ? { ...x, answers: { ...x.answers, ...answers } }
+              : x
+          ),
+        }))
+        return true
+      },
+
+      logFlag: (token, flag) => {
+        setState((s) => ({
+          ...s,
+          invitations: s.invitations.map((x) =>
+            x.token === token && x.status === "started"
+              ? {
+                  ...x,
+                  flags: [
+                    ...x.flags,
+                    { ...flag, at: new Date().toISOString() },
+                  ],
+                }
+              : x
+          ),
+        }))
+      },
+
+      submitTest: (token) => {
+        setState((s) => {
+          const inv = s.invitations.find((i) => i.token === token)
+          if (!inv || inv.status !== "started") return s
+          const test = s.tests.find((t) => t.id === inv.testId)
+          const c = s.candidates.find((x) => x.id === inv.candidateId)
+          const company = s.company.tradingName || s.company.legalName
+          const submittedAt = new Date().toISOString()
+          return {
+            ...s,
+            invitations: s.invitations.map((x) =>
+              x.token === token
+                ? {
+                    ...x,
+                    status: "submitted" as const,
+                    submittedAt,
+                    autoMarks: autoMarks(
+                      x.questionIds,
+                      s.questionBank,
+                      x.answers
+                    ),
+                  }
+                : x
+            ),
+            outbox: c
+              ? [
+                  makeEmail({
+                    kind: "assessment_submitted",
+                    to: c.email,
+                    toName: c.name,
+                    subject: `${company}: we received your assessment`,
+                    body: `Hello ${c.name.split(" ")[0]},\n\nThank you. Your answers to "${test?.name ?? "the assessment"}" were submitted at ${submittedAt.slice(11, 16)} UTC. The team will be in touch about next steps.`,
+                    sendAt: nowIso(),
+                    relatedId: inv.id,
+                    status: "sent",
+                  }),
+                  ...s.outbox,
+                ]
+              : s.outbox,
+            notifications: [
+              {
+                id: uid("n"),
+                title: `${c?.name ?? "A candidate"} submitted an assessment`,
+                body: `${test?.name ?? "Assessment"} is ready to review.`,
+                at: nowIso(),
+                read: false,
+                kind: "system" as const,
+                href: "/recruitment",
+              },
+              ...s.notifications,
+            ],
+          }
+        })
+      },
+
+      saveReview: (id, marks, note, finish) => {
+        setState((s) => {
+          const inv = s.invitations.find((i) => i.id === id)
+          if (!inv || inv.status !== "submitted") return s
+          return {
+            ...s,
+            invitations: s.invitations.map((x) =>
+              x.id === id
+                ? {
+                    ...x,
+                    reviewMarks: marks,
+                    reviewNote: note || null,
+                    reviewed: finish,
+                    reviewerId: actorId,
+                  }
+                : x
+            ),
+            auditLog: finish
+              ? [
+                  {
+                    id: uid("a"),
+                    employeeId: null,
+                    actorId,
+                    action: "Reviewed an assessment",
+                    field: id,
+                    at: nowIso(),
+                  },
+                  ...s.auditLog,
+                ]
+              : s.auditLog,
+          }
+        })
+      },
+
+      grantExtraTime: (id, minutes, note) => {
+        setState((s) => {
+          const inv = s.invitations.find((i) => i.id === id)
+          const test = inv && s.tests.find((t) => t.id === inv.testId)
+          if (!inv || !test || inv.status === "submitted" || minutes <= 0)
+            return s
+          const extra = inv.extraMinutes + minutes
+          return {
+            ...s,
+            invitations: s.invitations.map((x) =>
+              x.id === id
+                ? {
+                    ...x,
+                    extraMinutes: extra,
+                    extraNote: [x.extraNote, `${minutes} min: ${note}`]
+                      .filter(Boolean)
+                      .join("; "),
+                    deadline: x.startedAt
+                      ? deadlineFor(x.startedAt, test, extra)
+                      : x.deadline,
+                  }
+                : x
+            ),
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: null,
+                actorId,
+                action: `Granted ${minutes} extra minutes on an assessment`,
+                field: note,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
       setAlertSettings: (patch) => {
         setState((s) => ({
           ...s,
@@ -2673,14 +3589,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       log,
       reset: () => {
         try {
-          sessionStorage.removeItem(STORAGE_KEY)
+          localStorage.removeItem(STORAGE_KEY)
         } catch {
           // ignore
         }
-        setState(INITIAL)
+        setState((s) => ({ ...INITIAL, activeRole: s.activeRole }))
       },
     }
-  }, [state])
+  }, [state, hydrated])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

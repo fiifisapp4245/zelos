@@ -54,7 +54,8 @@ export function ProfileMenu({
     setOpen(false)
     // Ends the demo session, so signing back in starts from the seeded data.
     try {
-      sessionStorage.removeItem("zelos-hr-session")
+      localStorage.removeItem("zelos-hr-session")
+      sessionStorage.removeItem("zelos-hr-role")
     } catch {
       // Blocked storage: the sign-out page still shows.
     }

@@ -67,6 +67,86 @@ describe("recruitment", () => {
   })
 })
 
+describe("the assessment gate before an offer", () => {
+  const base = {
+    ...by(CANDIDATES, "c-2"), // at assessment, interview scored
+    stage: "assessment" as const,
+  }
+  const test = {
+    id: "t1",
+    name: "Backend screen",
+    requisitionId: null,
+    questionIds: [],
+    pickCount: null,
+    shuffle: false,
+    durationMin: 60,
+    passMarkPct: 60,
+    windowDays: 5,
+    requiredForOffer: true,
+    active: true,
+  }
+  const inv = (over: Record<string, unknown>) => ({
+    id: "i1",
+    token: "t",
+    candidateId: base.id,
+    testId: "t1",
+    status: "invited" as const,
+    invitedOn: "",
+    windowEnd: "",
+    startedAt: null,
+    deadline: null,
+    extraMinutes: 0,
+    extraNote: null,
+    submittedAt: null,
+    questionIds: [],
+    answers: {},
+    flags: [],
+    autoMarks: {},
+    reviewMarks: {},
+    reviewed: false,
+    reviewNote: null,
+    reviewerId: null,
+    ...over,
+  })
+
+  it("does not stand in the way when no test was sent", () => {
+    expect(advanceBlocker(base, { tests: [test], invitations: [] })).toBeNull()
+  })
+
+  it("waits for a test that was sent but not taken", () => {
+    expect(
+      advanceBlocker(base, { tests: [test], invitations: [inv({})] })
+    ).toMatch(/Waiting for them/)
+  })
+
+  it("waits for a submitted test to be reviewed", () => {
+    expect(
+      advanceBlocker(base, {
+        tests: [test],
+        invitations: [inv({ status: "submitted" })],
+      })
+    ).toMatch(/Review/)
+  })
+
+  it("lets them through once it is reviewed", () => {
+    expect(
+      advanceBlocker(base, {
+        tests: [test],
+        invitations: [inv({ status: "submitted", reviewed: true })],
+      })
+    ).toBeNull()
+  })
+
+  it("ignores a test that is not marked as needed for an offer", () => {
+    expect(
+      advanceBlocker(base, {
+        tests: [{ ...test, requiredForOffer: false }],
+        invitations: [inv({})],
+      })
+    ).toBeNull()
+  })
+})
+
 describe("disciplinary due process", () => {
   it("reads steps off the case rather than storing ticks", () => {
     const c = by(CASES, "DC-2026-03") // investigation, evidence uploaded
