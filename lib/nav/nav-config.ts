@@ -12,6 +12,7 @@ import {
   FileText,
   Gavel,
   GraduationCap,
+  Flag,
   House,
   LogOut,
   Megaphone,
@@ -300,6 +301,14 @@ export const NAV_ITEMS: NavItemConfig[] = [
     section: "talent",
     roles: ["hr_admin"],
   },
+  {
+    id: "goals",
+    label: "Goals",
+    href: "/goals",
+    icon: Flag,
+    section: "talent",
+    roles: ["hr_admin"],
+  },
 
   // Employee relations
   {
@@ -357,6 +366,14 @@ export const NAV_ITEMS: NavItemConfig[] = [
     label: "My pay",
     href: "/me/pay",
     icon: Wallet,
+    section: "me",
+    roles: ["manager", "employee", "payroll"],
+  },
+  {
+    id: "my-goals",
+    label: "Goals",
+    href: "/goals",
+    icon: Flag,
     section: "me",
     roles: ["manager", "employee", "payroll"],
   },

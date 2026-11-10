@@ -255,3 +255,15 @@ identity documents waiting to be verified, and completes the matching onboarding
 - **Pulse surveys** — short anonymous surveys (eNPS, 1–5 agreement, free text). An answer carries no name,
   only the team; who took part is kept apart and the answers are stored in a shuffled order. Results are
   shown only once five people have answered, and a team only once it has five.
+
+## Goals and OKRs
+
+`/goals` holds goals at three levels: company, team and individual. Each has key results (a number, a percentage or done/not done) and can sit under a goal it supports, so progress rolls up. A goal with no key results of its own shows the average of the goals beneath it.
+
+- **Check-ins** move each key result to where it stands now, with a confidence (on track, at risk, off track) and a note. A goal with no check-in for 14 days is flagged, and a manager can ask for one, which sends an email to the Outbox.
+- **Approval:** a goal you set for yourself is proposed to your manager (or HR), who approves it or sends it back with a note. Goals set by a manager or HR start active.
+- **Who sees what:** company and team goals are open to everyone. An individual goal is visible to its owner, their managers and HR.
+- **Performance review:** the review sheet lists the person's goals for that cycle with their progress and health.
+- **Reports:** "Goals and OKRs" (HR) shows company and team goals one by one, and individual goals only by department once a group has 5 or more.
+
+Logic is in `lib/goals.ts` with tests in `lib/goals.test.ts`.

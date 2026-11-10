@@ -162,6 +162,9 @@ import type {
   Survey,
   SurveyResponse,
   SurveyParticipation,
+  Goal,
+  CheckIn,
+  Confidence,
 } from "./types"
 import { DEFAULT_ALERT_SETTINGS } from "./alerts"
 import { TODAY, TODAY_ISO, LIFECYCLE_TRANSITIONS } from "./format"
@@ -211,6 +214,8 @@ import {
 } from "./assets"
 import { audienceMembers } from "./announcements"
 import { canRespond } from "./surveys"
+import { GOALS, CHECK_INS } from "./data/goals"
+import { applyValues, startingStatus } from "./goals"
 import { applyLeavePolicy, homeCountry, leaveRulesFor } from "./leave/policy"
 import { buildReportData } from "./report-data"
 import { dueReports, reportEmail } from "./report-schedule"
@@ -312,6 +317,8 @@ interface State {
   surveys: Survey[]
   surveyResponses: SurveyResponse[]
   surveyParticipation: SurveyParticipation[]
+  goals: Goal[]
+  checkIns: CheckIn[]
   company: CompanyProfile
   /** Editable settings tables, keyed by table id. */
   tables: Record<string, TableRow[]>
@@ -389,6 +396,8 @@ export const INITIAL: State = {
   surveys: SURVEYS,
   surveyResponses: SURVEY_RESPONSES,
   surveyParticipation: SURVEY_PARTICIPATION,
+  goals: GOALS,
+  checkIns: CHECK_INS,
   company: COMPANY,
   tables: TABLE_ROWS,
   activeRole: "hr_admin",
@@ -404,7 +413,7 @@ export const ROLE_KEY = "zelos-hr-role"
  * this week's types is how you get a crash three screens away from the
  * change that caused it.
  */
-export const STORAGE_VERSION = 16
+export const STORAGE_VERSION = 17
 
 /**
  * Keeps only the restored slices that still look like the ones we seed.
@@ -783,6 +792,20 @@ interface StoreValue extends State {
     state: "returned" | "outstanding" | "lost"
   ) => void
 
+  /** Creates or edits a goal. A new individual goal someone sets for themselves goes to their manager. */
+  saveGoal: (
+    g: Omit<Goal, "createdBy" | "returnNote" | "status"> &
+      Partial<Pick<Goal, "status">>
+  ) => Goal
+  /** proposed → active (approve) or back to draft with a note; any → done / cancelled. */
+  setGoalStatus: (id: string, status: Goal["status"], note?: string) => void
+  deleteGoal: (id: string) => void
+  addCheckIn: (
+    goalId: string,
+    p: { values: Record<string, number>; confidence: Confidence; note: string }
+  ) => void
+  /** Asks the owner for a check-in, by email and notification. */
+  nudgeCheckIn: (goalId: string) => void
   saveSurvey: (sv: Survey) => void
   setSurveyStatus: (id: string, status: Survey["status"]) => void
   deleteSurvey: (id: string) => void
@@ -4570,6 +4593,212 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             ],
           }
         })
+      },
+
+      saveGoal: (g) => {
+        const s0 = stateRef.current
+        const ctx = { viewer, employees: s0.employees }
+        const existing = s0.goals.find((x) => x.id === g.id)
+        const status = existing
+          ? (g.status ?? existing.status)
+          : (g.status ?? startingStatus(g.ownerId, g.level, ctx))
+        const saved: Goal = {
+          ...g,
+          status,
+          createdBy: existing?.createdBy ?? actorId,
+          // A note from sending it back stays until it is resubmitted.
+          returnNote: existing?.returnNote ?? null,
+        }
+        setState((s) => {
+          const at = nowIso()
+          const owner = saved.ownerId
+            ? s.employees.find((e) => e.id === saved.ownerId)
+            : undefined
+          const asksApproval =
+            !existing && status === "proposed" && owner?.managerId
+          return {
+            ...s,
+            goals: existing
+              ? s.goals.map((x) => (x.id === saved.id ? saved : x))
+              : [saved, ...s.goals],
+            notifications: asksApproval
+              ? [
+                  {
+                    id: uid("n"),
+                    title: `${owner!.firstName} ${owner!.lastName} proposed a goal`,
+                    body: saved.title,
+                    at,
+                    read: false,
+                    kind: "approval" as const,
+                    href: "/goals",
+                  },
+                  ...s.notifications,
+                ]
+              : s.notifications,
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: saved.ownerId,
+                actorId,
+                action: `${existing ? "Updated" : "Created"} a goal`,
+                field: saved.title,
+                at,
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+        return saved
+      },
+
+      setGoalStatus: (id, status, note) => {
+        setState((s) => {
+          const g = s.goals.find((x) => x.id === id)
+          if (!g) return s
+          const at = nowIso()
+          const owner = g.ownerId
+            ? s.employees.find((e) => e.id === g.ownerId)
+            : undefined
+          return {
+            ...s,
+            goals: s.goals.map((x) =>
+              x.id === id
+                ? {
+                    ...x,
+                    status,
+                    returnNote: status === "draft" ? (note ?? null) : null,
+                  }
+                : x
+            ),
+            notifications:
+              owner &&
+              (status === "active" || status === "draft") &&
+              g.status === "proposed"
+                ? [
+                    {
+                      id: uid("n"),
+                      title:
+                        status === "active"
+                          ? "Your goal was approved"
+                          : "Your goal was sent back",
+                      body:
+                        status === "active"
+                          ? g.title
+                          : `${g.title}: ${note ?? ""}`,
+                      at,
+                      read: false,
+                      kind: "approval" as const,
+                      href: "/goals",
+                    },
+                    ...s.notifications,
+                  ]
+                : s.notifications,
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: g.ownerId,
+                actorId,
+                action: `Set a goal to ${status}`,
+                field: g.title,
+                at,
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      deleteGoal: (id) => {
+        setState((s) => {
+          const g = s.goals.find((x) => x.id === id)
+          // Only a goal nobody has worked on yet can be removed; the rest are history.
+          if (
+            !g ||
+            (g.status !== "draft" && g.status !== "proposed") ||
+            s.checkIns.some((c) => c.goalId === id)
+          )
+            return s
+          return {
+            ...s,
+            goals: s.goals
+              .filter((x) => x.id !== id)
+              .map((x) =>
+                x.parentId === id ? { ...x, parentId: g.parentId } : x
+              ),
+          }
+        })
+      },
+
+      addCheckIn: (goalId, p) => {
+        setState((s) => {
+          const g = s.goals.find((x) => x.id === goalId)
+          if (!g || g.status !== "active") return s
+          const at = nowIso()
+          return {
+            ...s,
+            goals: s.goals.map((x) =>
+              x.id === goalId ? applyValues(x, p.values) : x
+            ),
+            checkIns: [
+              {
+                id: uid("ci"),
+                goalId,
+                at,
+                by: actorId,
+                confidence: p.confidence,
+                note: p.note.trim(),
+                values: p.values,
+              },
+              ...s.checkIns,
+            ],
+          }
+        })
+      },
+
+      nudgeCheckIn: (goalId) => {
+        const s0 = stateRef.current
+        const g = s0.goals.find((x) => x.id === goalId)
+        if (!g) return
+        const lead =
+          g.level === "individual"
+            ? s0.employees.find((e) => e.id === g.ownerId)
+            : s0.employees.find(
+                (e) =>
+                  e.department === g.team &&
+                  e.id === s0.departments.find((d) => d.name === g.team)?.headId
+              )
+        if (!lead) return
+        const origin =
+          typeof window === "undefined" ? "" : window.location.origin
+        setState((s) => ({
+          ...s,
+          outbox: [
+            makeEmail({
+              kind: "other",
+              to: lead.email,
+              toName: `${lead.firstName} ${lead.lastName}`,
+              subject: `Check-in due: ${g.title}`,
+              body: `Hello ${lead.firstName},\n\nA short update on "${g.title}" is due: where each key result stands, and how confident you are.`,
+              cta: { label: "Open your goals", href: `${origin}/goals` },
+              sendAt: nowIso(),
+              relatedId: goalId,
+              status: "sent",
+            }),
+            ...s.outbox,
+          ],
+          notifications: [
+            {
+              id: uid("n"),
+              title: "Check-in due",
+              body: g.title,
+              at: nowIso(),
+              read: false,
+              kind: "alert" as const,
+              href: "/goals",
+            },
+            ...s.notifications,
+          ],
+        }))
       },
 
       saveSurvey: (sv) => {

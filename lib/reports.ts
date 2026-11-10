@@ -13,6 +13,8 @@
  * are held to the floor for everyone, and so is every report for a manager.
  */
 import type {
+  CheckIn,
+  Goal,
   AttendanceRecord,
   Candidate,
   DisciplinaryCase,
@@ -38,6 +40,7 @@ import {
 } from "./format"
 import { isOnStrength } from "./selectors"
 import { addDays, daysBetween } from "./time"
+import { healthOf, isStale, progressOf } from "./goals"
 import { ratingBuckets } from "./talent/performance"
 import { accruedLeaveDays, dailyRate } from "./talent/offboarding"
 import { SEVERITY_LABEL } from "./talent/disciplinary"
@@ -53,6 +56,8 @@ export interface ReportData {
   leaveBalances: LeaveBalance[]
   documents: EmployeeDocument[]
   attendance: AttendanceRecord[]
+  goals: Goal[]
+  checkIns: CheckIn[]
 }
 
 export interface ReportContext {
@@ -724,6 +729,66 @@ const performance: ReportDef = {
   },
 }
 
+/* ── Goals ───────────────────────────────────────────────────────────────── */
+
+const goalsReport: ReportDef = {
+  id: "goals",
+  title: "Goals and OKRs",
+  group: "Performance",
+  description:
+    "Progress on company and team goals, and how individual goals are going by department.",
+  options: [],
+  allowed: (v) => has(v, "hr_admin"),
+  run(d, ctx) {
+    const floor = floorFor(ctx.viewer, true)
+    const live = d.goals.filter((g) => g.status === "active")
+    const health = (g: Goal) => healthOf(g, d.goals, d.checkIns, ctx.today)
+    const summarise = (items: Goal[]) => ({
+      goals: items.length,
+      progress: Math.round(avg(items.map((g) => progressOf(g, d.goals))) * 100),
+      atRisk: items.filter((g) => health(g) !== "on_track").length,
+      stale: items.filter((g) => isStale(g, d.checkIns, ctx.today)).length,
+    })
+    const shared = live.filter((g) => g.level !== "individual")
+    const rows: Row[] = shared.map((g) => ({
+      scope:
+        g.level === "company" ? `Company: ${g.title}` : `${g.team}: ${g.title}`,
+      ...summarise([g]),
+    }))
+    const empOf = (id: string | null) => d.employees.find((e) => e.id === id)
+    const people = countBy(
+      live.filter((g) => g.level === "individual"),
+      (g) => empOf(g.ownerId)?.department ?? "Unknown"
+    )
+    const shown = people.filter((p) => p.items.length >= floor)
+    for (const p of shown)
+      rows.push({ scope: `${p.key} (individual goals)`, ...summarise(p.items) })
+    return {
+      columns: [
+        { key: "scope", label: "Goal or group" },
+        { key: "goals", label: "Goals", format: "number" },
+        { key: "progress", label: "Progress", format: "percent" },
+        { key: "atRisk", label: "At risk", format: "number" },
+        { key: "stale", label: "No recent check-in", format: "number" },
+      ],
+      rows,
+      withheld: people.length - shown.length,
+      summary: [
+        { label: "Live goals", value: String(live.length) },
+        {
+          label: "Average progress",
+          value: `${summarise(live).progress}%`,
+        },
+        { label: "At risk", value: String(summarise(live).atRisk) },
+      ],
+      notes: [
+        `Individual goals are grouped by department, and a group is shown only at ${floor}+ goals, so no one person's goal can be picked out.`,
+      ],
+      bar: { label: "scope", value: "progress" },
+    }
+  },
+}
+
 /* ── Compliance ──────────────────────────────────────────────────────────── */
 
 const compliance: ReportDef = {
@@ -839,6 +904,7 @@ export const REPORTS: ReportDef[] = [
   payroll,
   liability,
   performance,
+  goalsReport,
   compliance,
 ]
 

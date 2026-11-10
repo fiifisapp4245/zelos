@@ -1,3 +1,4 @@
+import { GOALS, CHECK_INS } from "./data/goals"
 import { describe, expect, it } from "vitest"
 
 import {
@@ -118,6 +119,8 @@ describe("what a scheduled file contains", () => {
     leaveBalances: LEAVE_BALANCES,
     documents: DOCUMENTS,
     attendance: ATTENDANCE,
+    goals: GOALS,
+    checkIns: CHECK_INS,
   }
 
   it("has only the saver's own team when they are a manager", () => {
