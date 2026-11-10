@@ -879,3 +879,62 @@ export interface OfferSignature {
   /** Every step, in order, with a time. This is the audit trail. */
   trail: { at: string; text: string }[]
 }
+
+/* ── Pre-hire portal ─────────────────────────────────────────────────────── */
+
+export type PortalSection =
+  "personal" | "identity" | "statutory" | "pay" | "emergency"
+
+export interface PortalUpload {
+  id: string
+  name: string
+  sizeKb: number
+}
+
+/** What a new hire has filled in so far. Everything is text until HR accepts it. */
+export interface PortalData {
+  dateOfBirth: string
+  gender: "" | "male" | "female" | "other"
+  nationality: string
+  phone: string
+  personalEmail: string
+  residentialAddress: string
+  gpsAddress: string
+  ghanaCard: string
+  idDocuments: PortalUpload[]
+  ssnitNumber: string
+  tin: string
+  tier2Provider: string
+  tier3Provider: string
+  paymentMethod: "" | "mobile_money" | "bank"
+  momoProvider: string
+  momoNumber: string
+  bankName: string
+  bankAccount: string
+  accountName: string
+  emergencyName: string
+  emergencyRelationship: string
+  emergencyPhone: string
+  emergencyEmail: string
+}
+
+export interface PortalReview {
+  status: "ok" | "changes"
+  note: string
+}
+
+export interface PreHirePortal {
+  id: string
+  /** The private link's key. */
+  token: string
+  employeeId: string
+  status:
+    "invited" | "in_progress" | "submitted" | "changes_requested" | "approved"
+  invitedOn: string
+  expiresOn: string
+  data: PortalData
+  submittedOn: string | null
+  review: Partial<Record<PortalSection, PortalReview>>
+  reviewedBy: string | null
+  history: { at: string; text: string }[]
+}

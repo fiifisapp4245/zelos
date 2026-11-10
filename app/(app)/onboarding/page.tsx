@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { FormDialog } from "@/components/common/form-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PortalRow } from "@/components/onboarding/portal-panel"
 import { useStore } from "@/lib/store"
 import { visibleEmployees } from "@/lib/selectors"
 import { daysUntil, formatDate, fullName, relativeTime } from "@/lib/format"
@@ -172,6 +173,11 @@ function JoinerCard({ employeeId }: { employeeId: string }) {
           </div>
         </div>
       </div>
+
+      {(employee.lifecycleState === "pre_hire" ||
+        employee.lifecycleState === "probation") && (
+        <PortalRow employeeId={employeeId} />
+      )}
 
       {blockers.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 border-b bg-danger-muted px-5 py-2.5 text-sm">

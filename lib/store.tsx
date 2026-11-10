@@ -152,6 +152,10 @@ import type {
   IntegrityFlag,
   OfferTemplate,
   OfferSignature,
+  PreHirePortal,
+  PortalData,
+  PortalSection,
+  PortalReview,
 } from "./types"
 import { DEFAULT_ALERT_SETTINGS } from "./alerts"
 import { TODAY, TODAY_ISO, LIFECYCLE_TRANSITIONS } from "./format"
@@ -175,6 +179,16 @@ import {
   type ApplicationInput,
 } from "./careers"
 import { nameMatches, signingState } from "./offers"
+import {
+  SECTIONS,
+  SECTION_TITLE,
+  documentsFor,
+  emptyData,
+  mergeCompensation,
+  recordPatch,
+  validateAll,
+  type Ctx as PortalCtx,
+} from "./portal"
 import { holidayDates, newToken } from "./booking/slots"
 import {
   cancelledEmail,
@@ -267,6 +281,7 @@ interface State {
   invitations: TestInvitation[]
   offerTemplates: OfferTemplate[]
   offerSignatures: OfferSignature[]
+  portals: PreHirePortal[]
   company: CompanyProfile
   /** Editable settings tables, keyed by table id. */
   tables: Record<string, TableRow[]>
@@ -337,6 +352,7 @@ export const INITIAL: State = {
   invitations: INVITATIONS,
   offerTemplates: OFFER_TEMPLATES,
   offerSignatures: OFFER_SIGNATURES,
+  portals: [],
   company: COMPANY,
   tables: TABLE_ROWS,
   activeRole: "hr_admin",
@@ -352,7 +368,7 @@ export const ROLE_KEY = "zelos-hr-role"
  * this week's types is how you get a crash three screens away from the
  * change that caused it.
  */
-export const STORAGE_VERSION = 14
+export const STORAGE_VERSION = 15
 
 /**
  * Keeps only the restored slices that still look like the ones we seed.
@@ -683,6 +699,21 @@ interface StoreValue extends State {
     reason: string
   ) => { ok: true } | { ok: false; reason: string }
   withdrawOffer: (id: string) => void
+
+  /** Invites a new hire to fill in their own details, and emails them a private link. */
+  invitePortal: (
+    employeeId: string
+  ) => { ok: true; token: string } | { ok: false; reason: string }
+  resendPortal: (id: string) => void
+  savePortalDraft: (token: string, patch: Partial<PortalData>) => boolean
+  submitPortal: (
+    token: string
+  ) => { ok: true } | { ok: false; reason: string; sections: PortalSection[] }
+  /** Accepts or sends back what a new hire submitted. Accepting writes it to their record. */
+  reviewPortal: (
+    id: string,
+    review: Partial<Record<PortalSection, PortalReview>>
+  ) => { ok: true; approved: boolean } | { ok: false; reason: string }
   resendOffer: (id: string) => void
   saveReport: (
     r: Omit<SavedReport, "id" | "createdBy" | "createdOn" | "lastRunOn">
@@ -1018,6 +1049,114 @@ function applyCancel(
   }
 }
 
+/** Who and what a submission is checked against. */
+function portalCtx(s: State, employeeId: string): PortalCtx {
+  const e = s.employees.find((x) => x.id === employeeId)
+  return {
+    today: TODAY_ISO,
+    takenCards: s.employees
+      .filter((x) => x.id !== employeeId && x.ghanaCard)
+      .map((x) => x.ghanaCard),
+    fullName: e ? `${e.firstName} ${e.lastName}` : "",
+  }
+}
+
+/** The portal's deadline is the first day, with a week's grace. */
+const portalExpiry = (startDate: string) =>
+  `${addDays(startDate, 7)}T23:59:59.000Z`
+
+/**
+ * Creates the invitation and the emails that go with it: the welcome with the
+ * private link now, and reminders a week and two days before the first day,
+ * which are withdrawn the moment the details are submitted.
+ */
+function invitePortalIn(
+  s: State,
+  employeeId: string,
+  token: string,
+  id: string,
+  origin: string
+): State {
+  const e = s.employees.find((x) => x.id === employeeId)
+  if (!e) return s
+  const at = nowIso()
+  const company = s.company.tradingName || s.company.legalName
+  const first = e.firstName
+  const to = e.personalEmail || e.email
+  const href = `${origin}/welcome/${token}`
+  const portal: PreHirePortal = {
+    id,
+    token,
+    employeeId,
+    status: "invited",
+    invitedOn: TODAY_ISO,
+    expiresOn: portalExpiry(e.startDate),
+    data: emptyData(e),
+    submittedOn: null,
+    review: {},
+    reviewedBy: null,
+    history: [{ at, text: "Invitation sent." }],
+  }
+  const mail = (
+    subject: string,
+    body: string,
+    sendAt: string,
+    status: "sent" | "scheduled"
+  ) =>
+    makeEmail({
+      kind: "other",
+      to,
+      toName: `${e.firstName} ${e.lastName}`,
+      subject,
+      body,
+      cta: { label: "Complete your details", href },
+      sendAt,
+      relatedId: id,
+      status,
+    })
+  const reminders = [7, 2]
+    .map((d) => `${addDays(e.startDate, -d)}T09:00:00.000Z`)
+    .filter((t) => t > nowIso())
+    .map((t) =>
+      mail(
+        `Reminder: ${company} needs your details before you start`,
+        `Hello ${first},\n\nA reminder to complete your details before your first day on ${e.startDate}. It takes about ten minutes.`,
+        t,
+        "scheduled"
+      )
+    )
+  return {
+    ...s,
+    portals: [
+      portal,
+      ...s.portals.filter(
+        (p) => p.employeeId !== employeeId || p.status === "approved"
+      ),
+    ],
+    outbox: [
+      mail(
+        `Welcome to ${company}: complete your details before day one`,
+        `Hello ${first},\n\nWelcome to ${company}. Before you start on ${e.startDate}, please fill in your details: your contact information, Ghana Card, SSNIT and tax numbers, how you would like to be paid, and an emergency contact. It takes about ten minutes, you can stop and come back, and the link is private to you.`,
+        at,
+        "sent"
+      ),
+      ...reminders,
+      ...s.outbox,
+    ],
+    auditLog: [
+      {
+        id: uid("a"),
+        employeeId,
+        actorId: "system",
+        action: "Invited to the pre-hire portal",
+        field: id,
+        at,
+      },
+      ...s.auditLog,
+    ],
+  }
+}
+
 /**
  * Turns a hired candidate into a pre-hire record with onboarding tasks, and
  * marks the requisition filled when its openings are. Shared by "Hire" and by
@@ -1054,46 +1193,48 @@ function hireIn(
     done: false,
     category,
   }))
+  const origin = typeof window === "undefined" ? "" : window.location.origin
+  const hired: State = {
+    ...s,
+    employees: [emp, ...s.employees],
+    candidates: s.candidates.map((x) =>
+      x.id === id ? { ...x, stage: "hired", employeeId: emp.id } : x
+    ),
+    requisitions: s.requisitions.map((r) =>
+      r.id === req.id && hiredCount >= r.openings
+        ? { ...r, status: "filled" }
+        : r
+    ),
+    onboardingTasks: [...s.onboardingTasks, ...tasks],
+    lifecycleEvents: [
+      {
+        id: uid("le"),
+        employeeId: emp.id,
+        from: null,
+        to: "pre_hire",
+        reason: `Hired from ${req.id}`,
+        actorId,
+        at: nowIso(),
+        effectiveDate: emp.startDate,
+      },
+      ...s.lifecycleEvents,
+    ],
+    auditLog: [
+      {
+        id: uid("a"),
+        employeeId: emp.id,
+        actorId,
+        action: "Created pre-hire record from a recruitment hire",
+        field: c.id,
+        after: req.id,
+        at: nowIso(),
+      },
+      ...s.auditLog,
+    ],
+  }
   return {
     employee: emp,
-    state: {
-      ...s,
-      employees: [emp, ...s.employees],
-      candidates: s.candidates.map((x) =>
-        x.id === id ? { ...x, stage: "hired", employeeId: emp.id } : x
-      ),
-      requisitions: s.requisitions.map((r) =>
-        r.id === req.id && hiredCount >= r.openings
-          ? { ...r, status: "filled" }
-          : r
-      ),
-      onboardingTasks: [...s.onboardingTasks, ...tasks],
-      lifecycleEvents: [
-        {
-          id: uid("le"),
-          employeeId: emp.id,
-          from: null,
-          to: "pre_hire",
-          reason: `Hired from ${req.id}`,
-          actorId,
-          at: nowIso(),
-          effectiveDate: emp.startDate,
-        },
-        ...s.lifecycleEvents,
-      ],
-      auditLog: [
-        {
-          id: uid("a"),
-          employeeId: emp.id,
-          actorId,
-          action: "Created pre-hire record from a recruitment hire",
-          field: c.id,
-          after: req.id,
-          at: nowIso(),
-        },
-        ...s.auditLog,
-      ],
-    },
+    state: invitePortalIn(hired, emp.id, newToken(), uid("pt"), origin),
   }
 }
 
@@ -3530,6 +3671,343 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             ],
           }
         })
+      },
+
+      invitePortal: (employeeId) => {
+        const s0 = stateRef.current
+        const e = s0.employees.find((x) => x.id === employeeId)
+        if (!e) return { ok: false, reason: "Employee not found." }
+        if (e.lifecycleState !== "pre_hire" && e.lifecycleState !== "probation")
+          return {
+            ok: false,
+            reason:
+              "Only people who have not started or are on probation can be invited.",
+          }
+        const live = s0.portals.find(
+          (p) => p.employeeId === employeeId && p.status !== "approved"
+        )
+        if (live)
+          return {
+            ok: false,
+            reason: "They already have a portal open. Resend it instead.",
+          }
+        const token = newToken()
+        const origin =
+          typeof window === "undefined" ? "" : window.location.origin
+        setState((s) => invitePortalIn(s, employeeId, token, uid("pt"), origin))
+        return { ok: true, token }
+      },
+
+      resendPortal: (id) => {
+        setState((s) => {
+          const p = s.portals.find((x) => x.id === id)
+          const e = p && s.employees.find((x) => x.id === p.employeeId)
+          if (!p || !e || p.status === "approved") return s
+          const at = nowIso()
+          const origin =
+            typeof window === "undefined" ? "" : window.location.origin
+          const company = s.company.tradingName || s.company.legalName
+          return {
+            ...s,
+            portals: s.portals.map((x) =>
+              x.id === id
+                ? {
+                    ...x,
+                    expiresOn: portalExpiry(e.startDate),
+                    history: [
+                      ...x.history,
+                      { at, text: "Invitation sent again." },
+                    ],
+                  }
+                : x
+            ),
+            outbox: [
+              makeEmail({
+                kind: "other",
+                to: e.personalEmail || e.email,
+                toName: `${e.firstName} ${e.lastName}`,
+                subject: `${company}: your details are still needed`,
+                body: `Hello ${e.firstName},\n\nHere is your link again to complete your details before you start on ${e.startDate}.`,
+                cta: {
+                  label: "Complete your details",
+                  href: `${origin}/welcome/${p.token}`,
+                },
+                sendAt: at,
+                relatedId: id,
+                status: "sent",
+              }),
+              ...s.outbox,
+            ],
+          }
+        })
+      },
+
+      savePortalDraft: (token, patch) => {
+        const p0 = stateRef.current.portals.find((x) => x.token === token)
+        if (!p0 || p0.status === "approved" || p0.status === "submitted")
+          return false
+        if (p0.expiresOn < TODAY_ISO) return false
+        setState((s) => ({
+          ...s,
+          portals: s.portals.map((p) =>
+            p.token === token &&
+            p.status !== "approved" &&
+            p.status !== "submitted"
+              ? {
+                  ...p,
+                  // Sent-back work stays sent back until it is submitted again.
+                  status:
+                    p.status === "invited"
+                      ? ("in_progress" as const)
+                      : p.status,
+                  data: { ...p.data, ...patch },
+                }
+              : p
+          ),
+        }))
+        return true
+      },
+
+      submitPortal: (token) => {
+        const s0 = stateRef.current
+        const p = s0.portals.find((x) => x.token === token)
+        if (!p || p.status === "approved" || p.status === "submitted")
+          return {
+            ok: false,
+            reason: "This form cannot be submitted.",
+            sections: [],
+          }
+        const errs = validateAll(p.data, portalCtx(s0, p.employeeId))
+        // Only the parts HR sent back have to be right again; the rest was already accepted.
+        const sections = SECTIONS.map((x) => x.key).filter(
+          (k) => Object.keys(errs[k]).length > 0
+        )
+        if (sections.length)
+          return {
+            ok: false,
+            reason: "Some sections still need your attention.",
+            sections,
+          }
+        setState((s) => {
+          const cur = s.portals.find((x) => x.token === token)
+          const e = cur && s.employees.find((x) => x.id === cur.employeeId)
+          if (
+            !cur ||
+            !e ||
+            cur.status === "submitted" ||
+            cur.status === "approved"
+          )
+            return s
+          const at = nowIso()
+          return {
+            ...s,
+            portals: s.portals.map((x) =>
+              x.id === cur.id
+                ? {
+                    ...x,
+                    status: "submitted" as const,
+                    submittedOn: at,
+                    // A fresh look at everything once it comes back.
+                    review: {},
+                    history: [
+                      ...x.history,
+                      { at, text: "Submitted by the new hire." },
+                    ],
+                  }
+                : x
+            ),
+            outbox: s.outbox.map((m) =>
+              m.relatedId === cur.id && m.status === "scheduled"
+                ? { ...m, status: "cancelled" as const }
+                : m
+            ),
+            notifications: [
+              {
+                id: uid("n"),
+                title: `${e.firstName} ${e.lastName} submitted their details`,
+                body: "Review them, then accept to update their record.",
+                at,
+                read: false,
+                kind: "approval" as const,
+                href: "/onboarding",
+              },
+              ...s.notifications,
+            ],
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: e.id,
+                actorId: e.id,
+                action: "Submitted pre-hire details",
+                field: cur.id,
+                at,
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+        return { ok: true }
+      },
+
+      reviewPortal: (id, review) => {
+        const s0 = stateRef.current
+        const p = s0.portals.find((x) => x.id === id)
+        if (!p || p.status !== "submitted")
+          return {
+            ok: false,
+            reason: "There is nothing waiting to be reviewed.",
+          }
+        const all = SECTIONS.map((x) => x.key)
+        const missing = all.filter((k) => !review[k])
+        if (missing.length)
+          return {
+            ok: false,
+            reason: `Decide on ${SECTION_TITLE[missing[0]].toLowerCase()} too.`,
+          }
+        const sent = all.filter((k) => review[k]!.status === "changes")
+        const unexplained = sent.find((k) => review[k]!.note.trim().length < 5)
+        if (unexplained)
+          return {
+            ok: false,
+            reason: `Say what needs fixing in ${SECTION_TITLE[unexplained].toLowerCase()}.`,
+          }
+        const approved = sent.length === 0
+        setState((s) => {
+          const cur = s.portals.find((x) => x.id === id)
+          const e = cur && s.employees.find((x) => x.id === cur.employeeId)
+          if (!cur || !e || cur.status !== "submitted") return s
+          const at = nowIso()
+          const company = s.company.tradingName || s.company.legalName
+          const origin =
+            typeof window === "undefined" ? "" : window.location.origin
+          const to = e.personalEmail || e.email
+          const reviewer = nameOf(s, actorId)
+          if (!approved) {
+            const notes = sent
+              .map((k) => `• ${SECTION_TITLE[k]}: ${review[k]!.note.trim()}`)
+              .join("\n")
+            return {
+              ...s,
+              portals: s.portals.map((x) =>
+                x.id === id
+                  ? {
+                      ...x,
+                      status: "changes_requested" as const,
+                      review,
+                      reviewedBy: actorId,
+                      history: [
+                        ...x.history,
+                        {
+                          at,
+                          text: `Sent back by ${reviewer}: ${sent.map((k) => SECTION_TITLE[k]).join(", ")}.`,
+                        },
+                      ],
+                    }
+                  : x
+              ),
+              outbox: [
+                makeEmail({
+                  kind: "other",
+                  to,
+                  toName: `${e.firstName} ${e.lastName}`,
+                  subject: `${company}: a few details need fixing`,
+                  body: `Hello ${e.firstName},\n\nThank you for sending your details. A few things need another look:\n\n${notes}\n\nYou only need to correct those sections.`,
+                  cta: {
+                    label: "Fix your details",
+                    href: `${origin}/welcome/${cur.token}`,
+                  },
+                  sendAt: at,
+                  relatedId: id,
+                  status: "sent",
+                }),
+                ...s.outbox,
+              ],
+              auditLog: [
+                {
+                  id: uid("a"),
+                  employeeId: e.id,
+                  actorId,
+                  action: "Sent pre-hire details back for correction",
+                  field: id,
+                  at,
+                },
+                ...s.auditLog,
+              ],
+            }
+          }
+          const docs = documentsFor(cur, at)
+          return {
+            ...s,
+            portals: s.portals.map((x) =>
+              x.id === id
+                ? {
+                    ...x,
+                    status: "approved" as const,
+                    review,
+                    reviewedBy: actorId,
+                    history: [
+                      ...x.history,
+                      { at, text: `Accepted by ${reviewer}. Record updated.` },
+                    ],
+                  }
+                : x
+            ),
+            employees: s.employees.map((x) =>
+              x.id === e.id
+                ? {
+                    ...x,
+                    ...recordPatch(cur.data),
+                    compensation: mergeCompensation(x.compensation, cur.data),
+                  }
+                : x
+            ),
+            // An identity document that was missing is replaced by what they uploaded.
+            documents: [
+              ...docs,
+              ...s.documents.filter(
+                (d) =>
+                  !(
+                    d.employeeId === e.id &&
+                    d.category === "identity" &&
+                    d.status === "missing" &&
+                    docs.length > 0
+                  )
+              ),
+            ],
+            onboardingTasks: s.onboardingTasks.map((t) =>
+              t.employeeId === e.id &&
+              t.owner === "employee" &&
+              t.category === "compliance"
+                ? { ...t, done: true }
+                : t
+            ),
+            outbox: [
+              makeEmail({
+                kind: "other",
+                to,
+                toName: `${e.firstName} ${e.lastName}`,
+                subject: `${company}: thank you, your details are in`,
+                body: `Hello ${e.firstName},\n\nYour details have been checked and added to your record. We will be in touch about your first day on ${e.startDate}.`,
+                sendAt: at,
+                relatedId: id,
+                status: "sent",
+              }),
+              ...s.outbox,
+            ],
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: e.id,
+                actorId,
+                action: "Updated the record from the pre-hire portal",
+                field: "personal, identity, statutory, pay, emergency contact",
+                at,
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+        return { ok: true, approved }
       },
 
       queueEmail: (m) => {
