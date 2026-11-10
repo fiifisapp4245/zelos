@@ -361,6 +361,11 @@ exports[`persisted state and its version > has not changed shape without the ver
     "settlement",
     "state",
   ],
+  "offerTemplates": [
+    "body",
+    "id",
+    "name",
+  ],
   "onboardingTasks": [
     "category",
     "done",
@@ -485,6 +490,7 @@ exports[`persisted state and its version > has not changed shape without the ver
   "requisitions": [
     "branch",
     "budgetMonthly",
+    "careers",
     "department",
     "employmentType",
     "hiringManagerId",

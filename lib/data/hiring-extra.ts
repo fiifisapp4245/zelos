@@ -1,4 +1,7 @@
+import { DEFAULT_OFFER_TEMPLATE } from "../offers"
 import type {
+  OfferSignature,
+  OfferTemplate,
   Availability,
   AssessmentTest,
   Booking,
@@ -252,3 +255,9 @@ export const TESTS: AssessmentTest[] = [
     active: true,
   },
 ]
+
+export const OFFER_TEMPLATES: OfferTemplate[] = [
+  { id: "ot-standard", name: "Standard offer", body: DEFAULT_OFFER_TEMPLATE },
+]
+
+export const OFFER_SIGNATURES: OfferSignature[] = []

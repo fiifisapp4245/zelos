@@ -212,6 +212,19 @@ export interface Requisition {
   openedOn: string
   targetStartDate: string
   budgetMonthly: number
+  /** What the public careers page shows. Absent means it has never been set up. */
+  careers?: CareersListing
+}
+
+export interface CareersListing {
+  published: boolean
+  summary: string
+  responsibilities: string[]
+  requirements: string[]
+  /** Asked on the application form, each one required. */
+  questions: string[]
+  /** Last day to apply, or null for open until filled. */
+  closesOn: string | null
 }
 
 export type CandidateStage =
@@ -242,6 +255,9 @@ export interface Candidate {
   offer: CandidateOffer | null
   /** The pre-hire record this person became, once hired. */
   employeeId: string | null
+  /** What they said on the careers form, and the CV they attached. */
+  answers?: Record<string, string>
+  cvName?: string
 }
 
 export type InterviewKind = "phone" | "technical" | "panel" | "final"
@@ -268,6 +284,8 @@ export interface CandidateOffer {
   status: "draft" | "sent" | "accepted" | "declined"
   sentOn: string | null
   decidedOn: string | null
+  /** The signing request this offer went out on, once sent for signature. */
+  signatureId?: string
 }
 
 export interface OnboardingTask {
@@ -738,7 +756,8 @@ export interface Booking {
 
 /* ── Assessments ─────────────────────────────────────────────────────────── */
 
-export type QuestionKind = "mcq" | "multi" | "short" | "long" | "upload" | "code"
+export type QuestionKind =
+  "mcq" | "multi" | "short" | "long" | "upload" | "code"
 
 export interface TestCase {
   args: unknown[]
@@ -825,4 +844,38 @@ export interface TestInvitation {
   reviewed: boolean
   reviewNote: string | null
   reviewerId: string | null
+}
+
+/* ── Offer letters and e-signature ───────────────────────────────────────── */
+
+export interface OfferTemplate {
+  id: string
+  name: string
+  /** Plain text with {{placeholders}}, filled from the candidate and the role. */
+  body: string
+}
+
+export interface OfferSignature {
+  id: string
+  /** The private link's key for the candidate. */
+  token: string
+  candidateId: string
+  templateId: string | null
+  /** The letter exactly as sent. Never re-rendered, so what was signed is what is shown. */
+  letter: string
+  /** SHA-256 of the letter, so a changed letter is detectable. */
+  letterHash: string
+  salaryMonthly: number
+  startDate: string
+  status: "sent" | "viewed" | "signed" | "declined" | "withdrawn" | "expired"
+  sentOn: string
+  expiresOn: string
+  viewedOn: string | null
+  signedOn: string | null
+  signedName: string | null
+  /** A drawn signature as a small image, when they drew one. */
+  signatureImage: string | null
+  declinedReason: string | null
+  /** Every step, in order, with a time. This is the audit trail. */
+  trail: { at: string; text: string }[]
 }

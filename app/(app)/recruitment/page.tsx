@@ -30,6 +30,8 @@ import { SegmentedTabs } from "@/components/common/segmented-tabs"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { CandidateSheet } from "@/components/talent/candidate-sheet"
 import { BookingTab } from "@/components/talent/booking-tab"
+import { CareersTab } from "@/components/talent/careers-tab"
+import { OffersTab } from "@/components/talent/offers-tab"
 import { AssessmentsTab } from "@/components/talent/assessments-tab"
 import {
   AddCandidateDialog,
@@ -159,6 +161,14 @@ export default function RecruitmentPage() {
               { value: "requisitions", label: "Requisitions" },
               ...(isHr
                 ? [
+                    { value: "careers", label: "Careers" },
+                    {
+                      value: "offers",
+                      label: "Offers",
+                      count: store.offerSignatures.filter(
+                        (o) => o.status === "sent" || o.status === "viewed"
+                      ).length,
+                    },
                     { value: "booking", label: "Booking" },
                     {
                       value: "assessments",
@@ -284,6 +294,18 @@ export default function RecruitmentPage() {
             </div>
           )}
         </TabsContent>
+
+        {isHr && (
+          <TabsContent value="careers">
+            <CareersTab />
+          </TabsContent>
+        )}
+
+        {isHr && (
+          <TabsContent value="offers">
+            <OffersTab onOpenCandidate={setOpenCandidate} />
+          </TabsContent>
+        )}
 
         {isHr && (
           <TabsContent value="assessments">

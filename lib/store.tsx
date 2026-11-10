@@ -150,6 +150,8 @@ import type {
   TestInvitation,
   AnswerValue,
   IntegrityFlag,
+  OfferTemplate,
+  OfferSignature,
 } from "./types"
 import { DEFAULT_ALERT_SETTINGS } from "./alerts"
 import { TODAY, TODAY_ISO, LIFECYCLE_TRANSITIONS } from "./format"
@@ -162,7 +164,17 @@ import {
   QUESTION_BANK,
   TESTS,
   INVITATIONS,
+  OFFER_TEMPLATES,
+  OFFER_SIGNATURES,
 } from "./data/hiring-extra"
+import {
+  alreadyApplied,
+  hasErrors,
+  isListed,
+  validateApplication,
+  type ApplicationInput,
+} from "./careers"
+import { nameMatches, signingState } from "./offers"
 import { holidayDates, newToken } from "./booking/slots"
 import {
   cancelledEmail,
@@ -253,6 +265,8 @@ interface State {
   questionBank: Question[]
   tests: AssessmentTest[]
   invitations: TestInvitation[]
+  offerTemplates: OfferTemplate[]
+  offerSignatures: OfferSignature[]
   company: CompanyProfile
   /** Editable settings tables, keyed by table id. */
   tables: Record<string, TableRow[]>
@@ -321,6 +335,8 @@ export const INITIAL: State = {
   questionBank: QUESTION_BANK,
   tests: TESTS,
   invitations: INVITATIONS,
+  offerTemplates: OFFER_TEMPLATES,
+  offerSignatures: OFFER_SIGNATURES,
   company: COMPANY,
   tables: TABLE_ROWS,
   activeRole: "hr_admin",
@@ -336,7 +352,7 @@ export const ROLE_KEY = "zelos-hr-role"
  * this week's types is how you get a crash three screens away from the
  * change that caused it.
  */
-export const STORAGE_VERSION = 13
+export const STORAGE_VERSION = 14
 
 /**
  * Keeps only the restored slices that still look like the ones we seed.
@@ -641,6 +657,33 @@ interface StoreValue extends State {
     finish: boolean
   ) => void
   grantExtraTime: (id: string, minutes: number, note: string) => void
+
+  /** A public application from the careers page becomes a candidate at Applied. */
+  applyToJob: (
+    requisitionId: string,
+    input: ApplicationInput
+  ) => { ok: true; candidateId: string } | { ok: false; reason: string }
+  saveOfferTemplate: (t: OfferTemplate) => void
+  deleteOfferTemplate: (id: string) => void
+  /** Sends the letter, already rendered and hashed, to be signed online. */
+  sendOfferForSignature: (p: {
+    candidateId: string
+    templateId: string | null
+    letter: string
+    letterHash: string
+  }) => { ok: true; token: string } | { ok: false; reason: string }
+  markOfferViewed: (token: string) => void
+  /** Signing accepts the offer and, when it does, hires the candidate. */
+  signOffer: (
+    token: string,
+    p: { name: string; image: string | null; agreed: boolean }
+  ) => { ok: true } | { ok: false; reason: string }
+  declineOffer: (
+    token: string,
+    reason: string
+  ) => { ok: true } | { ok: false; reason: string }
+  withdrawOffer: (id: string) => void
+  resendOffer: (id: string) => void
   saveReport: (
     r: Omit<SavedReport, "id" | "createdBy" | "createdOn" | "lastRunOn">
   ) => void
@@ -974,6 +1017,94 @@ function applyCancel(
     ],
   }
 }
+
+/**
+ * Turns a hired candidate into a pre-hire record with onboarding tasks, and
+ * marks the requisition filled when its openings are. Shared by "Hire" and by
+ * a signed offer, so both leave exactly the same trail.
+ */
+function hireIn(
+  s: State,
+  id: string,
+  actorId: string
+): { state: State; employee: Employee | null } {
+  const c = s.candidates.find((x) => x.id === id)
+  const req = c && s.requisitions.find((r) => r.id === c.requisitionId)
+  if (!c || !req || c.employeeId) return { state: s, employee: null }
+  const emp = preHireFrom(c, req, s.employees)
+  const hiredCount = s.candidates.filter(
+    (x) => x.requisitionId === req.id && (x.stage === "hired" || x.id === id)
+  ).length
+  const due = (days: number) => addDays(emp.startDate, days)
+  const tasks: OnboardingTask[] = (
+    [
+      ["Return signed employment contract", "employee", -3, "paperwork"],
+      ["Submit Ghana Card & SSNIT number", "employee", -2, "compliance"],
+      ["Create work email & accounts", "it", -2, "access"],
+      ["Issue laptop and access badge", "it", -1, "access"],
+      ["Register on payroll", "hr", -1, "compliance"],
+      ["Day-one orientation", "hr", 0, "orientation"],
+    ] as const
+  ).map(([title, owner, offset, category]) => ({
+    id: uid("ot"),
+    employeeId: emp.id,
+    title,
+    owner,
+    dueOn: due(offset),
+    done: false,
+    category,
+  }))
+  return {
+    employee: emp,
+    state: {
+      ...s,
+      employees: [emp, ...s.employees],
+      candidates: s.candidates.map((x) =>
+        x.id === id ? { ...x, stage: "hired", employeeId: emp.id } : x
+      ),
+      requisitions: s.requisitions.map((r) =>
+        r.id === req.id && hiredCount >= r.openings
+          ? { ...r, status: "filled" }
+          : r
+      ),
+      onboardingTasks: [...s.onboardingTasks, ...tasks],
+      lifecycleEvents: [
+        {
+          id: uid("le"),
+          employeeId: emp.id,
+          from: null,
+          to: "pre_hire",
+          reason: `Hired from ${req.id}`,
+          actorId,
+          at: nowIso(),
+          effectiveDate: emp.startDate,
+        },
+        ...s.lifecycleEvents,
+      ],
+      auditLog: [
+        {
+          id: uid("a"),
+          employeeId: emp.id,
+          actorId,
+          action: "Created pre-hire record from a recruitment hire",
+          field: c.id,
+          after: req.id,
+          at: nowIso(),
+        },
+        ...s.auditLog,
+      ],
+    },
+  }
+}
+
+/** A person's name for a record anyone will read, not their internal id. */
+function nameOf(s: State, id: string) {
+  const e = s.employees.find((x) => x.id === id)
+  return e ? `${e.firstName} ${e.lastName}` : id
+}
+
+const SIGN_DAYS = 7
+const signExpiry = () => `${addDays(TODAY_ISO, SIGN_DAYS)}T23:59:59.000Z`
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<State>(INITIAL)
@@ -2732,82 +2863,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       hireCandidate: (id) => {
         let created: Employee | null = null
         setState((s) => {
-          const c = s.candidates.find((x) => x.id === id)
-          const req = c && s.requisitions.find((r) => r.id === c.requisitionId)
-          if (!c || !req || c.employeeId) return s
-          const emp = preHireFrom(c, req, s.employees)
-          created = emp
-          const hiredCount = s.candidates.filter(
-            (x) =>
-              x.requisitionId === req.id && (x.stage === "hired" || x.id === id)
-          ).length
-          const due = (days: number) => addDays(emp.startDate, days)
-          const tasks: OnboardingTask[] = (
-            [
-              [
-                "Return signed employment contract",
-                "employee",
-                -3,
-                "paperwork",
-              ],
-              [
-                "Submit Ghana Card & SSNIT number",
-                "employee",
-                -2,
-                "compliance",
-              ],
-              ["Create work email & accounts", "it", -2, "access"],
-              ["Issue laptop and access badge", "it", -1, "access"],
-              ["Register on payroll", "hr", -1, "compliance"],
-              ["Day-one orientation", "hr", 0, "orientation"],
-            ] as const
-          ).map(([title, owner, offset, category]) => ({
-            id: uid("ot"),
-            employeeId: emp.id,
-            title,
-            owner,
-            dueOn: due(offset),
-            done: false,
-            category,
-          }))
-          return {
-            ...s,
-            employees: [emp, ...s.employees],
-            candidates: s.candidates.map((x) =>
-              x.id === id ? { ...x, stage: "hired", employeeId: emp.id } : x
-            ),
-            requisitions: s.requisitions.map((r) =>
-              r.id === req.id && hiredCount >= r.openings
-                ? { ...r, status: "filled" }
-                : r
-            ),
-            onboardingTasks: [...s.onboardingTasks, ...tasks],
-            lifecycleEvents: [
-              {
-                id: uid("le"),
-                employeeId: emp.id,
-                from: null,
-                to: "pre_hire",
-                reason: `Hired from ${req.id}`,
-                actorId,
-                at: nowIso(),
-                effectiveDate: emp.startDate,
-              },
-              ...s.lifecycleEvents,
-            ],
-            auditLog: [
-              {
-                id: uid("a"),
-                employeeId: emp.id,
-                actorId,
-                action: "Created pre-hire record from a recruitment hire",
-                field: c.id,
-                after: req.id,
-                at: nowIso(),
-              },
-              ...s.auditLog,
-            ],
-          }
+          const r = hireIn(s, id, actorId)
+          created = r.employee
+          return r.state
         })
         return created
       },
@@ -2932,6 +2990,546 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ...s,
           externalReturnFiles: s.externalReturnFiles.filter((f) => f.id !== id),
         }))
+      },
+
+      applyToJob: (requisitionId, input) => {
+        const s0 = stateRef.current
+        const req = s0.requisitions.find((r) => r.id === requisitionId)
+        if (!req || !isListed(req, TODAY_ISO))
+          return {
+            ok: false,
+            reason: "This role is no longer taking applications.",
+          }
+        const errors = validateApplication(input, req)
+        if (hasErrors(errors))
+          return { ok: false, reason: "Please fix the highlighted fields." }
+        if (alreadyApplied(s0.candidates, requisitionId, input.email))
+          return {
+            ok: false,
+            reason:
+              "You have already applied for this role. We will be in touch.",
+          }
+        const id = uid("c")
+        const tones = [
+          "bg-emerald-600",
+          "bg-blue-600",
+          "bg-amber-700",
+          "bg-violet-600",
+          "bg-rose-600",
+        ]
+        setState((s) => {
+          const company = s.company.tradingName || s.company.legalName
+          const first = input.name.trim().split(/\s+/)[0]
+          return {
+            ...s,
+            candidates: [
+              {
+                id,
+                requisitionId,
+                name: input.name.trim().replace(/\s+/g, " "),
+                email: input.email.trim(),
+                phone: input.phone.trim(),
+                stage: "applied" as const,
+                appliedOn: TODAY_ISO,
+                source: "Careers page",
+                rating: 3,
+                avatarTone: tones[s.candidates.length % tones.length],
+                notes: "",
+                rejectedReason: null,
+                interviews: [],
+                offer: null,
+                employeeId: null,
+                answers: input.answers,
+                cvName: input.cvName,
+              },
+              ...s.candidates,
+            ],
+            outbox: [
+              makeEmail({
+                kind: "other",
+                to: input.email.trim(),
+                toName: input.name.trim(),
+                subject: `${company}: we received your application for ${req.title}`,
+                body: `Hello ${first},\n\nThank you for applying for ${req.title}. We have your application and CV, and a member of the team will review it. If we would like to take it further we will email you a link to choose a time to talk.`,
+                sendAt: nowIso(),
+                relatedId: id,
+                status: "sent",
+              }),
+              ...s.outbox,
+            ],
+            notifications: [
+              {
+                id: uid("n"),
+                title: `New application: ${input.name.trim()}`,
+                body: `${req.title} · via the careers page`,
+                at: nowIso(),
+                read: false,
+                kind: "system" as const,
+                href: "/recruitment",
+              },
+              ...s.notifications,
+            ],
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: null,
+                actorId: "careers",
+                action: `Application received from ${input.name.trim()}`,
+                field: req.id,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+        return { ok: true, candidateId: id }
+      },
+
+      saveOfferTemplate: (t) => {
+        setState((s) => ({
+          ...s,
+          offerTemplates: s.offerTemplates.some((x) => x.id === t.id)
+            ? s.offerTemplates.map((x) => (x.id === t.id ? t : x))
+            : [t, ...s.offerTemplates],
+        }))
+      },
+
+      deleteOfferTemplate: (id) => {
+        setState((s) => ({
+          ...s,
+          offerTemplates: s.offerTemplates.filter((t) => t.id !== id),
+        }))
+      },
+
+      sendOfferForSignature: ({
+        candidateId,
+        templateId,
+        letter,
+        letterHash,
+      }) => {
+        const s0 = stateRef.current
+        const c = s0.candidates.find((x) => x.id === candidateId)
+        if (!c?.offer)
+          return {
+            ok: false,
+            reason: "Prepare the offer's salary and start date first.",
+          }
+        if (c.stage === "rejected" || c.stage === "hired")
+          return { ok: false, reason: "This application is closed." }
+        if (c.offer.status === "accepted")
+          return { ok: false, reason: "This offer has already been accepted." }
+        const token = newToken()
+        const origin =
+          typeof window === "undefined" ? "" : window.location.origin
+        const req = s0.requisitions.find((r) => r.id === c.requisitionId)
+        const offer = c.offer
+        setState((s) => {
+          const at = nowIso()
+          const company = s.company.tradingName || s.company.legalName
+          const sig: OfferSignature = {
+            id: uid("sig"),
+            token,
+            candidateId,
+            templateId,
+            letter,
+            letterHash,
+            salaryMonthly: offer.salaryMonthly,
+            startDate: offer.startDate,
+            status: "sent",
+            sentOn: at,
+            expiresOn: signExpiry(),
+            viewedOn: null,
+            signedOn: null,
+            signedName: null,
+            signatureImage: null,
+            declinedReason: null,
+            trail: [
+              { at, text: `Sent for signature by ${nameOf(s, actorId)}.` },
+            ],
+          }
+          // A newer letter replaces an older one that was never signed.
+          const outbox = s.outbox.map((e) =>
+            s.offerSignatures.some(
+              (o) =>
+                o.candidateId === candidateId &&
+                (o.status === "sent" || o.status === "viewed") &&
+                o.id === e.relatedId
+            ) && e.status === "scheduled"
+              ? { ...e, status: "cancelled" as const }
+              : e
+          )
+          return {
+            ...s,
+            offerSignatures: [
+              sig,
+              ...s.offerSignatures.map((o) =>
+                o.candidateId === candidateId &&
+                (o.status === "sent" || o.status === "viewed")
+                  ? {
+                      ...o,
+                      status: "withdrawn" as const,
+                      trail: [
+                        ...o.trail,
+                        { at, text: "Replaced by a newer letter." },
+                      ],
+                    }
+                  : o
+              ),
+            ],
+            candidates: s.candidates.map((x) =>
+              x.id === candidateId && x.offer
+                ? {
+                    ...x,
+                    offer: {
+                      ...x.offer,
+                      status: "sent" as const,
+                      sentOn: TODAY_ISO,
+                      decidedOn: null,
+                      signatureId: sig.id,
+                    },
+                  }
+                : x
+            ),
+            outbox: [
+              makeEmail({
+                kind: "other",
+                to: c.email,
+                toName: c.name,
+                subject: `${company}: your offer letter for ${req?.title ?? "the role"}`,
+                body: `Hello ${c.name.split(" ")[0]},\n\nWe are pleased to send you your offer of employment. Please read the letter and sign it online. The link is private to you and works until ${sig.expiresOn.slice(0, 10)}.`,
+                cta: {
+                  label: "Read and sign your offer",
+                  href: `${origin}/sign/${token}`,
+                },
+                sendAt: at,
+                relatedId: sig.id,
+                status: "sent",
+              }),
+              makeEmail({
+                kind: "other",
+                to: c.email,
+                toName: c.name,
+                subject: `Reminder: your offer from ${company} is waiting for your signature`,
+                body: `Hello ${c.name.split(" ")[0]},\n\nA reminder that your offer letter is still waiting for your signature, and lapses on ${sig.expiresOn.slice(0, 10)}.`,
+                cta: {
+                  label: "Read and sign your offer",
+                  href: `${origin}/sign/${token}`,
+                },
+                sendAt: `${addDays(TODAY_ISO, SIGN_DAYS - 2)}T09:00:00.000Z`,
+                relatedId: sig.id,
+                status: "scheduled",
+              }),
+              ...outbox,
+            ],
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: null,
+                actorId,
+                action: `Sent an offer letter to ${c.name} for signature`,
+                field: sig.id,
+                at,
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+        return { ok: true, token }
+      },
+
+      markOfferViewed: (token) => {
+        setState((s) => {
+          const sig = s.offerSignatures.find((o) => o.token === token)
+          if (!sig || sig.status !== "sent") return s
+          const at = nowIso()
+          return {
+            ...s,
+            offerSignatures: s.offerSignatures.map((o) =>
+              o.id === sig.id
+                ? {
+                    ...o,
+                    status: "viewed" as const,
+                    viewedOn: at,
+                    trail: [
+                      ...o.trail,
+                      { at, text: "Opened by the candidate." },
+                    ],
+                  }
+                : o
+            ),
+          }
+        })
+      },
+
+      signOffer: (token, { name, image, agreed }) => {
+        const sig0 = stateRef.current.offerSignatures.find(
+          (o) => o.token === token
+        )
+        const problem = signingState(sig0, TODAY)
+        if (problem)
+          return { ok: false, reason: "This letter can no longer be signed." }
+        const c0 = stateRef.current.candidates.find(
+          (x) => x.id === sig0!.candidateId
+        )
+        if (!c0)
+          return { ok: false, reason: "This application is no longer open." }
+        if (!agreed)
+          return {
+            ok: false,
+            reason: "Please tick the box to agree to sign electronically.",
+          }
+        if (!nameMatches(name, c0.name))
+          return {
+            ok: false,
+            reason: `Type your full name as it appears on the letter: ${c0.name}.`,
+          }
+        setState((s) => {
+          const sig = s.offerSignatures.find((o) => o.token === token)
+          if (!sig || signingState(sig, TODAY)) return s
+          const c = s.candidates.find((x) => x.id === sig.candidateId)
+          if (!c?.offer) return s
+          const at = nowIso()
+          const company = s.company.tradingName || s.company.legalName
+          const signed: State = {
+            ...s,
+            offerSignatures: s.offerSignatures.map((o) =>
+              o.id === sig.id
+                ? {
+                    ...o,
+                    status: "signed" as const,
+                    signedOn: at,
+                    signedName: name.trim().replace(/\s+/g, " "),
+                    signatureImage: image,
+                    trail: [
+                      ...o.trail,
+                      {
+                        at,
+                        text: `Signed electronically as “${name.trim()}”. Letter checksum ${o.letterHash.slice(0, 12)}…`,
+                      },
+                    ],
+                  }
+                : o
+            ),
+            candidates: s.candidates.map((x) =>
+              x.id === c.id && x.offer
+                ? {
+                    ...x,
+                    offer: {
+                      ...x.offer,
+                      status: "accepted" as const,
+                      decidedOn: TODAY_ISO,
+                    },
+                  }
+                : x
+            ),
+            outbox: [
+              makeEmail({
+                kind: "other",
+                to: c.email,
+                toName: c.name,
+                subject: `${company}: your signed offer`,
+                body: `Hello ${c.name.split(" ")[0]},\n\nThank you for signing. We are delighted you are joining. You can open or print your signed copy, with its signing record, from the link below. We will be in touch about your first day.`,
+                cta: {
+                  label: "Open your signed copy",
+                  href: `${typeof window === "undefined" ? "" : window.location.origin}/sign/${token}`,
+                },
+                sendAt: at,
+                relatedId: sig.id,
+                status: "sent",
+              }),
+              ...s.outbox.map((e) =>
+                e.relatedId === sig.id && e.status === "scheduled"
+                  ? { ...e, status: "cancelled" as const }
+                  : e
+              ),
+            ],
+            notifications: [
+              {
+                id: uid("n"),
+                title: `${c.name} signed their offer`,
+                body: "They have been hired: a pre-hire record and onboarding tasks were created.",
+                at,
+                read: false,
+                kind: "system" as const,
+                href: "/recruitment",
+              },
+              ...s.notifications,
+            ],
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: null,
+                actorId: "candidate",
+                action: `${c.name} signed their offer letter`,
+                field: sig.id,
+                at,
+              },
+              ...s.auditLog,
+            ],
+          }
+          // A signed offer is an accepted offer, and an accepted offer is a hire.
+          return hireIn(signed, c.id, actorId).state
+        })
+        return { ok: true }
+      },
+
+      declineOffer: (token, reason) => {
+        const sig0 = stateRef.current.offerSignatures.find(
+          (o) => o.token === token
+        )
+        if (signingState(sig0, TODAY) || !sig0)
+          return { ok: false, reason: "This letter can no longer be answered." }
+        if (reason.trim().length < 3)
+          return { ok: false, reason: "Please say briefly why." }
+        setState((s) => {
+          const sig = s.offerSignatures.find((o) => o.token === token)
+          if (!sig || signingState(sig, TODAY)) return s
+          const at = nowIso()
+          return {
+            ...s,
+            offerSignatures: s.offerSignatures.map((o) =>
+              o.id === sig.id
+                ? {
+                    ...o,
+                    status: "declined" as const,
+                    declinedReason: reason.trim(),
+                    trail: [
+                      ...o.trail,
+                      { at, text: "Declined by the candidate." },
+                    ],
+                  }
+                : o
+            ),
+            candidates: s.candidates.map((x) =>
+              x.id === sig.candidateId && x.offer
+                ? {
+                    ...x,
+                    stage: "rejected" as const,
+                    rejectedReason: "Offer declined",
+                    offer: {
+                      ...x.offer,
+                      status: "declined" as const,
+                      decidedOn: TODAY_ISO,
+                    },
+                  }
+                : x
+            ),
+            outbox: s.outbox.map((e) =>
+              e.relatedId === sig.id && e.status === "scheduled"
+                ? { ...e, status: "cancelled" as const }
+                : e
+            ),
+            notifications: [
+              {
+                id: uid("n"),
+                title: `${s.candidates.find((x) => x.id === sig.candidateId)?.name ?? "A candidate"} declined their offer`,
+                body: reason.trim(),
+                at,
+                read: false,
+                kind: "system" as const,
+                href: "/recruitment",
+              },
+              ...s.notifications,
+            ],
+          }
+        })
+        return { ok: true }
+      },
+
+      withdrawOffer: (id) => {
+        setState((s) => {
+          const sig = s.offerSignatures.find((o) => o.id === id)
+          if (!sig || (sig.status !== "sent" && sig.status !== "viewed"))
+            return s
+          const at = nowIso()
+          return {
+            ...s,
+            offerSignatures: s.offerSignatures.map((o) =>
+              o.id === id
+                ? {
+                    ...o,
+                    status: "withdrawn" as const,
+                    trail: [
+                      ...o.trail,
+                      { at, text: `Withdrawn by ${nameOf(s, actorId)}.` },
+                    ],
+                  }
+                : o
+            ),
+            candidates: s.candidates.map((x) =>
+              x.id === sig.candidateId && x.offer && x.offer.status === "sent"
+                ? {
+                    ...x,
+                    offer: {
+                      ...x.offer,
+                      status: "draft" as const,
+                      sentOn: null,
+                    },
+                  }
+                : x
+            ),
+            outbox: s.outbox.map((e) =>
+              e.relatedId === id && e.status === "scheduled"
+                ? { ...e, status: "cancelled" as const }
+                : e
+            ),
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: null,
+                actorId,
+                action: "Withdrew an offer letter",
+                field: id,
+                at,
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      resendOffer: (id) => {
+        setState((s) => {
+          const sig = s.offerSignatures.find((o) => o.id === id)
+          const c = sig && s.candidates.find((x) => x.id === sig.candidateId)
+          if (!sig || !c || (sig.status !== "sent" && sig.status !== "viewed"))
+            return s
+          const at = nowIso()
+          const origin =
+            typeof window === "undefined" ? "" : window.location.origin
+          return {
+            ...s,
+            offerSignatures: s.offerSignatures.map((o) =>
+              o.id === id
+                ? {
+                    ...o,
+                    expiresOn: signExpiry(),
+                    trail: [
+                      ...o.trail,
+                      { at, text: "Sent again. Deadline extended." },
+                    ],
+                  }
+                : o
+            ),
+            outbox: [
+              makeEmail({
+                kind: "other",
+                to: c.email,
+                toName: c.name,
+                subject: "Your offer letter is waiting for your signature",
+                body: `Hello ${c.name.split(" ")[0]},\n\nHere is your offer letter again. The link works until ${signExpiry().slice(0, 10)}.`,
+                cta: {
+                  label: "Read and sign your offer",
+                  href: `${origin}/sign/${sig.token}`,
+                },
+                sendAt: at,
+                relatedId: id,
+                status: "sent",
+              }),
+              ...s.outbox,
+            ],
+          }
+        })
       },
 
       queueEmail: (m) => {

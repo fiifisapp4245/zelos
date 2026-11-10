@@ -722,6 +722,28 @@ export const REQUISITIONS: Requisition[] = [
     openedOn: "2026-08-04",
     targetStartDate: "2026-11-02",
     budgetMonthly: 15000,
+    careers: {
+      published: true,
+      summary:
+        "Build and run the services behind our payments and payroll products. You will own APIs from design to production, work closely with product, and help us raise the bar on reliability.",
+      responsibilities: [
+        "Design, build and operate backend services and APIs",
+        "Own the quality of what you ship: tests, monitoring and on-call",
+        "Review code and mentor engineers earlier in their careers",
+        "Work with product and design to shape what we build next",
+      ],
+      requirements: [
+        "5+ years building production backend systems",
+        "Strong in one of TypeScript, Python, Java or Go, and SQL",
+        "Comfortable with cloud infrastructure and CI/CD",
+        "Clear written and spoken communication",
+      ],
+      questions: [
+        "Describe a system you built that you are proud of, and your part in it",
+        "When could you start, and what notice do you need to give?",
+      ],
+      closesOn: "2026-10-30",
+    },
   },
   {
     id: "REQ-015",
@@ -735,6 +757,23 @@ export const REQUISITIONS: Requisition[] = [
     openedOn: "2026-08-19",
     targetStartDate: "2026-10-19",
     budgetMonthly: 12000,
+    careers: {
+      published: true,
+      summary:
+        "Lead how we tell the product story: positioning, launches and campaigns across Ghana and the region.",
+      responsibilities: [
+        "Own positioning and messaging for each product",
+        "Plan and run launches with product and sales",
+        "Turn customer insight into campaigns that work",
+      ],
+      requirements: [
+        "4+ years in product or B2B marketing",
+        "A record of launches you can talk through",
+        "Excellent writing",
+      ],
+      questions: ["Share a launch or campaign you led and what it achieved"],
+      closesOn: null,
+    },
   },
   {
     id: "REQ-016",
@@ -748,6 +787,14 @@ export const REQUISITIONS: Requisition[] = [
     openedOn: "2026-07-11",
     targetStartDate: "2026-10-01",
     budgetMonthly: 3200,
+    careers: {
+      published: false,
+      summary: "Support our Kumasi warehouse operations day to day.",
+      responsibilities: ["Receive, store and dispatch stock", "Keep stock records accurate"],
+      requirements: ["Warehouse or logistics experience", "Able to lift and work shifts"],
+      questions: [],
+      closesOn: null,
+    },
   },
   {
     id: "REQ-013",
