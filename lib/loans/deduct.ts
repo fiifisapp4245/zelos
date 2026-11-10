@@ -41,11 +41,7 @@ export function floorFor(floor: NetPayFloor, gross: number): number {
 }
 
 /** What the schedule asks of one loan in one period. */
-export function dueIn(
-  loan: Loan,
-  scheme: LoanScheme,
-  period: string
-): number {
+export function dueIn(loan: Loan, scheme: LoanScheme, period: string): number {
   if (loan.status === "paused") return 0
   if (loan.status === "settled" || loan.status === "written_off") return 0
   if (loan.status !== "disbursed" && loan.status !== "repaying") return 0
@@ -117,7 +113,9 @@ export function applyWithFloor(
     const schemeCeiling = round(
       (netBeforeLoans * request.scheme.maxDeductionPercentOfNet) / 100
     )
-    const taken = round(Math.max(0, Math.min(scheduled, schemeCeiling, available)))
+    const taken = round(
+      Math.max(0, Math.min(scheduled, schemeCeiling, available))
+    )
     const shortfall = round(scheduled - taken)
 
     if (shortfall > 0) reduced = true
@@ -138,10 +136,7 @@ export function applyWithFloor(
 }
 
 /** What is still owed on a loan, from what has been taken so far. */
-export function outstandingOf(
-  loan: Loan,
-  takenSoFar: number
-): number {
+export function outstandingOf(loan: Loan, takenSoFar: number): number {
   return round(Math.max(0, loan.totalRepayable - takenSoFar))
 }
 

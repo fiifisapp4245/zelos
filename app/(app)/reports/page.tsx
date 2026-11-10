@@ -4,6 +4,7 @@ import * as React from "react"
 import {
   CalendarClock,
   ChartColumn,
+  Mail,
   Download,
   FileBarChart,
   Trash2,
@@ -22,14 +23,14 @@ import {
 } from "@/components/reports/workforce-sections"
 import {
   ReportViewer,
+  SaveDialog,
   csvName,
   downloadText,
 } from "@/components/reports/report-viewer"
 import { useStore } from "@/lib/store"
-import { has } from "@/lib/rbac"
-import { visibleEmployees } from "@/lib/selectors"
 import { TODAY_ISO, formatDate } from "@/lib/format"
-import { addDays } from "@/lib/time"
+import { nextDue } from "@/lib/report-schedule"
+import { buildReportData } from "@/lib/report-data"
 import {
   REPORTS,
   REPORT_GROUPS,
@@ -48,13 +49,6 @@ const SCHEDULE_LABEL: Record<SavedReport["schedule"], string> = {
   monthly: "Monthly",
 }
 
-/** When a repeating report is next due, counting from the last time it was run. */
-function nextDue(r: SavedReport) {
-  if (r.schedule === "none") return null
-  const from = r.lastRunOn ?? r.createdOn
-  return addDays(from, r.schedule === "weekly" ? 7 : 30)
-}
-
 export default function ReportsPage() {
   const store = useStore()
   const { viewer } = store
@@ -63,31 +57,14 @@ export default function ReportsPage() {
   const [tab, setTab] = React.useState("library")
   const [selected, setSelected] = React.useState(available[0]?.id ?? "")
   const [options, setOptions] = React.useState<Record<string, string>>({})
+  const [editing, setEditing] = React.useState<SavedReport | null>(null)
 
   // Reports only ever see what the viewer can open, so a manager's headcount
   // is their team's and not the company's.
-  const data = React.useMemo<ReportData>(() => {
-    const people = visibleEmployees(viewer, store.employees)
-    const ids = new Set(people.map((e) => e.id))
-    const mine = has(viewer, "hr_admin")
-      ? store.requisitions
-      : store.requisitions.filter(
-          (r) => r.hiringManagerId === viewer.employeeId
-        )
-    const reqIds = new Set(mine.map((r) => r.id))
-    return {
-      employees: people,
-      requisitions: mine,
-      candidates: store.candidates.filter((c) => reqIds.has(c.requisitionId)),
-      reviews: store.reviews.filter((r) => ids.has(r.employeeId)),
-      cases: store.cases.filter((c) => ids.has(c.employeeId)),
-      offboarding: store.offboarding.filter((c) => ids.has(c.employeeId)),
-      leaveRequests: store.leaveRequests.filter((r) => ids.has(r.employeeId)),
-      leaveBalances: store.leaveBalances.filter((b) => ids.has(b.employeeId)),
-      documents: store.documents.filter((d) => ids.has(d.employeeId)),
-      attendance: store.attendance.filter((a) => ids.has(a.employeeId)),
-    }
-  }, [viewer, store])
+  const data = React.useMemo<ReportData>(
+    () => buildReportData(viewer, store),
+    [viewer, store]
+  )
 
   const def = available.find((r) => r.id === selected) ?? available[0]
   const saved = store.savedReports.filter((r) =>
@@ -241,6 +218,10 @@ export default function ReportsPage() {
                             ? ` · last run ${formatDate(r.lastRunOn)}`
                             : " · never run"}
                           {due && ` · next ${formatDate(due)}`}
+                          {r.recipients.length > 0 &&
+                            ` · emails ${r.recipients.join(", ")}`}
+                          {r.recipients.length > 0 &&
+                            ` · emails ${r.recipients.join(", ")}`}
                         </p>
                       </div>
                       <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -267,6 +248,34 @@ export default function ReportsPage() {
                           ))}
                         </NativeSelect>
                       </label>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={r.recipients.length === 0}
+                        title={
+                          r.recipients.length === 0
+                            ? "Add who to email it to first"
+                            : undefined
+                        }
+                        onClick={() => {
+                          const n = store.sendReportNow(r.id)
+                          if (n > 0)
+                            toast.success(
+                              `Emailed to ${n} recipient${n === 1 ? "" : "s"}. It is in the Outbox.`
+                            )
+                          else toast.error("You can no longer run this report.")
+                        }}
+                      >
+                        <Mail className="size-3.5" />
+                        Email now
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditing(r)}
+                      >
+                        Edit
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
@@ -301,6 +310,14 @@ export default function ReportsPage() {
           </div>
         </TabsContent>
       </Tabs>
+      {editing && (
+        <SaveDialog
+          def={REPORTS.find((x) => x.id === editing.reportId)!}
+          options={editing.options}
+          existing={editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </PageShell>
   )
 }

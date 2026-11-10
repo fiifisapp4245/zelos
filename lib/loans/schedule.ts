@@ -1,9 +1,4 @@
-import type {
-  Installment,
-  InterestMethod,
-  Loan,
-  LoanScheme,
-} from "./types"
+import type { Installment, InterestMethod, Loan, LoanScheme } from "./types"
 
 /**
  * Repayment schedules.
@@ -66,9 +61,7 @@ export function annuityPayment(
 ): number {
   if (months <= 0) return 0
   if (monthlyRate === 0) return principal / months
-  return (
-    (principal * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months))
-  )
+  return (principal * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months))
 }
 
 /**
@@ -193,7 +186,10 @@ export function eligibilityProblems(
   const ceiling = ceilingFor(scheme, monthlyBasic)
 
   if (request.amount <= 0)
-    problems.push({ field: "amount", message: "The amount must be above zero." })
+    problems.push({
+      field: "amount",
+      message: "The amount must be above zero.",
+    })
   else if (ceiling !== null && request.amount > ceiling)
     problems.push({
       field: "amount",
@@ -201,7 +197,10 @@ export function eligibilityProblems(
     })
 
   if (request.months <= 0)
-    problems.push({ field: "term", message: "The term must be at least one period." })
+    problems.push({
+      field: "term",
+      message: "The term must be at least one period.",
+    })
   else if (request.months > scheme.maxTermMonths)
     problems.push({
       field: "term",

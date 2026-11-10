@@ -88,9 +88,9 @@ describe("joining on the 15th of a 31-day month", () => {
   })
 
   it("gives three different answers on the same facts", () => {
-    const amounts = (["calendar_days", "working_days", "thirtieths"] as const).map(
-      (m) => prorate(10_000, prorationFor(m, october, joiner, calendar))
-    )
+    const amounts = (
+      ["calendar_days", "working_days", "thirtieths"] as const
+    ).map((m) => prorate(10_000, prorationFor(m, october, joiner, calendar)))
     expect(new Set(amounts).size).toBe(3)
   })
 })
@@ -159,9 +159,9 @@ describe("leaving mid-period", () => {
   })
 
   it("marks the period as partial", () => {
-    expect(isPartial(prorationFor("calendar_days", october, leaver, calendar))).toBe(
-      true
-    )
+    expect(
+      isPartial(prorationFor("calendar_days", october, leaver, calendar))
+    ).toBe(true)
   })
 })
 

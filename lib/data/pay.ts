@@ -51,6 +51,10 @@ const VERIFY_SSNIT = "current SSNIT guidance"
 const VERIFY_GRA = "GRA's published figures for 2026"
 const VERIFY_CAP = "GRA guidance; it may be company policy, not law"
 const GHANA_RULES: CountryRulePack = {
+  leave: {
+    annualMinimumDays: 15,
+    source: "Labour Act, 2003 (Act 651), section 20",
+  },
   country: "Ghana",
   version: "2026.1",
   effectiveFrom: "2026-01-01",
@@ -231,6 +235,10 @@ const GHANA_RULES: CountryRulePack = {
  * contribution rates did not.
  */
 const GHANA_RULES_2025: CountryRulePack = {
+  leave: {
+    annualMinimumDays: 15,
+    source: "Labour Act, 2003 (Act 651), section 20",
+  },
   ...GHANA_RULES,
   version: "2025.1",
   effectiveFrom: "2025-01-01",
@@ -272,6 +280,10 @@ const GHANA_RULES_2025: CountryRulePack = {
  * They exist so the update, its review and its impact can be seen working.
  */
 const GHANA_RULES_2027: CountryRulePack = {
+  leave: {
+    annualMinimumDays: 15,
+    source: "Labour Act, 2003 (Act 651), section 20",
+  },
   ...GHANA_RULES,
   version: "2027.1",
   effectiveFrom: "2027-01-01",

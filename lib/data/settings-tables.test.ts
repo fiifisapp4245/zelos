@@ -120,9 +120,9 @@ describe("the rule pack carries what the tables used to show", () => {
     expect(tier3).toBeDefined()
     // It must not sit among the mandatory rules, or everyone would be
     // deducted for a scheme they never joined.
-    expect(
-      ghana.employeeContributionRules.some((r) => r.id === "tier3")
-    ).toBe(false)
+    expect(ghana.employeeContributionRules.some((r) => r.id === "tier3")).toBe(
+      false
+    )
   })
 
   it("carries the same seven PAYE bands the table listed", () => {

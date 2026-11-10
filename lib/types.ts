@@ -436,9 +436,13 @@ export type OffboardingReason =
 /** One item of company property, tracked individually so exit is auditable. */
 export interface AssetReturn {
   item: string
+  /** The register entry this item is, so returning it here returns it there. */
+  assetId?: string
   /** Asset tag or serial, where the item carries one. */
   tag?: string
   returned: boolean
+  /** Written off rather than handed back. It clears the checklist, and the register says lost. */
+  lost?: boolean
 }
 
 export interface OffboardingCase {
@@ -645,6 +649,10 @@ export interface SavedReport {
   createdOn: string
   schedule: "none" | "weekly" | "monthly"
   lastRunOn: string | null
+  /** Who the file is emailed to when it is due. */
+  recipients: string[]
+  /** The roles of whoever saved it, so it runs with the same access they had. */
+  createdRoles: PermissionRole[]
 }
 
 /** How far ahead each kind of alert starts appearing, and when HR last chased managers. */
@@ -692,6 +700,8 @@ export interface EmailMessage {
   /** The one button in the message, when it has one. */
   cta?: { label: string; href: string }
   createdAt: string
+  /** A file that travels with the message, e.g. a report's CSV. */
+  attachment?: { name: string; type: string; content: string }
   /** When it goes out. Later than now means it is still waiting. */
   sendAt: string
   status: "sent" | "scheduled" | "cancelled"
@@ -878,4 +888,151 @@ export interface OfferSignature {
   declinedReason: string | null
   /** Every step, in order, with a time. This is the audit trail. */
   trail: { at: string; text: string }[]
+}
+
+/* ── Pre-hire portal ─────────────────────────────────────────────────────── */
+
+export type PortalSection =
+  "personal" | "identity" | "statutory" | "pay" | "emergency"
+
+export interface PortalUpload {
+  id: string
+  name: string
+  sizeKb: number
+}
+
+/** What a new hire has filled in so far. Everything is text until HR accepts it. */
+export interface PortalData {
+  dateOfBirth: string
+  gender: "" | "male" | "female" | "other"
+  nationality: string
+  phone: string
+  personalEmail: string
+  residentialAddress: string
+  gpsAddress: string
+  ghanaCard: string
+  idDocuments: PortalUpload[]
+  ssnitNumber: string
+  tin: string
+  tier2Provider: string
+  tier3Provider: string
+  paymentMethod: "" | "mobile_money" | "bank"
+  momoProvider: string
+  momoNumber: string
+  bankName: string
+  bankAccount: string
+  accountName: string
+  emergencyName: string
+  emergencyRelationship: string
+  emergencyPhone: string
+  emergencyEmail: string
+}
+
+export interface PortalReview {
+  status: "ok" | "changes"
+  note: string
+}
+
+export interface PreHirePortal {
+  id: string
+  /** The private link's key. */
+  token: string
+  employeeId: string
+  status:
+    "invited" | "in_progress" | "submitted" | "changes_requested" | "approved"
+  invitedOn: string
+  expiresOn: string
+  data: PortalData
+  submittedOn: string | null
+  review: Partial<Record<PortalSection, PortalReview>>
+  reviewedBy: string | null
+  history: { at: string; text: string }[]
+}
+
+/* ── Announcements ───────────────────────────────────────────────────────── */
+
+export interface Audience {
+  kind: "all" | "department" | "branch"
+  /** The department or branch name, when it is not everyone. */
+  value: string
+}
+
+export interface Announcement {
+  id: string
+  title: string
+  body: string
+  audience: Audience
+  postedBy: string
+  postedOn: string
+  pinned: boolean
+  /** A policy: each person has to say they have read and understood it. */
+  requiresAck: boolean
+  archived: boolean
+}
+
+export interface AnnouncementRead {
+  announcementId: string
+  employeeId: string
+  readOn: string
+  acknowledgedOn: string | null
+}
+
+/* ── Company assets ──────────────────────────────────────────────────────── */
+
+export type AssetKind =
+  "laptop" | "phone" | "sim" | "card" | "vehicle" | "other"
+export type AssetStatus =
+  "in_stock" | "assigned" | "repair" | "retired" | "lost"
+
+export interface Asset {
+  id: string
+  /** The label stuck on it. Unique. */
+  tag: string
+  kind: AssetKind
+  name: string
+  serial: string
+  status: AssetStatus
+  assignedTo: string | null
+  assignedOn: string | null
+  history: { at: string; text: string }[]
+}
+
+/* ── Pulse surveys ───────────────────────────────────────────────────────── */
+
+export interface PulseQuestion {
+  id: string
+  /** enps is 0-10 "would you recommend"; scale is 1-5; text is free words. */
+  kind: "enps" | "scale" | "text"
+  prompt: string
+}
+
+export interface Survey {
+  id: string
+  title: string
+  intro: string
+  questions: PulseQuestion[]
+  audience: Audience
+  status: "draft" | "open" | "closed"
+  createdBy: string
+  createdOn: string
+  closesOn: string | null
+}
+
+/**
+ * An answer, with no name on it. Only the team it came from is kept, so
+ * results can be split by department, and only shown for a group big enough
+ * that no one can be picked out of it.
+ */
+export interface SurveyResponse {
+  id: string
+  surveyId: string
+  department: string
+  answers: Record<string, number | string>
+  on: string
+}
+
+/** That someone took part, kept apart from what they said. */
+export interface SurveyParticipation {
+  surveyId: string
+  employeeId: string
 }

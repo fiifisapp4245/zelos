@@ -188,6 +188,13 @@ export interface FilingDeadline {
   annualOn?: string
 }
 
+/** What the law of a country guarantees an employee, in working days. */
+export interface LeaveRules {
+  annualMinimumDays: number
+  /** Where the figure comes from, for the screen that shows it. */
+  source: string
+}
+
 export interface CountryRulePack {
   country: string
   version: string
@@ -214,6 +221,8 @@ export interface CountryRulePack {
   taxBandsToVerify?: string
   statutoryReports: string[]
   filingDeadlines: FilingDeadline[]
+  /** The country's statutory leave floor, read by the leave settings and balances. */
+  leave?: LeaveRules
   updates: RulePackUpdate[]
 }
 

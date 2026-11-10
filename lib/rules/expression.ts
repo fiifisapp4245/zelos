@@ -21,16 +21,7 @@ export type Expr =
   | { kind: "if"; test: Expr; then: Expr; otherwise: Expr }
 
 export type BinaryOp =
-  | "+"
-  | "-"
-  | "*"
-  | "/"
-  | "<"
-  | "<="
-  | ">"
-  | ">="
-  | "=="
-  | "!="
+  "+" | "-" | "*" | "/" | "<" | "<=" | ">" | ">=" | "==" | "!="
 
 export type FunctionName = "min" | "max" | "round" | "floor" | "ceil" | "abs"
 
@@ -159,10 +150,7 @@ export function parse(source: string): Expr {
     if (token.type === "paren" && token.value === "(") {
       next()
       const inner = parseComparison()
-      expect(
-        (t) => t?.type === "paren" && t.value === ")",
-        "a closing bracket"
-      )
+      expect((t) => t?.type === "paren" && t.value === ")", "a closing bracket")
       return inner
     }
 
@@ -171,7 +159,10 @@ export function parse(source: string): Expr {
       const name = token.value
 
       // A function call, or a bare variable.
-      if (peek()?.type === "paren" && (peek() as { value: string }).value === "(") {
+      if (
+        peek()?.type === "paren" &&
+        (peek() as { value: string }).value === "("
+      ) {
         next()
         const args: Expr[] = []
         if (!(peek()?.type === "paren")) {
@@ -191,7 +182,12 @@ export function parse(source: string): Expr {
             throw new RuleSyntaxError(
               "if takes three parts: a test, the value when it is true, and the value when it is not."
             )
-          return { kind: "if", test: args[0], then: args[1], otherwise: args[2] }
+          return {
+            kind: "if",
+            test: args[0],
+            then: args[1],
+            otherwise: args[2],
+          }
         }
 
         const fn = FUNCTIONS[name as FunctionName]

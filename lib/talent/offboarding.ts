@@ -117,15 +117,17 @@ export interface ExitStep {
 
 /** Every thing that has to be true before a person can leave the record. */
 export function exitSteps(c: OffboardingCase): ExitStep[] {
-  const out = c.clearance.assets.filter((a) => !a.returned).length
+  const out = c.clearance.assets.filter((a) => !a.returned && !a.lost).length
   return [
     {
       key: "assets",
       label: "Company assets returned",
       detail:
-        out === 0
-          ? `All ${c.clearance.assets.length} items back`
-          : `${out} of ${c.clearance.assets.length} still out`,
+        c.clearance.assets.length === 0
+          ? "Nothing was issued"
+          : out === 0
+            ? `All ${c.clearance.assets.length} accounted for`
+            : `${out} of ${c.clearance.assets.length} still out`,
       done: out === 0,
       owner: "hr",
     },

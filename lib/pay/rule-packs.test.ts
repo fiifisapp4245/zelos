@@ -283,7 +283,7 @@ describe("switching country on Pay components", () => {
     paymentChannels: [],
     varianceThresholdPercent: 10,
     prorationMethod: "thirtieths",
-      calculationMode: "native",
+    calculationMode: "native",
   })
 
   it("offers each country somebody is paid in, once, and no contractors", () => {

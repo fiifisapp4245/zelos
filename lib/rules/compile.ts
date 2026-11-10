@@ -44,9 +44,17 @@ export function compile(params: RuleParams): Expr {
       // the minimum even where the cap would have cut it lower, which
       // is what "between X and Y" means to the person who wrote it.
       if (params.max !== null)
-        expression = { kind: "call", fn: "min", args: [expression, num(params.max)] }
+        expression = {
+          kind: "call",
+          fn: "min",
+          args: [expression, num(params.max)],
+        }
       if (params.min !== null)
-        expression = { kind: "call", fn: "max", args: [expression, num(params.min)] }
+        expression = {
+          kind: "call",
+          fn: "max",
+          args: [expression, num(params.min)],
+        }
       return expression
     }
 

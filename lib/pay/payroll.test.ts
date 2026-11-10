@@ -666,8 +666,14 @@ describe("Ghana tax treatment of capped allowances and pre-tax deductions", () =
     },
   ]
   const paye = (v: CompensationVersion) =>
-    calculateLine(v, ghana, [], [], PERIOD, context({ components }))
-      .deductions.find((d) => d.componentId === "pc-paye")!.amount
+    calculateLine(
+      v,
+      ghana,
+      [],
+      [],
+      PERIOD,
+      context({ components })
+    ).deductions.find((d) => d.componentId === "pc-paye")!.amount
   const at = (taxable: number) => taxOn(taxable, ghana)
   const employee = (base: number) => round2((base * 5.5) / 100)
 

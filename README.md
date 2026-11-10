@@ -225,3 +225,33 @@ files keep only their name, and calendar sync is not built.
 
 This is an electronic signature in the sense of a typed name with an audit trail, suitable for a
 prototype. A production build should add identity checks, a trusted timestamp and PDF output.
+
+## Pre-hire portal
+
+Hiring someone (by *Hire*, or by a signed offer) also invites them to fill in their own details at
+`/welcome/<token>`, a private link emailed to their personal address, with reminders a week and two
+days before their first day. They work through five short sections (about you, identity with a photo
+of their Ghana Card, tax and pension, how they are paid, emergency contact) with the same format
+checks HR's own form uses, and it saves as they go, so they can stop and come back. Nothing touches
+their record until HR accepts it: Onboarding → *Review details* shows each section, and HR accepts it
+or sends it back with a note (the new hire is emailed and only has to fix what was flagged). Accepting
+writes the personal, statutory and payment fields, keeps salary and grade, turns the uploads into
+identity documents waiting to be verified, and completes the matching onboarding task.
+
+## Smaller additions
+
+- **Scheduled report emails** — a saved report that repeats weekly or monthly is emailed as a CSV to the
+  addresses on it when it comes due (checked whenever the app opens), and *Email now* sends one on demand.
+  Each report runs with the access of the person who saved it, so a manager's file never holds the company.
+  Messages, with the file attached, are in the Outbox.
+- **Leave rules from the country** — Ghana's 15-day annual minimum lives in its rule pack, not in a form.
+  Settings → Leave policies refuses annual leave below it (and says where the floor comes from), balances
+  never show less, and the leave type marked *Sick* sets everyone's sick entitlement.
+- **Announcements** — news for everyone, a department or an office, with read tracking. A policy asks each
+  person to confirm they have read and understood it; HR sees who has not and can remind them.
+- **Company assets** — a register of laptops, phones, SIMs and cards, with assign, take back, repair, lost
+  and retire, each leaving a history line. Starting an exit builds the leaver's checklist from what the
+  register says they hold, and ticking an item off (or marking it lost) updates the register too.
+- **Pulse surveys** — short anonymous surveys (eNPS, 1–5 agreement, free text). An answer carries no name,
+  only the team; who took part is kept apart and the answers are stored in a shuffled order. Results are
+  shown only once five people have answered, and a team only once it has five.

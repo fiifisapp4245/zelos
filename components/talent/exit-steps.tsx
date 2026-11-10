@@ -4,6 +4,7 @@ import * as React from "react"
 import { Lock } from "lucide-react"
 import { toast } from "sonner"
 
+import { Pill } from "@/components/common"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -45,20 +46,28 @@ export function AssetsStep({ c, onSaved }: StepProps) {
   const canAct = useCanAct()
   const [item, setItem] = React.useState("")
   const [tag, setTag] = React.useState("")
-  const out = c.clearance.assets.filter((a) => !a.returned).length
+  const out = c.clearance.assets.filter((a) => !a.returned && !a.lost).length
 
-  function set(index: number, returned: boolean) {
+  function setAsset(index: number, state: "returned" | "outstanding" | "lost") {
+    const a = c.clearance.assets[index]
+    if (a.assetId) {
+      // On the register: returning it here takes it back there, in the same step.
+      store.setExitAssetReturned(c.id, index, state)
+      return
+    }
     store.updateOffboarding(
       c.id,
       {
         clearance: {
           ...c.clearance,
-          assets: c.clearance.assets.map((a, i) =>
-            i === index ? { ...a, returned } : a
+          assets: c.clearance.assets.map((x, i) =>
+            i === index
+              ? { ...x, returned: state === "returned", lost: state === "lost" }
+              : x
           ),
         },
       },
-      `Marked ${c.clearance.assets[index].item} ${returned ? "returned" : "outstanding"}`
+      `Marked ${a.item} ${state}`
     )
   }
 
@@ -87,34 +96,66 @@ export function AssetsStep({ c, onSaved }: StepProps) {
 
   return (
     <div className="space-y-5">
-      <ul className="divide-y rounded-lg border">
-        {c.clearance.assets.map((a, i) => (
-          <li key={`${a.item}-${i}`}>
-            <label className="flex cursor-pointer items-center gap-3 px-4 py-3 text-sm">
-              <input
-                type="checkbox"
-                checked={a.returned}
-                disabled={!canAct}
-                onChange={(e) => set(i, e.target.checked)}
-                className="size-4 accent-[var(--primary)]"
-              />
-              <span
-                className={cn(
-                  "flex-1",
-                  a.returned && "text-muted-foreground line-through"
-                )}
-              >
-                {a.item}
-              </span>
-              {a.tag && (
-                <span className="font-mono text-xs text-muted-foreground">
-                  {a.tag}
+      {c.clearance.assets.length === 0 ? (
+        <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
+          Nothing is registered to them. If they hold something that is not on
+          the register, add it below.
+        </p>
+      ) : (
+        <ul className="divide-y rounded-lg border">
+          {c.clearance.assets.map((a, i) => (
+            <li
+              key={`${a.item}-${i}`}
+              className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm"
+            >
+              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={a.returned}
+                  disabled={!canAct || !!a.lost}
+                  onChange={(e) =>
+                    setAsset(i, e.target.checked ? "returned" : "outstanding")
+                  }
+                  className="size-4 accent-[var(--primary)]"
+                />
+                <span
+                  className={cn(
+                    "min-w-0 flex-1",
+                    (a.returned || a.lost) &&
+                      "text-muted-foreground line-through"
+                  )}
+                >
+                  {a.item}
                 </span>
+                {a.tag && (
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {a.tag}
+                  </span>
+                )}
+              </label>
+              {a.lost && <Pill tone="danger">Lost</Pill>}
+              {canAct && a.lost && (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => setAsset(i, "outstanding")}
+                >
+                  Found
+                </Button>
               )}
-            </label>
-          </li>
-        ))}
-      </ul>
+              {canAct && !a.returned && !a.lost && (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => setAsset(i, "lost")}
+                >
+                  Mark lost
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
       {canAct && (
         <form
           className="grid gap-3 sm:grid-cols-[1fr_180px_auto]"
@@ -126,7 +167,7 @@ export function AssetsStep({ c, onSaved }: StepProps) {
           <Input
             value={item}
             onChange={(e) => setItem(e.target.value)}
-            placeholder="Add an item, e.g. Company credit card"
+            placeholder="Add an item not on the register"
             aria-label="Item"
           />
           <Input
@@ -142,7 +183,7 @@ export function AssetsStep({ c, onSaved }: StepProps) {
       )}
       <div className="flex items-center justify-between border-t pt-4">
         <p className="text-sm text-muted-foreground">
-          {out === 0 ? "Everything is back." : `${out} still out.`}
+          {out === 0 ? "Everything is accounted for." : `${out} still out.`}
         </p>
         <Button onClick={onSaved} variant={out === 0 ? "default" : "outline"}>
           {out === 0 ? "Continue" : "Skip for now"}

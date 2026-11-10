@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import {
-  RuleSyntaxError,
-  evaluate,
-  parse,
-  variablesUsed,
-} from "./expression"
+import { RuleSyntaxError, evaluate, parse, variablesUsed } from "./expression"
 import type { RuleContext } from "./types"
 
 const context: RuleContext = {
@@ -115,7 +110,9 @@ describe("refusing what a rule may not say", () => {
   })
 
   it("rejects a variable nobody defined", () => {
-    expect(() => parse("bonus_pot * 2")).toThrow(/no variable called bonus_pot/i)
+    expect(() => parse("bonus_pot * 2")).toThrow(
+      /no variable called bonus_pot/i
+    )
   })
 
   it("names the allowed variables when it rejects one", () => {
