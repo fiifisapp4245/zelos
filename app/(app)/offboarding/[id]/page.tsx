@@ -76,7 +76,10 @@ export default function OffboardingCasePage() {
     null
   )
   const [closing, setClosing] = React.useState(false)
-  const current = selected ?? firstOpen
+  // Opens on the first unfinished step and stays there: finishing the last item
+  // of a step should not whisk you away before you have looked at the result.
+  const [landed] = React.useState<ExitStepKey | "close">(() => firstOpen)
+  const current = selected ?? landed
 
   if (!c || !emp)
     return (

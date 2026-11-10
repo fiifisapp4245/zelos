@@ -11,7 +11,8 @@ import {
 } from "./schedule"
 import type { LoanScheme } from "./types"
 
-const sum = (ns: number[]) => Math.round(ns.reduce((a, b) => a + b, 0) * 100) / 100
+const sum = (ns: number[]) =>
+  Math.round(ns.reduce((a, b) => a + b, 0) * 100) / 100
 
 describe("counting months", () => {
   it("moves within a year", () => {

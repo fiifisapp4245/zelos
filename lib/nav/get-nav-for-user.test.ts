@@ -67,7 +67,7 @@ describe("getNavForUser — HR Admin", () => {
 
   it("matches the end-state HR Admin sidebar", () => {
     expect(nav).toEqual([
-      ["primary", ["Home", "Approvals"]],
+      ["primary", ["Home", "Announcements", "Surveys", "Approvals"]],
       [
         "people",
         [
@@ -76,6 +76,7 @@ describe("getNavForUser — HR Admin", () => {
           "Lifecycle events",
           "Onboarding",
           "Offboarding",
+          "Assets",
         ],
       ],
       ["time", ["Attendance", "Timesheets", "Schedules", "Leave"]],
@@ -103,7 +104,7 @@ describe("getNavForUser — Line Manager / HoD", () => {
 
   it("matches the end-state manager sidebar", () => {
     expect(nav).toEqual([
-      ["primary", ["Home", "Approvals"]],
+      ["primary", ["Home", "Announcements", "Surveys", "Approvals"]],
       [
         "team",
         [
@@ -150,7 +151,7 @@ describe("getNavForUser — Employee", () => {
 
   it("matches the end-state employee sidebar", () => {
     expect(nav).toEqual([
-      ["primary", ["Home"]],
+      ["primary", ["Home", "Announcements", "Surveys"]],
       [
         "me",
         [

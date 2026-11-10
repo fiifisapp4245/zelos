@@ -19,6 +19,7 @@ import {
   type ReportData,
   type ReportDef,
 } from "@/lib/reports"
+import { parseRecipients } from "@/lib/report-schedule"
 import type { SavedReport } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -229,33 +230,50 @@ export function ReportViewer({
   )
 }
 
-function SaveDialog({
+/** Saves a report, or edits how a saved one is delivered. */
+export function SaveDialog({
   def,
   options,
+  existing,
   onClose,
 }: {
   def: ReportDef
   options: Record<string, string>
+  existing?: SavedReport
   onClose: () => void
 }) {
   const store = useStore()
-  const [name, setName] = React.useState(def.title)
-  const [schedule, setSchedule] =
-    React.useState<SavedReport["schedule"]>("none")
+  const me = store.employeeById(store.viewer.employeeId)
+  const [name, setName] = React.useState(existing?.name ?? def.title)
+  const [schedule, setSchedule] = React.useState<SavedReport["schedule"]>(
+    existing?.schedule ?? "none"
+  )
+  const [to, setTo] = React.useState(
+    (existing?.recipients ?? (me ? [me.email] : [])).join(", ")
+  )
   const [touched, setTouched] = React.useState(false)
+  const { ok: recipients, bad } = parseRecipients(to)
   const dup = store.savedReports.some(
-    (r) => r.name.trim().toLowerCase() === name.trim().toLowerCase()
+    (r) =>
+      r.id !== existing?.id &&
+      r.name.trim().toLowerCase() === name.trim().toLowerCase()
   )
   const error = !name.trim()
     ? "Give the report a name."
     : dup
       ? "You already have a saved report with that name."
       : null
+  const toError =
+    bad.length > 0
+      ? `${bad[0]} is not an email address.`
+      : schedule !== "none" && recipients.length === 0
+        ? "Add who it should be emailed to."
+        : null
 
   return (
     <FormDialog
-      title="Save this report"
-      description="Keeps the report with the choices you made, so it opens the same way next time."
+      title={existing ? "Edit saved report" : "Save this report"}
+      description="Keeps the report with the choices you made. A repeating report is emailed as a CSV when it comes due."
       onClose={onClose}
       footer={
         <>
@@ -266,18 +284,28 @@ function SaveDialog({
             size="lg"
             onClick={() => {
               setTouched(true)
-              if (error) return
-              store.saveReport({
-                reportId: def.id,
-                options,
-                name: name.trim(),
-                schedule,
-              })
-              toast.success(`Saved as “${name.trim()}”.`)
+              if (error || toError) return
+              if (existing) {
+                store.updateSavedReport(existing.id, {
+                  name: name.trim(),
+                  schedule,
+                  recipients,
+                })
+                toast.success("Saved.")
+              } else {
+                store.saveReport({
+                  reportId: def.id,
+                  options,
+                  name: name.trim(),
+                  schedule,
+                  recipients,
+                })
+                toast.success(`Saved as “${name.trim()}”.`)
+              }
               onClose()
             }}
           >
-            Save report
+            {existing ? "Save changes" : "Save report"}
           </Button>
         </>
       }
@@ -290,11 +318,7 @@ function SaveDialog({
             onChange={(e) => setName(e.target.value)}
           />
         </FormRow>
-        <FormRow
-          label="Repeat"
-          htmlFor="sv-sched"
-          hint="A scheduled report is listed as due, and Run downloads it. Delivery by email arrives with the real build."
-        >
+        <FormRow label="Repeat" htmlFor="sv-sched">
           <NativeSelect
             id="sv-sched"
             value={schedule}
@@ -306,6 +330,18 @@ function SaveDialog({
             <option value="weekly">Every week</option>
             <option value="monthly">Every month</option>
           </NativeSelect>
+        </FormRow>
+        <FormRow
+          label="Email to"
+          htmlFor="sv-to"
+          error={touched ? toError : null}
+          hint="One or more addresses, separated by commas. The file contains only what you can see."
+        >
+          <Input
+            id="sv-to"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+          />
         </FormRow>
       </div>
     </FormDialog>

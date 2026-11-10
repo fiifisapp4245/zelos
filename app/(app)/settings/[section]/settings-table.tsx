@@ -20,6 +20,14 @@ import {
 } from "@/components/ui/dialog"
 import { useStore } from "@/lib/store"
 import {
+  floorSentence,
+  homeCountry,
+  leaveRulesFor,
+  validateLeaveRow,
+  type LeaveTypeRow,
+} from "@/lib/leave/policy"
+import { TODAY_ISO } from "@/lib/format"
+import {
   TABLE_SPECS,
   type ColumnSpec,
   type TableRow,
@@ -48,7 +56,18 @@ export function SettingsTable({ tableId }: { tableId: string }) {
   return (
     <Panel
       title={spec.title}
-      description={spec.description}
+      description={
+        tableId === "leave-types"
+          ? `Entitlement is the statutory minimum or better. ${floorSentence(
+              leaveRulesFor(
+                store.countryRulePacks,
+                homeCountry(store.legalEntities),
+                TODAY_ISO
+              ),
+              homeCountry(store.legalEntities)
+            )}`
+          : spec.description
+      }
       bodyClassName="p-0"
       actions={
         canAdd && (
@@ -238,6 +257,20 @@ function RowDialog({
             : String(values[c.key] ?? "").trim(),
       ])
     )
+
+    if (spec.id === "leave-types") {
+      const country = homeCountry(store.legalEntities)
+      const problem = validateLeaveRow(
+        { ...(payload as LeaveTypeRow), id: row?.id },
+        (store.tables["leave-types"] ?? []) as unknown as LeaveTypeRow[],
+        leaveRulesFor(store.countryRulePacks, country, TODAY_ISO),
+        country
+      )
+      if (problem) {
+        toast.error(problem)
+        return
+      }
+    }
 
     const name = String(payload[spec.labelKey] ?? "Row")
     if (isNew) {

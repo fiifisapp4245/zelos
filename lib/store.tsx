@@ -156,6 +156,12 @@ import type {
   PortalData,
   PortalSection,
   PortalReview,
+  Announcement,
+  AnnouncementRead,
+  Asset,
+  Survey,
+  SurveyResponse,
+  SurveyParticipation,
 } from "./types"
 import { DEFAULT_ALERT_SETTINGS } from "./alerts"
 import { TODAY, TODAY_ISO, LIFECYCLE_TRANSITIONS } from "./format"
@@ -170,6 +176,12 @@ import {
   INVITATIONS,
   OFFER_TEMPLATES,
   OFFER_SIGNATURES,
+  ANNOUNCEMENTS,
+  ANNOUNCEMENT_READS,
+  ASSETS,
+  SURVEYS,
+  SURVEY_RESPONSES,
+  SURVEY_PARTICIPATION,
 } from "./data/hiring-extra"
 import {
   alreadyApplied,
@@ -191,6 +203,19 @@ import {
 } from "./portal"
 import { holidayDates, newToken } from "./booking/slots"
 import {
+  assign as assignAssetTo,
+  giveBack,
+  markLost,
+  retire as retireAsset,
+  exitItemsFor,
+} from "./assets"
+import { audienceMembers } from "./announcements"
+import { canRespond } from "./surveys"
+import { applyLeavePolicy, homeCountry, leaveRulesFor } from "./leave/policy"
+import { buildReportData } from "./report-data"
+import { dueReports, reportEmail } from "./report-schedule"
+import { REPORTS, runReport, toCsv } from "./reports"
+import {
   cancelledEmail,
   confirmationEmail,
   inviteEmail,
@@ -208,7 +233,6 @@ import {
   issuePaper,
 } from "./assess/logic"
 import {
-  STANDARD_ASSETS,
   caseStage,
   endStateFor,
   newCaseId as newOffboardingId,
@@ -282,6 +306,12 @@ interface State {
   offerTemplates: OfferTemplate[]
   offerSignatures: OfferSignature[]
   portals: PreHirePortal[]
+  announcements: Announcement[]
+  announcementReads: AnnouncementRead[]
+  assets: Asset[]
+  surveys: Survey[]
+  surveyResponses: SurveyResponse[]
+  surveyParticipation: SurveyParticipation[]
   company: CompanyProfile
   /** Editable settings tables, keyed by table id. */
   tables: Record<string, TableRow[]>
@@ -353,6 +383,12 @@ export const INITIAL: State = {
   offerTemplates: OFFER_TEMPLATES,
   offerSignatures: OFFER_SIGNATURES,
   portals: [],
+  announcements: ANNOUNCEMENTS,
+  announcementReads: ANNOUNCEMENT_READS,
+  assets: ASSETS,
+  surveys: SURVEYS,
+  surveyResponses: SURVEY_RESPONSES,
+  surveyParticipation: SURVEY_PARTICIPATION,
   company: COMPANY,
   tables: TABLE_ROWS,
   activeRole: "hr_admin",
@@ -368,7 +404,7 @@ export const ROLE_KEY = "zelos-hr-role"
  * this week's types is how you get a crash three screens away from the
  * change that caused it.
  */
-export const STORAGE_VERSION = 15
+export const STORAGE_VERSION = 16
 
 /**
  * Keeps only the restored slices that still look like the ones we seed.
@@ -715,9 +751,57 @@ interface StoreValue extends State {
     review: Partial<Record<PortalSection, PortalReview>>
   ) => { ok: true; approved: boolean } | { ok: false; reason: string }
   resendOffer: (id: string) => void
-  saveReport: (
-    r: Omit<SavedReport, "id" | "createdBy" | "createdOn" | "lastRunOn">
+
+  postAnnouncement: (
+    a: Pick<
+      Announcement,
+      "title" | "body" | "audience" | "pinned" | "requiresAck"
+    >
   ) => void
+  updateAnnouncement: (id: string, patch: Partial<Announcement>) => void
+  archiveAnnouncement: (id: string) => void
+  markAnnouncementRead: (id: string) => void
+  acknowledgeAnnouncement: (id: string) => void
+  /** Nudges everyone in the audience who has not yet done what it asks. */
+  remindAnnouncement: (id: string) => number
+
+  addAsset: (d: Pick<Asset, "tag" | "kind" | "name" | "serial">) => void
+  updateAsset: (
+    id: string,
+    patch: Partial<Pick<Asset, "tag" | "name" | "serial" | "kind">>
+  ) => void
+  assignAsset: (id: string, employeeId: string) => void
+  returnAsset: (id: string, condition: "good" | "repair") => void
+  /** A repaired asset goes back into stock. */
+  finishRepair: (id: string) => void
+  markAssetLost: (id: string, note: string) => void
+  retireAsset: (id: string, note: string) => void
+  /** Ticks an item off a leaver's checklist and moves the register entry with it. */
+  setExitAssetReturned: (
+    caseId: string,
+    index: number,
+    state: "returned" | "outstanding" | "lost"
+  ) => void
+
+  saveSurvey: (sv: Survey) => void
+  setSurveyStatus: (id: string, status: Survey["status"]) => void
+  deleteSurvey: (id: string) => void
+  submitSurvey: (
+    surveyId: string,
+    answers: Record<string, number | string>
+  ) => { ok: true } | { ok: false; reason: string }
+  remindSurvey: (id: string) => number
+
+  saveReport: (
+    r: Omit<
+      SavedReport,
+      "id" | "createdBy" | "createdOn" | "lastRunOn" | "createdRoles"
+    >
+  ) => void
+  /** Emails a saved report now, to its recipients. */
+  sendReportNow: (id: string) => number
+  /** Sends every scheduled report that has come due. */
+  runDueReports: () => number
   updateSavedReport: (id: string, patch: Partial<SavedReport>) => void
   deleteSavedReport: (id: string) => void
   toggleOnboardingTask: (id: string) => void
@@ -1247,6 +1331,62 @@ function nameOf(s: State, id: string) {
 const SIGN_DAYS = 7
 const signExpiry = () => `${addDays(TODAY_ISO, SIGN_DAYS)}T23:59:59.000Z`
 
+/**
+ * Emails saved reports to their recipients. Each one runs with the access of
+ * the person who saved it (so a manager's report never contains the company),
+ * and its last-run date moves so the same day's report is not sent twice.
+ */
+function processReports(
+  s: State,
+  ids: string[]
+): { state: State; sent: number } {
+  const company = s.company.tradingName || s.company.legalName
+  const mails: EmailMessage[] = []
+  const ran = new Set<string>()
+  for (const r of s.savedReports.filter((x) => ids.includes(x.id))) {
+    if (r.recipients.length === 0) continue
+    const viewer = { employeeId: r.createdBy, roles: r.createdRoles }
+    const result = runReport(
+      r.reportId,
+      buildReportData(viewer, s),
+      { viewer, today: TODAY_ISO },
+      r.options
+    )
+    const def = REPORTS.find((d) => d.id === r.reportId)
+    // Someone who has lost access to a report does not keep receiving it.
+    if (!result || !def) continue
+    const csv = toCsv(result, def.title, TODAY_ISO)
+    for (const to of r.recipients)
+      mails.push(
+        makeEmail({
+          ...reportEmail({
+            report: r,
+            title: def.title,
+            csv,
+            to,
+            today: TODAY_ISO,
+            company,
+            sendAt: nowIso(),
+            rows: result.rows.length,
+          }),
+          status: "sent",
+        })
+      )
+    ran.add(r.id)
+  }
+  if (ran.size === 0) return { state: s, sent: 0 }
+  return {
+    sent: mails.length,
+    state: {
+      ...s,
+      savedReports: s.savedReports.map((r) =>
+        ran.has(r.id) ? { ...r, lastRunOn: TODAY_ISO } : r
+      ),
+      outbox: [...mails, ...s.outbox],
+    },
+  }
+}
+
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<State>(INITIAL)
   const [hydrated, setHydrated] = React.useState(false)
@@ -1283,6 +1423,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
     setHydrated(true)
   }, [])
+
+  // A scheduler of sorts: when the app opens, anything that came due is sent.
+  // Nothing due means the same state comes back, so nothing is written.
+  React.useEffect(() => {
+    if (!hydrated) return
+    // A scheduler has to run after the data is read, which is an effect's job.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setState((s) => {
+      const due = dueReports(s.savedReports, TODAY_ISO).map((r) => r.id)
+      return due.length ? processReports(s, due).state : s
+    })
+  }, [hydrated])
 
   // Another tab changed the data: take it, but keep this tab's persona.
   React.useEffect(() => {
@@ -1388,6 +1540,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     return {
       ...state,
+      // What the law guarantees and what Settings grants, applied once here so
+      // every screen that shows a balance shows the same one.
+      leaveBalances: applyLeavePolicy(
+        state.leaveBalances,
+        (state.tables["leave-types"] ?? []) as never,
+        leaveRulesFor(
+          state.countryRulePacks,
+          homeCountry(state.legalEntities),
+          TODAY_ISO
+        )
+      ),
       ready: hydrated,
       viewer,
       session,
@@ -2850,7 +3013,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             lastWorkingDay: draft.lastWorkingDay,
             exitInterviewDone: false,
             clearance: {
-              assets: STANDARD_ASSETS.map((a) => ({ ...a })),
+              assets: exitItemsFor(s.assets, emp.id),
               access: false,
               finance: false,
               handover: false,
@@ -4010,6 +4173,560 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return { ok: true, approved }
       },
 
+      postAnnouncement: (a) => {
+        setState((s) => {
+          const at = nowIso()
+          const id = uid("an")
+          return {
+            ...s,
+            announcements: [
+              { ...a, id, postedBy: actorId, postedOn: at, archived: false },
+              ...s.announcements,
+            ],
+            notifications: [
+              {
+                id: uid("n"),
+                title: a.requiresAck
+                  ? `Please read and confirm: ${a.title}`
+                  : a.title,
+                body: `Announcement from ${nameOf(s, actorId)}`,
+                at,
+                read: false,
+                kind: "system" as const,
+                href: "/announcements",
+              },
+              ...s.notifications,
+            ],
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: null,
+                actorId,
+                action: "Posted an announcement",
+                field: a.title,
+                at,
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      updateAnnouncement: (id, patch) => {
+        setState((s) => ({
+          ...s,
+          announcements: s.announcements.map((x) =>
+            x.id === id ? { ...x, ...patch } : x
+          ),
+        }))
+      },
+
+      archiveAnnouncement: (id) => {
+        setState((s) => ({
+          ...s,
+          announcements: s.announcements.map((x) =>
+            x.id === id ? { ...x, archived: true, pinned: false } : x
+          ),
+          auditLog: [
+            {
+              id: uid("a"),
+              employeeId: null,
+              actorId,
+              action: "Archived an announcement",
+              field: id,
+              at: nowIso(),
+            },
+            ...s.auditLog,
+          ],
+        }))
+      },
+
+      markAnnouncementRead: (id) => {
+        setState((s) => {
+          if (
+            s.announcementReads.some(
+              (r) => r.announcementId === id && r.employeeId === actorId
+            )
+          )
+            return s
+          return {
+            ...s,
+            announcementReads: [
+              ...s.announcementReads,
+              {
+                announcementId: id,
+                employeeId: actorId,
+                readOn: TODAY_ISO,
+                acknowledgedOn: null,
+              },
+            ],
+          }
+        })
+      },
+
+      acknowledgeAnnouncement: (id) => {
+        setState((s) => {
+          const has = s.announcementReads.find(
+            (r) => r.announcementId === id && r.employeeId === actorId
+          )
+          if (has?.acknowledgedOn) return s
+          return {
+            ...s,
+            announcementReads: has
+              ? s.announcementReads.map((r) =>
+                  r === has ? { ...r, acknowledgedOn: TODAY_ISO } : r
+                )
+              : [
+                  ...s.announcementReads,
+                  {
+                    announcementId: id,
+                    employeeId: actorId,
+                    readOn: TODAY_ISO,
+                    acknowledgedOn: TODAY_ISO,
+                  },
+                ],
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: actorId,
+                actorId,
+                action: "Acknowledged a policy",
+                field: id,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      remindAnnouncement: (id) => {
+        const s0 = stateRef.current
+        const a = s0.announcements.find((x) => x.id === id)
+        if (!a) return 0
+        const mine = s0.announcementReads.filter((r) => r.announcementId === id)
+        const todo = audienceMembers(a, s0.employees).filter((e) => {
+          const r = mine.find((x) => x.employeeId === e.id)
+          return a.requiresAck ? !r?.acknowledgedOn : !r
+        })
+        if (todo.length === 0) return 0
+        const origin =
+          typeof window === "undefined" ? "" : window.location.origin
+        setState((s) => {
+          const at = nowIso()
+          return {
+            ...s,
+            outbox: [
+              ...todo.map((e) =>
+                makeEmail({
+                  kind: "other",
+                  to: e.email,
+                  toName: `${e.firstName} ${e.lastName}`,
+                  subject: `${a.requiresAck ? "Please read and confirm" : "Reminder"}: ${a.title}`,
+                  body: `Hello ${e.firstName},\n\n${a.requiresAck ? "This policy needs your confirmation that you have read and understood it." : "You have an announcement you have not opened yet."}`,
+                  cta: {
+                    label: "Open the announcement",
+                    href: `${origin}/announcements`,
+                  },
+                  sendAt: at,
+                  relatedId: id,
+                  status: "sent",
+                })
+              ),
+              ...s.outbox,
+            ],
+          }
+        })
+        return todo.length
+      },
+
+      addAsset: (d) => {
+        setState((s) => {
+          const at = TODAY_ISO
+          return {
+            ...s,
+            assets: [
+              {
+                id: uid("as"),
+                tag: d.tag.trim(),
+                kind: d.kind,
+                name: d.name.trim(),
+                serial: d.serial.trim(),
+                status: "in_stock" as const,
+                assignedTo: null,
+                assignedOn: null,
+                history: [{ at, text: "Added to stock." }],
+              },
+              ...s.assets,
+            ],
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: null,
+                actorId,
+                action: "Added a company asset",
+                field: d.tag,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      updateAsset: (id, patch) => {
+        setState((s) => ({
+          ...s,
+          assets: s.assets.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+        }))
+      },
+
+      assignAsset: (id, employeeId) => {
+        setState((s) => {
+          const a = s.assets.find((x) => x.id === id)
+          const e = s.employees.find((x) => x.id === employeeId)
+          if (!a || !e || a.status !== "in_stock") return s
+          return {
+            ...s,
+            assets: s.assets.map((x) =>
+              x.id === id
+                ? assignAssetTo(
+                    x,
+                    e.id,
+                    `${e.firstName} ${e.lastName}`,
+                    TODAY_ISO
+                  )
+                : x
+            ),
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: e.id,
+                actorId,
+                action: `Assigned ${a.tag} to ${e.firstName} ${e.lastName}`,
+                field: a.name,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      returnAsset: (id, condition) => {
+        setState((s) => {
+          const a = s.assets.find((x) => x.id === id)
+          const e = a?.assignedTo
+            ? s.employees.find((x) => x.id === a.assignedTo)
+            : undefined
+          if (!a || a.status !== "assigned") return s
+          return {
+            ...s,
+            assets: s.assets.map((x) =>
+              x.id === id
+                ? giveBack(
+                    x,
+                    e ? `${e.firstName} ${e.lastName}` : "the holder",
+                    TODAY_ISO,
+                    condition
+                  )
+                : x
+            ),
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: e?.id ?? null,
+                actorId,
+                action: `Took back ${a.tag}`,
+                field: condition,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      finishRepair: (id) => {
+        setState((s) => ({
+          ...s,
+          assets: s.assets.map((a) =>
+            a.id === id && a.status === "repair"
+              ? {
+                  ...a,
+                  status: "in_stock" as const,
+                  history: [
+                    ...a.history,
+                    { at: TODAY_ISO, text: "Repaired, back in stock." },
+                  ],
+                }
+              : a
+          ),
+        }))
+      },
+
+      markAssetLost: (id, note) => {
+        setState((s) => ({
+          ...s,
+          assets: s.assets.map((x) =>
+            x.id === id ? markLost(x, TODAY_ISO, note) : x
+          ),
+          auditLog: [
+            {
+              id: uid("a"),
+              employeeId: s.assets.find((x) => x.id === id)?.assignedTo ?? null,
+              actorId,
+              action: "Marked an asset lost",
+              field: id,
+              at: nowIso(),
+            },
+            ...s.auditLog,
+          ],
+        }))
+      },
+
+      retireAsset: (id, note) => {
+        setState((s) => ({
+          ...s,
+          assets: s.assets.map((x) =>
+            x.id === id ? retireAsset(x, TODAY_ISO, note) : x
+          ),
+        }))
+      },
+
+      setExitAssetReturned: (caseId, index, state) => {
+        setState((s) => {
+          const c = s.offboarding.find((x) => x.id === caseId)
+          const item = c?.clearance.assets[index]
+          if (!c || !item) return s
+          const e = s.employees.find((x) => x.id === c.employeeId)
+          const who = e ? `${e.firstName} ${e.lastName}` : "the leaver"
+          const was = item.lost
+            ? "lost"
+            : item.returned
+              ? "returned"
+              : "outstanding"
+          if (was === state) return s
+          const asset = item.assetId
+            ? s.assets.find((a) => a.id === item.assetId)
+            : undefined
+          let assets = s.assets
+          if (asset) {
+            // Whatever it was, bring it back to the leaver first, then apply the new state.
+            let next = asset
+            if (was === "returned" && next.status === "in_stock")
+              next = assignAssetTo(next, c.employeeId, who, TODAY_ISO)
+            else if (was === "lost" && next.status === "lost")
+              next = {
+                ...next,
+                status: "assigned",
+                assignedTo: c.employeeId,
+                assignedOn: TODAY_ISO,
+                history: [
+                  ...next.history,
+                  { at: TODAY_ISO, text: `Found, back with ${who}.` },
+                ],
+              }
+            if (state === "returned" && next.status === "assigned")
+              next = giveBack(next, who, TODAY_ISO)
+            if (state === "lost" && next.status === "assigned")
+              next = markLost(
+                next,
+                TODAY_ISO,
+                `Not returned by ${who} at exit.`
+              )
+            assets = s.assets.map((a) => (a.id === asset.id ? next : a))
+          }
+          const list = c.clearance.assets.map((a, i) =>
+            i === index
+              ? { ...a, returned: state === "returned", lost: state === "lost" }
+              : a
+          )
+          return {
+            ...s,
+            assets,
+            offboarding: s.offboarding.map((x) =>
+              x.id === caseId
+                ? {
+                    ...x,
+                    clearance: { ...x.clearance, assets: list },
+                    state: caseStage({
+                      ...x,
+                      clearance: { ...x.clearance, assets: list },
+                    }),
+                  }
+                : x
+            ),
+            auditLog: [
+              {
+                id: uid("a"),
+                employeeId: c.employeeId,
+                actorId,
+                action: `Marked ${item.item} ${state}`,
+                field: caseId,
+                at: nowIso(),
+              },
+              ...s.auditLog,
+            ],
+          }
+        })
+      },
+
+      saveSurvey: (sv) => {
+        setState((s) => ({
+          ...s,
+          surveys: s.surveys.some((x) => x.id === sv.id)
+            ? s.surveys.map((x) => (x.id === sv.id ? sv : x))
+            : [
+                { ...sv, createdBy: actorId, createdOn: TODAY_ISO },
+                ...s.surveys,
+              ],
+        }))
+      },
+
+      setSurveyStatus: (id, status) => {
+        setState((s) => {
+          const sv = s.surveys.find((x) => x.id === id)
+          if (!sv) return s
+          return {
+            ...s,
+            surveys: s.surveys.map((x) => (x.id === id ? { ...x, status } : x)),
+            notifications:
+              status === "open"
+                ? [
+                    {
+                      id: uid("n"),
+                      title: `New survey: ${sv.title}`,
+                      body: "Anonymous, and it takes a few minutes.",
+                      at: nowIso(),
+                      read: false,
+                      kind: "system" as const,
+                      href: "/surveys",
+                    },
+                    ...s.notifications,
+                  ]
+                : s.notifications,
+          }
+        })
+      },
+
+      deleteSurvey: (id) => {
+        setState((s) => {
+          const sv = s.surveys.find((x) => x.id === id)
+          // A survey that has answers is a record: it is closed, not erased.
+          if (!sv || s.surveyResponses.some((r) => r.surveyId === id)) return s
+          return { ...s, surveys: s.surveys.filter((x) => x.id !== id) }
+        })
+      },
+
+      submitSurvey: (surveyId, answers) => {
+        const s0 = stateRef.current
+        const sv = s0.surveys.find((x) => x.id === surveyId)
+        const e = s0.employees.find((x) => x.id === actorId)
+        if (!sv || !e) return { ok: false, reason: "Survey not found." }
+        const can = canRespond(sv, e, s0.surveyParticipation, TODAY_ISO)
+        if (can !== "yes")
+          return {
+            ok: false,
+            reason:
+              can === "done"
+                ? "You have already answered this survey."
+                : can === "closed"
+                  ? "This survey is closed."
+                  : "This survey is not for you.",
+          }
+        const clean: Record<string, number | string> = {}
+        for (const q of sv.questions) {
+          const v = answers[q.id]
+          if (q.kind === "enps") {
+            if (
+              typeof v !== "number" ||
+              !Number.isInteger(v) ||
+              v < 0 ||
+              v > 10
+            )
+              return {
+                ok: false,
+                reason: "Please answer every scored question.",
+              }
+            clean[q.id] = v
+          } else if (q.kind === "scale") {
+            if (typeof v !== "number" || !Number.isInteger(v) || v < 1 || v > 5)
+              return {
+                ok: false,
+                reason: "Please answer every scored question.",
+              }
+            clean[q.id] = v
+          } else if (typeof v === "string" && v.trim())
+            clean[q.id] = v.trim().slice(0, 500)
+        }
+        setState((s) => {
+          if (
+            s.surveyParticipation.some(
+              (p) => p.surveyId === surveyId && p.employeeId === actorId
+            )
+          )
+            return s
+          return {
+            ...s,
+            // The answer and the fact of answering are written apart, and the answer keeps no name.
+            // It is also slipped in at a random place: otherwise the order of answers would match
+            // the order of who answered, and the two lists could be lined up.
+            surveyResponses: (() => {
+              const list = [...s.surveyResponses]
+              list.splice(Math.floor(Math.random() * (list.length + 1)), 0, {
+                id: uid("sr"),
+                surveyId,
+                department: e.department,
+                answers: clean,
+                on: TODAY_ISO,
+              })
+              return list
+            })(),
+            surveyParticipation: [
+              ...s.surveyParticipation,
+              { surveyId, employeeId: actorId },
+            ],
+          }
+        })
+        return { ok: true }
+      },
+
+      remindSurvey: (id) => {
+        const s0 = stateRef.current
+        const sv = s0.surveys.find((x) => x.id === id)
+        if (!sv) return 0
+        const todo = audienceMembers(sv, s0.employees).filter(
+          (e) =>
+            !s0.surveyParticipation.some(
+              (p) => p.surveyId === id && p.employeeId === e.id
+            )
+        )
+        if (todo.length === 0) return 0
+        const origin =
+          typeof window === "undefined" ? "" : window.location.origin
+        setState((s) => ({
+          ...s,
+          outbox: [
+            ...todo.map((e) =>
+              makeEmail({
+                kind: "other",
+                to: e.email,
+                toName: `${e.firstName} ${e.lastName}`,
+                subject: `${sv.title}: a few minutes of your time`,
+                body: `Hello ${e.firstName},\n\nThe survey is open until ${sv.closesOn ?? "further notice"}. It is anonymous: your answers are not linked to your name.`,
+                cta: { label: "Take the survey", href: `${origin}/surveys` },
+                sendAt: nowIso(),
+                relatedId: id,
+                status: "sent",
+              })
+            ),
+            ...s.outbox,
+          ],
+        }))
+        return todo.length
+      },
+
       queueEmail: (m) => {
         setState((s) => ({ ...s, outbox: [makeEmail(m), ...s.outbox] }))
       },
@@ -4572,10 +5289,31 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               createdBy: actorId,
               createdOn: TODAY_ISO,
               lastRunOn: null,
+              createdRoles: viewer.roles,
             },
             ...s.savedReports,
           ],
         }))
+      },
+
+      sendReportNow: (id) => {
+        const r = processReports(stateRef.current, [id])
+        if (r.sent > 0) setState((s) => processReports(s, [id]).state)
+        return r.sent
+      },
+
+      runDueReports: () => {
+        const due = dueReports(stateRef.current.savedReports, TODAY_ISO).map(
+          (x) => x.id
+        )
+        if (due.length === 0) return 0
+        let sent = 0
+        setState((s) => {
+          const r = processReports(s, due)
+          sent = r.sent
+          return r.state
+        })
+        return sent
       },
 
       updateSavedReport: (id, patch) => {

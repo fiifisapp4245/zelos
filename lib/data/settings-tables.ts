@@ -229,6 +229,7 @@ export const TABLE_SPECS: Record<string, TableSpec> = {
     labelKey: "name",
     columns: [
       t("name", "Type", { required: true }),
+      sel("kind", "Counts as", ["Annual", "Sick", "Parental", "Other"]),
       t("entitlement", "Entitlement", { required: true }),
       tog("paid", "Paid"),
       sel("accrual", "Accrual", [
@@ -648,6 +649,7 @@ export const TABLE_ROWS: Record<string, TableRow[]> = {
   "leave-types": rows("lt", [
     {
       name: "Annual",
+      kind: "Annual",
       entitlement: "15–21 days by grade",
       paid: true,
       accrual: "Monthly",
@@ -656,6 +658,7 @@ export const TABLE_ROWS: Record<string, TableRow[]> = {
     },
     {
       name: "Sick",
+      kind: "Sick",
       entitlement: "12 days",
       paid: true,
       accrual: "Upfront",
@@ -664,6 +667,7 @@ export const TABLE_ROWS: Record<string, TableRow[]> = {
     },
     {
       name: "Maternity",
+      kind: "Parental",
       entitlement: "14 weeks",
       paid: true,
       accrual: "On event",
@@ -672,6 +676,7 @@ export const TABLE_ROWS: Record<string, TableRow[]> = {
     },
     {
       name: "Paternity",
+      kind: "Parental",
       entitlement: "5 days",
       paid: true,
       accrual: "On event",
@@ -680,6 +685,7 @@ export const TABLE_ROWS: Record<string, TableRow[]> = {
     },
     {
       name: "Compassionate",
+      kind: "Other",
       entitlement: "5 days",
       paid: true,
       accrual: "On event",
@@ -688,6 +694,7 @@ export const TABLE_ROWS: Record<string, TableRow[]> = {
     },
     {
       name: "Study",
+      kind: "Other",
       entitlement: "10 days",
       paid: true,
       accrual: "On approval",
@@ -696,6 +703,7 @@ export const TABLE_ROWS: Record<string, TableRow[]> = {
     },
     {
       name: "Unpaid",
+      kind: "Other",
       entitlement: "No limit",
       paid: false,
       accrual: "On approval",

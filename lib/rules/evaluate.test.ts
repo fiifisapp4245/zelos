@@ -205,7 +205,13 @@ describe("applying a rule", () => {
 
   it("prorates a joiner: 16 of 31 days on a 1,500 allowance", () => {
     const r = rule(
-      { template: "capped_percent", percent: 15, of: "basic_salary", max: 2_000, min: null },
+      {
+        template: "capped_percent",
+        percent: 15,
+        of: "basic_salary",
+        max: 2_000,
+        min: null,
+      },
       { prorate: true }
     )
     const result = apply(r, context, {

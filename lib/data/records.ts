@@ -790,8 +790,14 @@ export const REQUISITIONS: Requisition[] = [
     careers: {
       published: false,
       summary: "Support our Kumasi warehouse operations day to day.",
-      responsibilities: ["Receive, store and dispatch stock", "Keep stock records accurate"],
-      requirements: ["Warehouse or logistics experience", "Able to lift and work shifts"],
+      responsibilities: [
+        "Receive, store and dispatch stock",
+        "Keep stock records accurate",
+      ],
+      requirements: [
+        "Warehouse or logistics experience",
+        "Able to lift and work shifts",
+      ],
       questions: [],
       closesOn: null,
     },
@@ -1552,9 +1558,24 @@ export const OFFBOARDING: OffboardingCase[] = [
     exitInterviewDone: false,
     clearance: {
       assets: [
-        { item: "Laptop — Dell Latitude", tag: "ZEL-LT-0182", returned: true },
-        { item: "Access card", tag: "AC-4471", returned: true },
-        { item: "MTN SIM (work line)", returned: false },
+        {
+          item: "Laptop — Dell Latitude",
+          tag: "ZEL-LT-0182",
+          assetId: "as-1",
+          returned: true,
+        },
+        {
+          item: "Access card",
+          tag: "AC-4471",
+          assetId: "as-2",
+          returned: true,
+        },
+        {
+          item: "MTN SIM (work line)",
+          tag: "ZEL-SIM-0031",
+          assetId: "as-3",
+          returned: false,
+        },
       ],
       access: false,
       finance: false,
